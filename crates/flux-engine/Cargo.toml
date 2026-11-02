@@ -1,0 +1,11 @@
+[package]
+name = "flux-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Flux audio playback engine and graph orchestration"
+
+[dependencies]
+flux-dsp = { path = "../flux-dsp" }
+
+[dev-dependencies]

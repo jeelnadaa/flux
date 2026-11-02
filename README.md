@@ -2,11 +2,11 @@
 
 A professional audio editor that runs in your browser: non-destructive editing, real 3D and 8D spatial audio, creative effects, and on-device AI for stems, voice cleanup, and editing audio by editing text.
 
-> **Status: pre-alpha.** Planning and design only; the design is confirmed. No code exists yet, and nothing below can be used today. See [What works today](#what-works-today).
+> **Status: pre-alpha.** Foundations in progress. Monorepo skeleton and automated CI harness established. See [What works today](#what-works-today).
 
 ## What works today
 
-Nothing yet. This section lists only features that are implemented and tested.
+- **Monorepo & build harness (P0.1-a):** Cargo workspace with 5 core crates (`flux-dsp`, `flux-engine`, `flux-ml`, `flux-wasm`, `flux-testkit`), TypeScript packages (`@flux/ui`, `@flux/app-core`, `@flux/web`), cross-platform `just ci` gate verifying all targets including `wasm32-unknown-unknown`.
 
 ## What Flux will do
 
@@ -39,7 +39,11 @@ Rust DSP engine compiled to WebAssembly, React + TypeScript UI, ONNX Runtime for
 
 ## Running Flux
 
-Not available yet. Setup instructions will appear here when Phase 0 is complete.
+To run the local gate and automated checks:
+
+```bash
+just ci
+```
 
 ## Project documents
 

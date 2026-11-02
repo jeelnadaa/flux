@@ -1,0 +1,13 @@
+{
+  "name": "flux-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

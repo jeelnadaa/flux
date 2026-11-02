@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 0 — Foundations (not started)
-- **Next item:** P0.1-a
+- **Phase:** 0 — Foundations
+- **Next item:** P0.1-b
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -15,7 +15,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
-| 0 | Foundations | Not started | 0 / 13 |
+| 0 | Foundations | In progress | 1 / 13 |
 | 1 | Core engine & I/O | Not started | 0 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
@@ -57,6 +57,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P0.1-a initialized git repository, .gitignore, .gitattributes, monorepo workspace (5 Rust crates, 3 TS packages/apps, skeleton dirs), and justfile; just ci green (5 unit tests, WASM target build, TS typecheck).
+- 2026-11-03: Initial repository setup with specs and design prototype.
 - 2026-11-03: DESIGN.md and LICENSES.md written; prototype finished at 87 screens plus landing. Sweep: 0 overflows across 6 fonts x 3 widths x 87 screens (1,566 renders), Cassette theme only. Not committed: no git repo yet (P0 creates it).
 - 2026-11-03: Plan revised to revision 2; AGENTS.md, PROGRESS.md and README.md created. No code yet.
 
@@ -66,7 +68,7 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 0 — Foundations (PLAN.md Phase 0)
 
-- [ ] P0.1-a Initialize git, `.gitignore`, `.gitattributes`, monorepo skeleton, `just ci`
+- [x] P0.1-a Initialize git, `.gitignore`, `.gitattributes`, monorepo skeleton, `just ci`
 - [ ] P0.1-b Lint, format and typo tooling for Rust and TypeScript
 - [ ] P0.1-c License scan (`cargo-deny`, JS checker), `LICENSES.md`, licence audit
 - [ ] P0.1-d ADRs for D1–D11, `docs/QUALITY_TARGETS.md`, privacy data-flow diagram

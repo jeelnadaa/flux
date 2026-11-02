@@ -1,0 +1,65 @@
+# Build outputs
+target/
+dist/
+build/
+coverage/
+.vite/
+.next/
+
+# Node / JS
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# Rust
+**/*.rs.bk
+*.profraw
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+.claude/
+
+# Audio fixtures, models, and datasets (see PLAN.md §0.2)
+*.onnx
+*.bin
+*.safetensors
+*.weights
+models/
+datasets/
+corpus/
+*.wav
+*.mp3
+*.flac
+*.aiff
+*.ogg
+*.opus
+*.m4a
+!tests/fixtures/**
+!tests/golden/**
+
+# Logs & temp
+*.log
+tmp/
+temp/
