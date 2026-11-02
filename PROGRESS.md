@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 0 — Foundations
-- **Next item:** P0.2-a
+- **Next item:** P0.2-b
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -15,7 +15,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
-| 0 | Foundations | In progress | 4 / 13 |
+| 0 | Foundations | In progress | 5 / 13 |
 | 1 | Core engine & I/O | Not started | 0 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P0.2-a completed flux-testkit signal generators, analyzers (RMS, peak, 4x True Peak, FFT, IEEE 1057 THD+N, group delay, BS.1770 LUFS), and comparison helpers (SNR, spectral distance, null residual); just ci green (13 unit tests passed).
 - 2026-11-03: P0.1-d written ADRs 0001-0011 (D1-D11), docs/QUALITY_TARGETS.md, and docs/PRIVACY_DATA_FLOW.md; just ci green.
 - 2026-11-03: P0.1-c configured license scanners (cargo-deny, license-checker-rseidelsohn) in deny.toml and just ci; completed LICENSES.md audit; just ci green (licenses ok, 0 violations).
 - 2026-11-03: P0.1-b configured lint, format, and typo tooling (rustfmt, clippy, eslint, prettier, typos); just ci green (fmt, clippy -D warnings, eslint, typos, 5 unit tests, WASM build, TS typecheck).
@@ -75,7 +76,7 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P0.1-b Lint, format and typo tooling for Rust and TypeScript
 - [x] P0.1-c License scan (`cargo-deny`, JS checker), `LICENSES.md`, licence audit
 - [x] P0.1-d ADRs for D1–D11, `docs/QUALITY_TARGETS.md`, privacy data-flow diagram
-- [ ] P0.2-a `flux-testkit`: signal generators and analyzers, with self-tests
+- [x] P0.2-a `flux-testkit`: signal generators and analyzers, with self-tests
 - [ ] P0.2-b Universal DSP invariant harness (§5.2)
 - [ ] P0.2-c Corpus manifest and integrity test; synthetic corpus generated
 - [ ] P0.2-d `tools/eval` Python metric harness
