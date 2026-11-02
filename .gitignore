@@ -48,7 +48,10 @@ Thumbs.db
 *.weights
 models/
 datasets/
-corpus/
+corpus/*
+!corpus/corpus.yaml
+!corpus/synthetic/
+!corpus/synthetic/**
 *.wav
 *.mp3
 *.flac
@@ -58,6 +61,7 @@ corpus/
 *.m4a
 !tests/fixtures/**
 !tests/golden/**
+!corpus/synthetic/**
 
 # Logs & temp
 *.log

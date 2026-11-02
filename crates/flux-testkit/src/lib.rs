@@ -3,10 +3,19 @@
 
 pub mod analyzers;
 pub mod compare;
+pub mod corpus;
 pub mod generators;
 pub mod invariants;
+pub mod sha256;
+pub mod wav;
 
+pub use corpus::{
+    generate_synthetic_corpus, parse_manifest_yaml, serialize_manifest_yaml,
+    verify_corpus_integrity, CorpusEntry, CorpusManifest, IntegrityReport,
+};
 pub use invariants::{run_dsp_invariants, InvariantConfig, InvariantSuiteResult};
+pub use sha256::sha256_digest;
+pub use wav::{decode_wav, encode_wav, read_wav_file, write_wav_file, WavData, WavFormat};
 
 #[cfg(test)]
 mod tests {
@@ -218,5 +227,85 @@ mod tests {
 
         let spec_dist = spectral_distance(&sig_a, &degraded, 48000.0);
         assert!(spec_dist < 5.0, "Spectral distance was {}", spec_dist);
+    }
+
+    #[test]
+    fn test_corpus_manifest_integrity() {
+        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("Failed to locate repo root");
+
+        let manifest_path = repo_root.join("corpus").join("corpus.yaml");
+        assert!(
+            manifest_path.exists(),
+            "corpus.yaml must exist at {}",
+            manifest_path.display()
+        );
+
+        let yaml_text =
+            std::fs::read_to_string(&manifest_path).expect("Failed to read corpus.yaml");
+        let manifest =
+            crate::corpus::parse_manifest_yaml(&yaml_text).expect("Failed to parse corpus.yaml");
+
+        assert_eq!(manifest.version, 1);
+        assert!(
+            !manifest.entries.is_empty(),
+            "Manifest entries must not be empty"
+        );
+
+        let report = crate::corpus::verify_corpus_integrity(&manifest, repo_root);
+        assert!(
+            report.failures.is_empty(),
+            "Corpus integrity failures: {:?}",
+            report.failures
+        );
+        assert!(report.is_valid(), "Corpus report invalid: {:?}", report);
+        assert_eq!(
+            report.synthetic_entries, 15,
+            "Expected 15 synthetic entries, found {}",
+            report.synthetic_entries
+        );
+        assert_eq!(
+            report.files_verified, 15,
+            "Expected 15 verified fixtures on disk, verified {}",
+            report.files_verified
+        );
+    }
+
+    #[test]
+    fn test_manifest_yaml_parse_and_serialize() {
+        let sample_yaml = r#"
+version: 1
+description: "Test manifest"
+
+corpus:
+  - id: syn_test_sine
+    path: corpus/synthetic/test_sine.wav
+    source: synthetic:test
+    licence: CC0-1.0
+    sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    duration: 1.000
+    sample_rate: 48000
+    channels: 1
+    synthetic: true
+    tags:
+      - test
+      - sine
+    expected_test_uses:
+      - dsp-unit
+"#;
+
+        let parsed = crate::corpus::parse_manifest_yaml(sample_yaml).expect("Failed to parse");
+        assert_eq!(parsed.entries.len(), 1);
+        assert_eq!(parsed.entries[0].id, "syn_test_sine");
+        assert_eq!(parsed.entries[0].channels, 1);
+        assert_eq!(parsed.entries[0].sample_rate, 48000);
+        assert!(parsed.entries[0].synthetic);
+
+        let serialized = crate::corpus::serialize_manifest_yaml(&parsed);
+        let parsed_again =
+            crate::corpus::parse_manifest_yaml(&serialized).expect("Failed to re-parse");
+        assert_eq!(parsed, parsed_again);
     }
 }
