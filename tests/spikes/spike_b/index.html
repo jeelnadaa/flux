@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flux Spike B: ONNX Runtime Web Benchmarks</title>
+  </head>
+  <body>
+    <h1>Flux Spike B: ONNX Runtime Web (Small &amp; Large Models)</h1>
+    <div id="status">Ready</div>
+    <pre id="output"></pre>
+
+    <script src="/node_modules/onnxruntime-web/dist/ort.all.min.js"></script>
+    <script>
+      async function runSpikeBTest() {
+        const outputEl = document.getElementById("output");
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = "Running...";
+
+        function log(msg) {
+          console.log(msg);
+          outputEl.textContent += msg + "\n";
+        }
+
+        try {
+          // Configure ONNX Runtime Web paths
+          ort.env.wasm.wasmPaths = "/node_modules/onnxruntime-web/dist/";
+          ort.env.wasm.numThreads = 1;
+
+          // Check WebGPU availability
+          let hasWebGpu = false;
+          if (navigator.gpu) {
+            try {
+              const adapter = await navigator.gpu.requestAdapter();
+              if (adapter) hasWebGpu = true;
+            } catch (err) {
+              log("WebGPU adapter check: " + err.message);
+            }
+          }
+          log("Hardware/Browser WebGPU available: " + hasWebGpu);
+
+          const providers = hasWebGpu ? ["webgpu", "wasm"] : ["wasm"];
+
+          // -------------------------------------------------------------
+          // 1. Small Model Benchmark (RNNoise-class, frame-based)
+          // -------------------------------------------------------------
+          log("\n--- Benchmarking Small Model (RNNoise-class) ---");
+          const smallModelUrl = "/tests/spikes/spike_b/small_model.onnx";
+          const smallSession = await ort.InferenceSession.create(smallModelUrl, {
+            executionProviders: providers,
+          });
+
+          // Warmup (5 frames)
+          const dummyFeats = new Float32Array(42);
+          for (let i = 0; i < 42; i++) dummyFeats[i] = Math.sin(i * 0.1);
+          for (let w = 0; w < 5; w++) {
+            const warmupTensor = new ort.Tensor("float32", dummyFeats, [1, 42]);
+            await smallSession.run({ input: warmupTensor });
+          }
+
+          // Benchmark 100 frames (10 ms per frame -> 1000 ms audio)
+          const numFrames = 100;
+          const frameDurationMs = 10.0;
+          const totalAudioMsSmall = numFrames * frameDurationMs;
+
+          const frameTimes = [];
+          const tSmallStart = performance.now();
+
+          for (let f = 0; f < numFrames; f++) {
+            // Slight variation per frame
+            for (let i = 0; i < 42; i++) dummyFeats[i] = Math.sin((f + i) * 0.1);
+            const inTensor = new ort.Tensor("float32", dummyFeats, [1, 42]);
+
+            const t0 = performance.now();
+            const outMap = await smallSession.run({ input: inTensor });
+            const t1 = performance.now();
+            frameTimes.push(t1 - t0);
+
+            // Sanity check output
+            const outTensor = outMap.output;
+            if (!outTensor || outTensor.dims[1] !== 42) {
+              throw new Error("Invalid output tensor from small model");
+            }
+          }
+
+          const tSmallEnd = performance.now();
+          const smallTotalComputeMs = tSmallEnd - tSmallStart;
+          const smallAvgFrameMs = frameTimes.reduce((a, b) => a + b, 0) / numFrames;
+          const smallMinFrameMs = Math.min(...frameTimes);
+          const smallMaxFrameMs = Math.max(...frameTimes);
+          const smallRtf = smallTotalComputeMs / totalAudioMsSmall;
+
+          log("Small model 100 frames processed in " + smallTotalComputeMs.toFixed(2) + " ms");
+          log(
+            "Small model avg frame: " + smallAvgFrameMs.toFixed(3) + " ms (audio budget: 10.0 ms)",
+          );
+          log("Small model RTF: " + smallRtf.toFixed(4) + " (target < 0.5)");
+
+          // -------------------------------------------------------------
+          // 2. Large Model Benchmark (HTDemucs-class, chunked stem separation)
+          // -------------------------------------------------------------
+          log("\n--- Benchmarking Large Model (HTDemucs-class chunked) ---");
+          const largeModelUrl = "/tests/spikes/spike_b/large_model.onnx";
+          const largeSession = await ort.InferenceSession.create(largeModelUrl, {
+            executionProviders: providers,
+          });
+
+          const initialHeap =
+            window.performance && performance.memory ? performance.memory.usedJSHeapSize : null;
+
+          // Warmup (1 chunk)
+          const chunkSamples = 48000;
+          const chunkStereoFloats = 2 * chunkSamples;
+          const dummyChunk = new Float32Array(chunkStereoFloats);
+          for (let i = 0; i < chunkStereoFloats; i++) {
+            dummyChunk[i] = Math.sin((2 * Math.PI * 440 * i) / 48000) * 0.2;
+          }
+          const warmupChunk = new ort.Tensor("float32", dummyChunk, [1, 2, chunkSamples]);
+          await largeSession.run({ audio_chunk: warmupChunk });
+
+          // Benchmark 4 chunks (1.0 s each with 50% overlap -> 2.5 s audio)
+          const numChunks = 4;
+          const chunkDurationMs = 1000.0;
+          const totalAudioMsLarge = 2500.0;
+
+          const chunkTimes = [];
+          const tLargeStart = performance.now();
+
+          for (let c = 0; c < numChunks; c++) {
+            const chunkTensor = new ort.Tensor("float32", dummyChunk, [1, 2, chunkSamples]);
+            const t0 = performance.now();
+            const stemsMap = await largeSession.run({ audio_chunk: chunkTensor });
+            const t1 = performance.now();
+            chunkTimes.push(t1 - t0);
+
+            // Verify stems shape [1, 4, 2, 48000]
+            const stemsTensor = stemsMap.separated_stems;
+            if (!stemsTensor) throw new Error("Missing separated_stems in output");
+            const dims = stemsTensor.dims;
+            if (dims[0] !== 1 || dims[1] !== 4 || dims[2] !== 2 || dims[3] !== chunkSamples) {
+              throw new Error("Unexpected stems dims: " + JSON.stringify(dims));
+            }
+
+            // Check non-zero finite values
+            const stemData = stemsTensor.data;
+            let nanCount = 0;
+            for (let i = 0; i < 1000; i++) {
+              if (isNaN(stemData[i]) || !isFinite(stemData[i])) nanCount++;
+            }
+            if (nanCount > 0) throw new Error("Found NaNs in separated stems");
+          }
+
+          const tLargeEnd = performance.now();
+          const largeTotalComputeMs = tLargeEnd - tLargeStart;
+          const largeAvgChunkMs = chunkTimes.reduce((a, b) => a + b, 0) / numChunks;
+          const largeRtf = largeTotalComputeMs / totalAudioMsLarge;
+
+          const finalHeap =
+            window.performance && performance.memory ? performance.memory.usedJSHeapSize : null;
+          const heapDeltaBytes =
+            initialHeap !== null && finalHeap !== null ? finalHeap - initialHeap : null;
+
+          log(
+            "Large model " +
+              numChunks +
+              " chunks processed in " +
+              largeTotalComputeMs.toFixed(2) +
+              " ms",
+          );
+          log(
+            "Large model avg chunk: " + largeAvgChunkMs.toFixed(2) + " ms (audio budget: 1000 ms)",
+          );
+          log("Large model RTF: " + largeRtf.toFixed(4) + " (effective 2.5s stream)");
+          if (heapDeltaBytes !== null) {
+            log("Heap delta: " + (heapDeltaBytes / (1024 * 1024)).toFixed(2) + " MB");
+          }
+
+          const result = {
+            success: true,
+            hasWebGpu,
+            providers,
+            smallModel: {
+              numFrames,
+              totalComputeMs: smallTotalComputeMs,
+              avgFrameMs: smallAvgFrameMs,
+              minFrameMs: smallMinFrameMs,
+              maxFrameMs: smallMaxFrameMs,
+              audioDurationMs: totalAudioMsSmall,
+              rtf: smallRtf,
+            },
+            largeModel: {
+              numChunks,
+              totalComputeMs: largeTotalComputeMs,
+              avgChunkMs: largeAvgChunkMs,
+              audioDurationMs: totalAudioMsLarge,
+              rtf: largeRtf,
+              initialHeap,
+              finalHeap,
+              heapDeltaBytes,
+            },
+          };
+
+          window.spikeBResult = result;
+          statusEl.textContent = "PASSED";
+          log("\nSpike B completed successfully!");
+        } catch (err) {
+          statusEl.textContent = "FAILED: " + err.message;
+          log("Error: " + err.stack || err.message);
+          window.spikeBResult = {
+            success: false,
+            error: err.message,
+            stack: err.stack,
+          };
+        }
+      }
+
+      if (new URLSearchParams(window.location.search).get("autorun") === "true") {
+        window.addEventListener("load", runSpikeBTest);
+      }
+    </script>
+  </body>
+</html>

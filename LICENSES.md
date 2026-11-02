@@ -63,6 +63,7 @@ Scanned and verified by `license-checker-rseidelsohn`.
 | `eslint` / `typescript-eslint` | Code quality & static analysis | MIT / Apache-2.0 | Allowed | Development gate |
 | `prettier` | Code formatting | MIT | Allowed | Development gate |
 | `license-checker-rseidelsohn` | License compliance auditing | MIT | Allowed | Development gate |
+| `onnxruntime-web` | In-browser ML inference runtime (WebGPU / WASM) | MIT | Allowed | Microsoft Corporation |
 | `GSAP` *(Landing prototype)* | Kinetic animations & scroll scenes | GreenSock standard licence | **Review Queued** | Terms review queued before production release |
 | `Lenis` *(Landing prototype)* | Smooth scrolling | MIT | Allowed | Studio Freight |
 

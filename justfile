@@ -45,9 +45,9 @@ test-rust:
 test-python:
     python -m pytest tools/eval/tests
 
-# Run headless browser AudioWorklet + WASM smoke tests
+# Run headless browser smoke tests (Spike A AudioWorklet + WASM, Spike B ONNX Runtime Web)
 test-browser:
-    python -m pytest tests/spikes/spike_a/test_spike_a.py
+    python -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py
 
 # Run full Python evaluation benchmark suite and update dashboards
 eval:

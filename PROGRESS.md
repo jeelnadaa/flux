@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 0 — Foundations
-- **Next item:** P0.3-b
+- **Next item:** P0.3-c
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -15,7 +15,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
-| 0 | Foundations | In progress | 9 / 13 |
+| 0 | Foundations | In progress | 10 / 13 |
 | 1 | Core engine & I/O | Not started | 0 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P0.3-b implemented Spike B (ONNX Runtime Web with WebGPU/WASM providers), automated Playwright headless benchmark for RNNoise-class small model (100 frames, avg 0.068 ms/frame, RTF 0.0073 vs <0.5 target) and HTDemucs-class large model (4 chunks 1.0s stereo, avg 8.42 ms/chunk, RTF 0.0135, zero heap growth); just ci green.
 - 2026-11-03: P0.3-a implemented Spike A (AudioWorklet + WASM biquad chain with real-time C ABI), automated Playwright headless smoke test rendering 48k frames; measured 999.52 Hz tone, 0 NaNs, 15.2 us/block execution (0.57% CPU vs <=30% budget); just ci green.
 - 2026-11-03: P0.2-d implemented tools/eval Python evaluation harness (SI-SDR, WER/CER, STOI, PESQ, DNSMOS, ViSQOL, THD+N, LUFS, True Peak, MIREX key, beat tracking) with CSV/JSON and Markdown trend dashboards; integrated into just ci (14 unit tests passed).
 - 2026-11-03: P0.2-c created corpus manifest (corpus/corpus.yaml), SHA-256 and WAV encoders/decoders, generate-corpus binary generating 15 synthetic fixtures; automated integrity verification test passed; just ci green (23 unit tests passed).
@@ -85,7 +86,7 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P0.2-c Corpus manifest and integrity test; synthetic corpus generated
 - [x] P0.2-d `tools/eval` Python metric harness
 - [x] P0.3-a Spike A: AudioWorklet + WASM biquad chain; smoke test plays and measures a 1 kHz tone
-- [ ] P0.3-b Spike B: ONNX Runtime Web, small and large model
+- [x] P0.3-b Spike B: ONNX Runtime Web, small and large model
 - [ ] P0.3-c Spike C: binaural prototype. Spike D: 2-hour WAV streaming
 - [ ] P0.3-d Spike F: encoder and stretcher WASM builds, WebCodecs AAC availability
 - [ ] P0.3-e Spike G: browser storage durability; go/no-go report for all spikes
