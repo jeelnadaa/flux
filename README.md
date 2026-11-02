@@ -9,6 +9,7 @@ A professional audio editor that runs in your browser: non-destructive editing, 
 - **Monorepo & build harness (P0.1-a):** Cargo workspace with 5 core crates (`flux-dsp`, `flux-engine`, `flux-ml`, `flux-wasm`, `flux-testkit`), TypeScript packages (`@flux/ui`, `@flux/app-core`, `@flux/web`), cross-platform `just ci` gate verifying all targets including `wasm32-unknown-unknown`.
 - **Linting, formatting & typo validation (P0.1-b):** Configured `rustfmt`, `clippy -D warnings`, `eslint`, `prettier`, and `typos` across Rust and TypeScript codebase, integrated into `just ci`.
 - **License compliance & audit (P0.1-c):** Automated license scanners (`cargo-deny` and `license-checker-rseidelsohn`) running in `just ci` with zero disallowed licenses; comprehensive legal audit recorded in `LICENSES.md`.
+- **Architecture, Quality Targets & Privacy Standards (P0.1-d):** Formalized ADRs 0001–0011 in `docs/adr/`, living numerical quality targets in `docs/QUALITY_TARGETS.md`, and ephemeral cloud privacy data-flow specification in `docs/PRIVACY_DATA_FLOW.md`.
 
 ## What Flux will do
 
