@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 0 — Foundations
-- **Next item:** P0.2-d
+- **Next item:** P0.3-a
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -15,7 +15,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
-| 0 | Foundations | In progress | 7 / 13 |
+| 0 | Foundations | In progress | 8 / 13 |
 | 1 | Core engine & I/O | Not started | 0 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P0.2-d implemented tools/eval Python evaluation harness (SI-SDR, WER/CER, STOI, PESQ, DNSMOS, ViSQOL, THD+N, LUFS, True Peak, MIREX key, beat tracking) with CSV/JSON and Markdown trend dashboards; integrated into just ci (14 unit tests passed).
 - 2026-11-03: P0.2-c created corpus manifest (corpus/corpus.yaml), SHA-256 and WAV encoders/decoders, generate-corpus binary generating 15 synthetic fixtures; automated integrity verification test passed; just ci green (23 unit tests passed).
 - 2026-11-03: P0.2-b implemented universal DSP invariant harness in flux-testkit verifying all 13 PLAN.md §5.2 invariants; defined DspNode trait in flux-dsp with PassthroughNode and GainNode; just ci green (16 unit tests passed).
 - 2026-11-03: P0.2-a completed flux-testkit signal generators, analyzers (RMS, peak, 4x True Peak, FFT, IEEE 1057 THD+N, group delay, BS.1770 LUFS), and comparison helpers (SNR, spectral distance, null residual); just ci green (13 unit tests passed).
@@ -81,7 +82,7 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P0.2-a `flux-testkit`: signal generators and analyzers, with self-tests
 - [x] P0.2-b Universal DSP invariant harness (§5.2)
 - [x] P0.2-c Corpus manifest and integrity test; synthetic corpus generated
-- [ ] P0.2-d `tools/eval` Python metric harness
+- [x] P0.2-d `tools/eval` Python metric harness
 - [ ] P0.3-a Spike A: AudioWorklet + WASM biquad chain; smoke test plays and measures a 1 kHz tone
 - [ ] P0.3-b Spike B: ONNX Runtime Web, small and large model
 - [ ] P0.3-c Spike C: binaural prototype. Spike D: 2-hour WAV streaming

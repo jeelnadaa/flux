@@ -6,8 +6,8 @@ npm_cmd := if os() == "windows" { "npm.cmd" } else { "npm" }
 default:
     @just --list
 
-# The local CI gate: format, lint, typos, licenses, unit, property, golden, null, integration, E2E, WASM build
-ci: fmt-check lint typos license-scan check-rust test-rust build-wasm check-ts
+# The local CI gate: format, lint, typos, licenses, unit, property, golden, null, integration, E2E, WASM build, Python eval
+ci: fmt-check lint typos license-scan check-rust test-rust test-python build-wasm check-ts
 
 # Format check across Rust and TypeScript
 fmt-check:
@@ -40,6 +40,14 @@ check-rust:
 # Run all Rust tests
 test-rust:
     cargo test --workspace
+
+# Run Python evaluation harness unit tests
+test-python:
+    python -m pytest tools/eval/tests
+
+# Run full Python evaluation benchmark suite and update dashboards
+eval:
+    python tools/eval/run_eval.py
 
 # Build WebAssembly crate
 build-wasm:

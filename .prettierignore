@@ -6,3 +6,4 @@ design/
 Cargo.lock
 package-lock.json
 *.md
+tools/eval/reports/
