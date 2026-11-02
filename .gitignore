@@ -52,12 +52,17 @@ corpus/*
 !corpus/corpus.yaml
 !corpus/synthetic/
 !corpus/synthetic/**
+!tests/fixtures/
+!tests/fixtures/**
 *.wav
 *.mp3
 *.flac
 *.aiff
 *.ogg
 *.opus
+
+# Test artifacts
+*.proptest-regressions
 *.m4a
 !tests/fixtures/**
 !tests/golden/**

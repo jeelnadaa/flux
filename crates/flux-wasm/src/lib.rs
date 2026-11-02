@@ -409,6 +409,47 @@ pub unsafe extern "C" fn codec_free_buffer(ptr: *mut u8, len: usize) {
     }
 }
 
+/// Decodes in-memory WAV or AIFF audio bytes into interleaved 32-bit floats.
+///
+/// # Safety
+/// `bytes_ptr` must point to `bytes_len` bytes. Out pointers must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn codec_decode_audio(
+    bytes_ptr: *const u8,
+    bytes_len: usize,
+    out_channels: *mut usize,
+    out_frames: *mut usize,
+    out_sample_rate: *mut u32,
+    out_samples_len: *mut usize,
+) -> *mut f32 {
+    let bytes = std::slice::from_raw_parts(bytes_ptr, bytes_len);
+    match flux_engine::decoder::decode_buffer(bytes) {
+        Ok(buf) => {
+            *out_channels = buf.num_channels();
+            *out_frames = buf.num_frames();
+            *out_sample_rate = buf.sample_rate;
+            let mut interleaved = buf.to_interleaved();
+            interleaved.shrink_to_fit();
+            *out_samples_len = interleaved.len();
+            let ptr = interleaved.as_mut_ptr();
+            std::mem::forget(interleaved);
+            ptr
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Frees an interleaved float buffer allocated by `codec_decode_audio`.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by `codec_decode_audio` with length `len`.
+#[no_mangle]
+pub unsafe extern "C" fn codec_free_audio_buffer(ptr: *mut f32, len: usize) {
+    if !ptr.is_null() && len > 0 {
+        drop(Vec::from_raw_parts(ptr, len, len));
+    }
+}
+
 /// Resets the biquad chain filter state.
 ///
 /// # Safety
@@ -539,6 +580,43 @@ mod tests {
             assert!(!vorbis_ptr.is_null());
             assert!(out_len > 100);
             codec_free_buffer(vorbis_ptr, out_len);
+
+            // WAV Decode via C ABI
+            let ch0 = vec![0.5f32; 100];
+            let ch1 = vec![-0.5f32; 100];
+            let wav_bytes = flux_engine::decoder::WavWriter::encode(
+                &[&ch0, &ch1],
+                48000,
+                flux_engine::decoder::WavEncoding::Float32,
+                None,
+                false,
+            )
+            .unwrap();
+
+            let mut out_channels = 0usize;
+            let mut out_frames = 0usize;
+            let mut out_sr = 0u32;
+            let mut out_samples_len = 0usize;
+
+            let audio_ptr = codec_decode_audio(
+                wav_bytes.as_ptr(),
+                wav_bytes.len(),
+                &mut out_channels,
+                &mut out_frames,
+                &mut out_sr,
+                &mut out_samples_len,
+            );
+            assert!(!audio_ptr.is_null());
+            assert_eq!(out_channels, 2);
+            assert_eq!(out_frames, 100);
+            assert_eq!(out_sr, 48000);
+            assert_eq!(out_samples_len, 200);
+
+            // Interleaved samples should alternate ch0 and ch1
+            assert_eq!(*audio_ptr, 0.5);
+            assert_eq!(*audio_ptr.add(1), -0.5);
+
+            codec_free_audio_buffer(audio_ptr, out_samples_len);
         }
     }
 }

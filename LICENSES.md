@@ -45,6 +45,7 @@ Scanned and verified by `cargo-deny`.
 | `flux-ml` | Machine learning runtime glue | MIT OR Apache-2.0 | First-party | Model management and chunked inference |
 | `flux-wasm` | WebAssembly bindings | MIT OR Apache-2.0 | First-party | Web target exports |
 | `flux-testkit` | Signal generators & DSP test harness | MIT OR Apache-2.0 | First-party | Verification fixtures and invariants |
+| `proptest` | Property-based testing framework | MIT OR Apache-2.0 | Allowed | Development and test runner |
 | `wasm-bindgen` | WASM interop | MIT OR Apache-2.0 | Allowed | Standard WebAssembly binding toolchain |
 | `symphonia` *(Planned P1)* | Multi-format audio decoder | MPL-2.0 / MIT / Apache-2.0 | Allowed | Permissive audio decoding |
 | `signalsmith-stretch` *(Planned P3)* | Pitch-shift and time-stretch | MIT | Allowed | Avoids GPL-restricted Rubber Band |

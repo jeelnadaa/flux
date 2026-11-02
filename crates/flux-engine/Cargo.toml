@@ -9,3 +9,7 @@ description = "Flux audio playback engine and graph orchestration"
 flux-dsp = { path = "../flux-dsp" }
 
 [dev-dependencies]
+flux-testkit = { path = "../flux-testkit" }
+proptest = "1.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
