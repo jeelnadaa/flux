@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Flux Audio Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="fonts.css">
+<link rel="preload" href="fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* Layout concept: one continuous piece of sound. The ground color itself is in flux, shifting chapter by chapter while the waveform passes through. */
+:root{
+  --cobalt:#1621E0; --ink:#090A12; --bone:#ECE9DE; --ember:#FF5A1C; --plum:#25103D; --paper:#F6F4EC;
+  --ground:var(--cobalt); --figure:var(--paper);
+  --gl:max(clamp(16px,4vw,64px),env(safe-area-inset-left,0px)); --gr:max(clamp(16px,4vw,64px),env(safe-area-inset-right,0px));
+  --spring:linear(0,.009,.035 2.1%,.141,.281 6.7%,.723 12.9%,.938 16.7%,1.017,1.077,1.121,1.149 24.3%,1.159,1.163,1.161,1.154 29.9%,1.129 32.8%,1.051 39.6%,1.017 43.1%,.991,.977 51%,.974 53.8%,.975 57.1%,.997 69.8%,1.003 76.9%,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--cobalt)}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+body{margin:0;background:var(--ground);color:var(--figure);font-family:var(--sans);font-size:18px;line-height:1.45;font-weight:500;-webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:inherit}
+canvas{display:block}
+.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:.02em;font-weight:400;font-variant-numeric:tabular-nums}
+.wrap{padding-left:var(--gl);padding-right:var(--gr)}
+:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
+
+/* nav */
+.nav{position:fixed;inset:0 0 auto;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:calc(18px + env(safe-area-inset-top,0px)) var(--gr) 18px var(--gl);color:#fff;mix-blend-mode:difference;pointer-events:none}
+.nav>*{pointer-events:auto}
+.wm{display:inline-flex;align-items:flex-end;font-family:var(--brand);font-weight:900;font-size:27px;line-height:.8;letter-spacing:-.045em;text-decoration:none;color:inherit;height:26px}
+.wm i{display:inline-block;width:.15em;height:.74em;background:currentColor;margin:0 .06em 0 .05em;transform-origin:bottom}
+.navr{display:flex;gap:10px;align-items:center;position:relative}
+.sndh{position:absolute;right:0;top:calc(100% + 9px);white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 20px;border-radius:99px;border:1.5px solid currentColor;background:none;color:inherit;font:700 15px var(--sans);text-decoration:none;white-space:nowrap;cursor:pointer;transition:transform .5s var(--spring),background .25s,color .25s}
+.btn:hover{transform:scale(1.04)}
+.btn:active{transform:scale(.96)}
+.btn.solid{background:var(--figure);color:var(--ground);border-color:var(--figure)}
+.bars{display:inline-flex;gap:2px;align-items:center;height:14px}
+.bars b{display:block;width:2px;height:100%;background:currentColor;transform:scaleY(.2);transition:transform .2s}
+.on .bars b{animation:bar .7s ease-in-out infinite alternate}
+.bars b:nth-child(2){animation-delay:-.25s!important}.bars b:nth-child(3){animation-delay:-.5s!important}.bars b:nth-child(4){animation-delay:-.1s!important}
+@keyframes bar{from{transform:scaleY(.25)}to{transform:scaleY(1)}}
+
+/* hero */
+.hero{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+#field{position:absolute;inset:0;width:100%;height:100%}
+.hero h1{position:absolute;left:0;right:0;top:46%;margin:0;transform:translateY(-50%);font-weight:900;font-size:min(23vw,34svh);line-height:.74;letter-spacing:calc(-.055em + var(--trk));text-align:left;padding-left:var(--gl);padding-right:var(--gr);user-select:none}
+.ln{display:block;white-space:nowrap}
+.ln.up .c{transform-origin:50% 88%}
+.ln.dn{padding-left:.42em;margin-top:.06em}
+.ln.dn .c{transform-origin:50% 12%}
+.c{display:inline-block;will-change:transform;text-align:center}
+.herofoot{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end;padding-block:0 28px}
+.herofoot p{margin:0;max-width:30em;font-size:clamp(17px,1.5vw,21px);line-height:1.32;font-weight:500;text-wrap:pretty}
+.seam{position:absolute;left:0;right:0;top:46%;height:1.5px;background:currentColor;opacity:.5;transform-origin:left}
+
+/* scenes */
+.scene{position:relative;height:100svh;overflow:hidden}
+.scene canvas.fill{position:absolute;inset:0;width:100%;height:100%}
+.cap{position:absolute;left:var(--gl);top:calc(82px + env(safe-area-inset-top,0px));max-width:min(34em,86vw)}
+.cap .eyebrow{display:block;margin-bottom:12px;opacity:.75}
+.big{font-weight:900;font-size:clamp(40px,7.4vw,124px);line-height:.92;letter-spacing:calc(-.04em + var(--trk));margin:0;text-wrap:balance}
+.step{position:absolute;left:0;top:0;width:100%;opacity:0;transform:translateY(24px);will-change:transform,opacity}
+.step p{margin:14px 0 0;font-size:clamp(16px,1.4vw,20px);max-width:27em;line-height:1.35;text-wrap:pretty}
+.step .big{font-size:clamp(34px,5vw,88px)}
+.rail{position:absolute;right:var(--gr);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:12px;text-align:right}
+.rail span{opacity:.4;transition:opacity .3s,transform .5s var(--spring)}
+.rail span.on{opacity:1;transform:translateX(-8px)}
+
+/* 8D */
+#s8d .type{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:min(62vw,88svh);letter-spacing:calc(-.07em + var(--trk));line-height:1;color:var(--ink);user-select:none}
+#s8d .type span{display:inline-block;will-change:transform}
+#s8d canvas{position:absolute;inset:0;width:100%;height:100%}
+#s8d .head8{position:absolute;left:var(--gl);top:calc(82px + env(safe-area-inset-top,0px));max-width:min(23em,70vw);color:var(--ink)}
+#s8d .head8 h2{margin:0;font-size:clamp(26px,3.1vw,48px);line-height:1;font-weight:900;letter-spacing:calc(-.03em + var(--trk));text-wrap:balance}
+#s8d .read{position:absolute;right:var(--gr);bottom:28px;color:var(--ink);display:grid;grid-template-columns:auto auto;gap:3px 18px;text-align:right}
+#s8d .read b{font-weight:500}
+#s8d .paths{position:absolute;left:var(--gl);bottom:28px;display:flex;flex-direction:column;gap:2px;color:var(--ink);font-weight:800;font-size:clamp(18px,2.2vw,32px);letter-spacing:-.02em;line-height:1.08}
+#s8d .paths span{opacity:.3;transition:opacity .3s,transform .6s var(--spring);transform-origin:left}
+#s8d .paths span.on{opacity:1;transform:translateX(12px)}
+
+/* transcript */
+#stext{color:var(--ink);display:flex;flex-direction:column;justify-content:center;gap:clamp(20px,4svh,44px)}
+#stext .tag{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.para{font-size:clamp(30px,5.3vw,88px);font-weight:700;line-height:1.05;letter-spacing:calc(-.035em + var(--trk));margin:0;max-width:17em}
+.w{display:inline-block;position:relative;white-space:pre;vertical-align:bottom}
+.w.fill{overflow:hidden;color:var(--ember)}
+.w.fill::after{content:"";position:absolute;left:0;right:0;top:54%;height:.09em;background:var(--ember);transform:scaleX(var(--x,0));transform-origin:left}
+#clipwave{width:100%;height:clamp(70px,14svh,130px)}
+
+/* effects wall */
+#sfx{overflow:hidden;height:100svh;display:flex;flex-direction:column;justify-content:center}
+#sfx h2{position:absolute;left:var(--gl);top:calc(82px + env(safe-area-inset-top,0px));margin:0;font-size:clamp(24px,3vw,44px);font-weight:900;letter-spacing:calc(-.03em + var(--trk));line-height:1;max-width:min(30em,86vw);text-wrap:balance}
+.track{display:flex;gap:clamp(12px,1.4vw,22px);padding:clamp(70px,12svh,110px) var(--gr) 0 var(--gl);width:max-content;will-change:transform;align-items:stretch}
+.fx{position:relative;width:min(82vw,720px);height:min(66svh,560px);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:22px;flex:none}
+.fx .meta{display:flex;justify-content:space-between;gap:12px;position:relative;z-index:2}
+.fx .word{position:relative;font-weight:900;line-height:.86;letter-spacing:calc(-.05em + var(--trk));font-size:clamp(58px,10.4vw,150px);flex:1;display:flex;align-items:center;white-space:nowrap}
+.l{display:inline-block}
+.f-slow{background:#142A6E;color:#CFE0FF}
+.f-slow .word{letter-spacing:.02em;font-weight:300;font-size:clamp(50px,8.6vw,124px);transform-origin:left;animation:slow 7s ease-in-out infinite alternate;text-shadow:.04em 0 0 #cfe0ff55,.1em 0 0 #cfe0ff33,.18em 0 0 #cfe0ff1f,.28em 0 0 #cfe0ff12}
+@keyframes slow{from{transform:scaleX(.82)}to{transform:scaleX(1.12)}}
+.f-night{background:#FF2E78;color:#17030B}
+.f-night .word{font-style:oblique 14deg;transform:skewX(-14deg);animation:jit .16s steps(2) infinite}
+@keyframes jit{to{transform:skewX(-14deg) translate(3px,-2px)}}
+.f-lofi{background:#C8A179;color:#2A1A0C}
+.f-lofi .word{filter:url(#crush);animation:flick 2.8s steps(9) infinite}
+@keyframes flick{0%,100%{opacity:1}42%{opacity:.82}47%{opacity:.96}}
+.f-vinyl{background:#111013;color:#EDE6D6}
+.f-vinyl .disc{position:absolute;right:-16%;top:50%;width:min(72vw,600px);aspect-ratio:1;transform:translateY(-50%);border-radius:50%;background:repeating-radial-gradient(circle at 50% 50%,#1b1a1d 0 2px,#0b0a0c 2px 5px);animation:spin 3.6s linear infinite}
+.f-vinyl .disc::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--ember)}
+.f-vinyl .disc::before{content:"";position:absolute;left:50%;top:0;bottom:50%;width:40%;background:#ede6d60a;transform-origin:0 100%;transform:skewX(-24deg)}
+@keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
+.f-tape{background:#DCCBA3;color:#1E1A10}
+.f-tape .word{animation:wow 3.2s ease-in-out infinite}
+@keyframes wow{0%,100%{transform:translateX(-1.2%) skewX(-3deg) scaleX(.97)}50%{transform:translateX(1.4%) skewX(3deg) scaleX(1.04)}}
+.f-water{background:#04424C;color:#9CF0E4}
+.f-water .l{animation:bob 2.6s ease-in-out infinite;animation-delay:calc(var(--i)*-.22s)}
+@keyframes bob{0%,100%{transform:translateY(-9%) rotate(-3deg)}50%{transform:translateY(9%) rotate(3deg)}}
+.f-radio{background:#E8A321;color:#1B1000}
+.f-radio .word{-webkit-mask-image:linear-gradient(90deg,#0000 0%,#000 30%,#000 70%,#0000 100%);mask-image:linear-gradient(90deg,#0000 0%,#000 30%,#000 70%,#0000 100%);-webkit-mask-size:60% 100%;mask-size:60% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;animation:tune 4s ease-in-out infinite alternate}
+@keyframes tune{from{-webkit-mask-position:0 0;mask-position:0 0}to{-webkit-mask-position:100% 0;mask-position:100% 0}}
+.f-stut{background:#F4F1E6;color:#0B0B10}
+.f-stut .word .l{animation:stut .8s steps(1) infinite;animation-delay:calc(var(--i)*.12s)}
+@keyframes stut{0%{opacity:1}30%{opacity:.12}60%{opacity:1}}
+.f-stop{background:#D4342A;color:#FFF6F1}
+.f-stop .l{transform-origin:50% 100%;transform:translateY(calc(var(--i)*var(--i)*.35%)) scaleX(calc(1.25 - var(--i)*.055)) scaleY(calc(1 - var(--i)*.075))}
+.f-rev{background:#E7E3FF;color:#21115C}
+.f-rev .word{transform:scaleX(-1);transform-origin:center;justify-content:center}
+.f-cath{background:#17140F;color:#F2E7CF}
+.f-cath .word{flex-direction:column;align-items:flex-start;justify-content:flex-end;font-size:clamp(46px,8vw,118px)}
+.f-cath .word span{display:block;line-height:.82}
+.f-next{background:#8B8C86;color:#111210}
+.f-next .word{filter:blur(.09em);justify-content:flex-end}
+.f-next::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background:repeating-linear-gradient(0deg,#0000 0 40px,#0000000d 40px 42px),repeating-linear-gradient(90deg,#0000 0 90px,#0000000a 90px 92px);pointer-events:none}
+.f-bot{background:#0D2B21;color:#7CFFB2}
+.f-bot .word{font-family:var(--mono);font-weight:500;letter-spacing:-.04em;animation:bot 1.2s steps(4) infinite}
+@keyframes bot{0%,100%{transform:translateY(-4%)}50%{transform:translateY(4%)}}
+
+/* stems */
+#sstem .stage3{position:absolute;inset:0;perspective:1400px;display:flex;align-items:center;justify-content:center}
+.plates{position:relative;width:min(70vw,860px);aspect-ratio:2.1;transform-style:preserve-3d;will-change:transform}
+@media(min-width:1000px){#sstem .stage3{justify-content:flex-end;padding-right:7vw}.plates{width:min(46vw,720px)}}
+.plate{position:absolute;inset:0;border:1.5px solid currentColor;border-radius:4px;will-change:transform;transform-style:preserve-3d}
+.plate canvas{position:absolute;inset:0;width:100%;height:100%}
+.plate span{position:absolute;left:12px;top:10px;font-weight:800;font-size:clamp(15px,1.6vw,24px);letter-spacing:-.02em}
+
+/* simple to pro */
+#spro{color:var(--ink)}
+.bench{position:absolute;left:var(--gl);right:var(--gr);top:50%;transform:translateY(-34%);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:clamp(8px,1.2vw,16px)}
+.mainslider{grid-column:1/-1;display:flex;flex-direction:column;gap:12px;will-change:transform}
+.mainslider .row{display:flex;justify-content:space-between;font-weight:800;font-size:clamp(20px,3vw,44px);letter-spacing:calc(-.03em + var(--trk))}
+.sl{height:clamp(20px,3.6vw,52px);background:#09091214;border-radius:99px;position:relative;overflow:hidden}
+.sl i{position:absolute;inset:0 auto 0 0;width:64%;background:var(--ink);border-radius:99px}
+.ctl{padding:10px 11px;background:#0909120f;border-radius:6px;display:flex;flex-direction:column;gap:8px;min-width:0;will-change:transform,opacity}
+.ctl label{display:block;font-weight:700;font-size:clamp(11px,1vw,14px);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl .v{font-family:var(--mono);font-size:clamp(10px,.86vw,12.5px)}
+.ctl .m{height:5px;background:#09091218;border-radius:9px;overflow:hidden}
+.ctl .m i{display:block;height:100%;background:var(--ink);border-radius:9px;transform-origin:left}
+
+/* numbers */
+#spec{padding-block:clamp(100px,18svh,180px)}
+#spec .huge{font-weight:900;font-size:clamp(70px,20.5vw,360px);line-height:.8;letter-spacing:calc(-.065em + var(--trk));margin:0}
+#spec .lede{font-size:clamp(22px,3vw,44px);font-weight:700;letter-spacing:-.025em;line-height:1.08;max-width:19em;margin:clamp(20px,3vw,36px) 0 clamp(50px,8svh,90px);text-wrap:balance}
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));border-top:1.5px solid currentColor}
+.spec{padding:16px 16px 26px 0;border-bottom:1.5px solid currentColor;display:flex;flex-direction:column;gap:8px}
+.spec b{font-size:clamp(26px,3.2vw,48px);font-weight:900;letter-spacing:calc(-.035em + var(--trk));line-height:1;font-variant-numeric:tabular-nums}
+.spec span{font-size:15.5px;line-height:1.3;max-width:24em}
+.note{margin-top:18px;opacity:.75}
+
+.mq{overflow:hidden;padding-block:clamp(40px,8svh,80px);border-block:1.5px solid currentColor;margin-block:0}
+.mq .tr{display:flex;gap:.3em;width:max-content;font-weight:900;font-size:clamp(60px,13vw,230px);line-height:.9;letter-spacing:calc(-.05em + var(--trk));will-change:transform}
+.mq .tr em{font-style:normal;font-weight:300}
+
+/* platforms */
+#splat{padding-block:clamp(90px,16svh,160px)}
+.plats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:clamp(26px,3vw,48px);margin-top:clamp(30px,6svh,60px)}
+.plat h3{margin:0 0 8px;font-size:clamp(26px,3vw,44px);font-weight:900;letter-spacing:calc(-.035em + var(--trk));line-height:1}
+.plat p{margin:0;max-width:26em;line-height:1.35}
+.plat .mono{display:block;margin-bottom:12px;opacity:.75}
+
+/* end */
+.end{position:relative;overflow:hidden;padding-top:clamp(100px,20svh,180px)}
+.end .say{font-weight:900;font-size:clamp(36px,6vw,104px);letter-spacing:calc(-.04em + var(--trk));line-height:.94;margin:0 0 30px;max-width:13em;text-wrap:balance}
+.bigmark{display:flex;align-items:flex-end;font-weight:900;font-size:min(46vw,66svh);letter-spacing:calc(-.065em + var(--trk));line-height:.74;margin-top:clamp(40px,8svh,90px);user-select:none;padding-bottom:.03em}
+.bigmark .c{transform-origin:50% 100%}
+.bigmark .bar{display:inline-block;width:.15em;height:.74em;background:currentColor;margin:0 .06em;transform-origin:bottom;will-change:transform}
+.foot{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;padding-block:22px 28px}
+.foot nav{display:flex;flex-wrap:wrap;gap:6px 22px}
+.foot a{text-underline-offset:3px}
+
+@media (max-width:760px){
+  .herofoot{grid-template-columns:minmax(0,1fr)}
+  .hero h1{top:40%;font-size:min(29vw,30svh)}
+  .seam{top:40%}
+  .rail{display:none}
+  #s8d .read{bottom:18px}
+  #s8d .paths{bottom:18px}
+  .bench{grid-template-columns:repeat(3,minmax(0,1fr));transform:translateY(-30%)}
+  .plates{width:84vw}
+  .fx{padding:16px}
+  .nav{padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:12px}
+  .nav .btn{height:38px;padding:0 12px;font-size:13px;gap:7px}
+  .navr{gap:6px}
+  .sndh{font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){
+  .fx *,.fx,.fx::after{animation:none!important}
+  .scene{height:auto;min-height:100svh}
+  .step{position:relative;opacity:1;transform:none;margin-bottom:24px}
+  .cap{position:relative;left:auto;top:auto;padding:100px var(--gr) 30px var(--gl);max-width:none}
+  #sfx{height:auto}#sfx h2{position:relative;left:auto;top:auto;padding:90px var(--gr) 0 var(--gl)}
+  .track{overflow-x:auto;width:auto;padding-top:30px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="crush"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="3"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter></svg>
+
+<header class="nav">
+  <a class="wm" href="#top" aria-label="Flux, back to top">f<i id="navl"></i>ux</a>
+  <div class="navr">
+    <button class="btn" id="snd" role="switch" aria-checked="true" aria-label="Sound"><span class="bars" aria-hidden="true"><b></b><b></b><b></b><b></b></span><span id="sndt">Sound on</span></button>
+    <span class="sndh mono" id="sndh" hidden>Click or tap anywhere to start the sound</span>
+    <a class="btn" href="app.html">Open Flux</a>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero" data-g="#1621E0" data-f="#F6F4EC" aria-labelledby="hh">
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="seam" id="seam" aria-hidden="true"></div>
+  <h1 id="hh" aria-label="Sound, in flux."><span class="ln up" data-split>Sound,</span><span class="ln dn" data-split>in flux.</span></h1>
+  <div class="herofoot wrap">
+    <p>A full audio editor in your browser. Cut it, spin it around your head, pull it apart into stems, edit it like a document. Your audio stays on your machine.</p>
+    <a class="btn solid" href="app.html">Open Flux</a>
+  </div>
+</section>
+
+<section class="scene" id="swave" data-g="#090A12" data-f="#F6F4EC">
+  <canvas class="fill" id="wavec" aria-hidden="true"></canvas>
+  <div class="cap" style="width:min(62em,86vw)">
+    <div class="step"><h2 class="big">Every sample where you left it.</h2><p>Open a two-hour recording and zoom from the whole file down to a single sample. Sources are never touched.</p></div>
+    <div class="step"><h2 class="big">Cut anywhere. Hear no click.</h2><p>Every edit lands on a sample, finds a zero crossing, and gets a micro-fade. Undo all of it, as far back as you like.</p></div>
+    <div class="step"><h2 class="big">See what you can't hear.</h2><p>Flip to the spectrogram. Draw around a cough, a phone buzz or a chair creak and paint it out.</p></div>
+    <div class="step"><h2 class="big">Finish at <span id="lufs">−23.4</span> LUFS.</h2><p>Master to your target with a true-peak ceiling, then compare at matched loudness so louder never wins by default.</p></div>
+  </div>
+  <div class="rail mono" id="wrail" aria-hidden="true"><span>Waveform</span><span>Edit</span><span>Spectrogram</span><span>Master</span></div>
+</section>
+
+<section class="scene" id="s8d" data-g="#FF5A1C" data-f="#090A12">
+  <canvas id="back8" aria-hidden="true"></canvas>
+  <div class="type" aria-hidden="true"><span id="t8">8</span><span id="tD">D</span></div>
+  <canvas id="front8" aria-hidden="true"></canvas>
+  <div class="head8"><h2>Real binaural audio, moving around your head.</h2><p class="mono" style="margin:10px 0 0">Put on headphones. The sound follows the dot.</p></div>
+  <div class="paths" id="paths" aria-label="Motion paths"><span>Orbit</span><span>Spiral</span><span>Figure eight</span><span>Vertical loop</span><span>Swarm</span></div>
+  <div class="read mono" aria-hidden="true"><span>Azimuth</span><b id="rAz">0°</b><span>Elevation</span><b id="rEl">0°</b><span>Distance</span><b id="rDi">1.0 m</b><span>Rate</span><b>0.10 Hz</b></div>
+</section>
+
+<section class="scene wrap" id="stext" data-g="#ECE9DE" data-f="#090A12">
+  <div class="tag mono"><span>Transcript, speaker 1</span><span id="dur">00:08.40</span></div>
+  <p class="para" id="para" aria-label="The thing I keep telling people is that audio should be as easy to edit as a document."></p>
+  <canvas id="clipwave" aria-hidden="true"></canvas>
+</section>
+
+<section class="scene" id="sfx" data-g="#090A12" data-f="#F6F4EC">
+  <h2>Every word below is the effect it names. Each color is also a theme in the app.</h2>
+  <div class="track" id="track">
+    <article class="fx f-slow"><div class="meta mono"><span>Slowed + reverb</span><span>0.85× · Hall 3.2 s</span></div><div class="word" aria-hidden="true">Slowed</div></article>
+    <article class="fx f-night"><div class="meta mono"><span>Nightcore</span><span>1.25× · +3.9 st</span></div><div class="word" aria-hidden="true">Nightcore</div></article>
+    <article class="fx f-lofi"><div class="meta mono"><span>Lo-fi, one slider</span><span>Amount 64%</span></div><div class="word" aria-hidden="true">Lo-fi</div></article>
+    <article class="fx f-vinyl"><div class="disc" aria-hidden="true"></div><div class="meta mono"><span>Vinyl</span><span>33⅓ · Crackle 4/s</span></div><div class="word" aria-hidden="true">Vinyl</div></article>
+    <article class="fx f-tape"><div class="meta mono"><span>Cassette</span><span>Wow 0.6 Hz · Hiss −52 dB</span></div><div class="word" aria-hidden="true">Cassette</div></article>
+    <article class="fx f-water"><div class="meta mono"><span>Underwater</span><span>Depth 12 m</span></div><div class="word" data-letters aria-hidden="true">Underwater</div></article>
+    <article class="fx f-radio"><div class="meta mono"><span>Old radio</span><span>300 Hz to 3 kHz</span></div><div class="word" aria-hidden="true">Old radio</div></article>
+    <article class="fx f-stut"><div class="meta mono"><span>Stutter</span><span>1/16 · Prob 72%</span></div><div class="word" data-letters aria-hidden="true">S-S-Stutter</div></article>
+    <article class="fx f-stop"><div class="meta mono"><span>Tape stop</span><span>1.4 s to 0×</span></div><div class="word" data-letters aria-hidden="true">Tape stop</div></article>
+    <article class="fx f-rev"><div class="meta mono"><span>Reverse</span><span>Clip or region</span></div><div class="word" aria-hidden="true">Reverse</div></article>
+    <article class="fx f-cath"><div class="meta mono"><span>Cathedral</span><span>RT60 6.8 s</span></div><div class="word" aria-hidden="true"><span style="opacity:.07">Cathedral</span><span style="opacity:.16">Cathedral</span><span style="opacity:.34">Cathedral</span><span>Cathedral</span></div></article>
+    <article class="fx f-next"><div class="meta mono"><span>Next door</span><span>Low-pass 620 Hz</span></div><div class="word" aria-hidden="true">Next door</div></article>
+    <article class="fx f-bot"><div class="meta mono"><span>Robot</span><span>Ring mod 30 Hz · Vocoder 24</span></div><div class="word" aria-hidden="true">R0B0T</div></article>
+  </div>
+</section>
+
+<section class="scene" id="sstem" data-g="#25103D" data-f="#F6F4EC">
+  <div class="stage3" aria-hidden="true"><div class="plates" id="plates"></div></div>
+  <div class="cap"><h2 class="big" style="font-size:clamp(34px,5.6vw,96px)">Pull the vocal out. Keep the band.</h2><p class="mono" style="margin-top:12px">Stems run on your device. Vocals, drums, bass, other.</p></div>
+</section>
+
+<section class="scene" id="spro" data-g="#ECE9DE" data-f="#090A12">
+  <div class="cap"><h2 class="big" style="font-size:clamp(34px,5.6vw,96px)" id="protitle">One slider. Or all of them.</h2></div>
+  <div class="bench" id="bench">
+    <div class="mainslider" id="ms"><div class="row"><span>Lo-fi amount</span><span id="msv">64%</span></div><div class="sl"><i id="msi"></i></div></div>
+  </div>
+</section>
+
+<section class="wrap" id="spec" data-g="#1621E0" data-f="#F6F4EC">
+  <p class="huge" id="zero">0 bytes</p>
+  <p class="lede">leave your machine unless you say so. AI runs on your device, and cloud processing is opt-in, per feature.</p>
+  <div class="specs">
+    <div class="spec"><b>32-bit float</b><span>All the way through the signal path. Dither is applied only when you export to a lower bit depth.</span></div>
+    <div class="spec"><b>±0.1 LU</b><span>Loudness accuracy against the EBU conformance signals, so −14 LUFS means −14 LUFS.</span></div>
+    <div class="spec"><b>−100 dBFS</b><span>Maximum difference between what you preview and what you export. Same engine, same output.</span></div>
+    <div class="spec"><b>±3 cents</b><span>Pitch accuracy across a full octave of shifting up or down.</span></div>
+    <div class="spec"><b>1 sample</b><span>Edit precision. Cuts, fades and automation resolve to samples, never to pixels.</span></div>
+    <div class="spec"><b>No account</b><span>Everything on-device works without signing in, and keeps working offline.</span></div>
+  </div>
+  <p class="mono note">Engineering targets. Flux tests each one automatically on every build.</p>
+</section>
+
+<section class="mq" data-g="#090A12" data-f="#F6F4EC" aria-label="Formats: WAV, FLAC, MP3, AAC, Opus, Vorbis, AIFF, M4A, MP4, MOV, MKV">
+  <div class="tr" id="mq1" aria-hidden="true">WAV <em>FLAC</em> MP3 <em>AAC</em> Opus <em>Vorbis</em> AIFF <em>M4A</em> MP4 <em>MOV</em> MKV <em>WAV</em> FLAC <em>MP3</em> AAC <em>Opus</em></div>
+</section>
+
+<section class="wrap" id="splat" data-g="#090A12" data-f="#F6F4EC">
+  <h2 class="big" style="font-size:clamp(36px,6vw,104px)">Starts in a tab. Unzips on Windows.</h2>
+  <div class="plats">
+    <div class="plat"><span class="mono">In your browser</span><h3>Web</h3><p>Open a link and start editing. Install it as an app, and it keeps working with no connection. Pinch the waveform on a phone too.</p></div>
+    <div class="plat"><span class="mono">Later, for Windows</span><h3>One zip</h3><p>Unpack it and run Flux.exe. Every DLL and tool is already inside, so there is nothing to install. Native audio engine, real project folders, pro audio devices.</p></div>
+  </div>
+</section>
+
+<section class="end" data-g="#1621E0" data-f="#F6F4EC">
+  <div class="wrap">
+    <h2 class="say">Drop a file in. Hear it differently.</h2>
+    <a class="btn solid" href="app.html" id="endcta" style="height:58px;padding:0 30px;font-size:18px">Open Flux</a>
+    <div class="bigmark" id="bigmark" aria-hidden="true"><span class="c">f</span><span class="bar" id="bigl"></span><span class="c">u</span><span class="c">x</span></div>
+  </div>
+  <footer class="foot wrap mono">
+    <span>Flux</span>
+    <nav aria-label="Footer"><a href="app.html#help">Help</a><a href="app.html#legal">Privacy</a><a href="app.html#legal-terms">Terms</a><a href="app.html#legal-credits">Attributions</a></nav>
+  </footer>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+<script src="landing.js"></script>
+</body>
+</html>

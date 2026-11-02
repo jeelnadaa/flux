@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Flux App Screens</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="themes.css">
+<link rel="stylesheet" href="app.css">
+<script>try{var t=localStorage.getItem("flux-theme"),f=localStorage.getItem("flux-font");if(t)document.documentElement.dataset.flux=t;if(f)document.documentElement.dataset.font=f}catch(e){}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="crush"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="3"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter></svg>
+<div id="rv" role="region" aria-label="Design review controls">
+  <a href="landing.html" class="ld">Landing page</a>
+  <button id="rvmap" type="button">All screens</button>
+  <button id="rvprev" type="button" aria-label="Previous screen">&#8592;</button>
+  <button id="rvnext" type="button" aria-label="Next screen">&#8594;</button>
+  <span class="nm" id="rvname" aria-live="polite"></span>
+  <div class="rvsz" role="group" aria-label="Frame width"><button type="button" data-w="100%" class="on">Desktop</button><button type="button" data-w="820px">Tablet</button><button type="button" data-w="390px">Phone</button></div>
+  <button id="rvfont" type="button" aria-haspopup="true" aria-expanded="false"><b>Aa</b><span id="rvfn">Bricolage Grotesque</span></button>
+  <button id="rvtheme" type="button" aria-haspopup="true" aria-expanded="false"><span class="swa" id="rvswa"></span><span id="rvtn">Cassette</span></button>
+</div>
+<div id="frame"><div id="stage"></div></div>
+<div id="rvpop" hidden role="menu" aria-label="Theme"></div>
+<div id="rvfpop" hidden role="menu" aria-label="Font"></div>
+<div id="map" hidden></div>
+<script src="viz.js"></script>
+<script src="app-core.js"></script>
+<script src="screens-a.js"></script>
+<script src="screens-b.js"></script>
+<script src="screens-c.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
