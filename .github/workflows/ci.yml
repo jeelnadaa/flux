@@ -21,10 +21,10 @@ jobs:
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
-      - name: Install binary tools (just, typos)
+      - name: Install binary tools (just, typos, cargo-deny)
         uses: taiki-e/install-action@v2
         with:
-          tool: just,typos
+          tool: just,typos,cargo-deny
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
