@@ -19,6 +19,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Install binary tools (just, typos)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,typos
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
@@ -31,15 +37,12 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Install just
-        uses: extractions/setup-just@v2
 
       - name: Install Node dependencies
         run: npm ci || npm install

@@ -13,9 +13,6 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "references": [
-    { "path": "../../packages/ui" },
-    { "path": "../../packages/app-core" }
-  ],
+  "references": [{ "path": "../../packages/ui" }, { "path": "../../packages/app-core" }],
   "include": ["src/**/*"]
 }

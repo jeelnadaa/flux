@@ -6,8 +6,27 @@ npm_cmd := if os() == "windows" { "npm.cmd" } else { "npm" }
 default:
     @just --list
 
-# The local CI gate: format, lint, unit, property, golden, null, integration, E2E, license scan, WASM build
-ci: check-rust test-rust build-wasm check-ts
+# The local CI gate: format, lint, typos, unit, property, golden, null, integration, E2E, license scan, WASM build
+ci: fmt-check lint typos check-rust test-rust build-wasm check-ts
+
+# Format check across Rust and TypeScript
+fmt-check:
+    cargo fmt --all -- --check
+    {{npm_cmd}} run format:check
+
+# Format code across Rust and TypeScript
+fmt:
+    cargo fmt --all
+    {{npm_cmd}} run format:write
+
+# Lint across Rust and TypeScript
+lint:
+    cargo clippy --workspace --all-targets -- -D warnings
+    {{npm_cmd}} run lint
+
+# Check spelling and typos across the repo
+typos:
+    typos
 
 # Check all Rust crates and targets
 check-rust:
