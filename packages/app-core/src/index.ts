@@ -24,3 +24,4 @@ export function createProjectMetadata(name: string, sampleRate = 48000): Project
 }
 
 export * from "./capture/AudioCaptureManager.js";
+export * from "./engine/EngineController.js";

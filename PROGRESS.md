@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 1 — Core engine & I/O
-- **Next item:** P1.3 (P1.3-a Effect graph, node trait, parameter smoothing, latency compensation)
+- **Next item:** P1.4 (P1.4-a Export WAV and FLAC with region, tail and fade options)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -16,7 +16,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
-| 1 | Core engine & I/O | In progress | 6 / 18 |
+| 1 | Core engine & I/O | In progress | 11 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P1.3-a, P1.3-b, P1.3-c, P1.3-d, P1.3-e implemented DAG audio graph, parameter smoothing & automation lanes, automatic plugin delay compensation (PDC), real-time AudioWorklet EngineHost, sample-accurate transport with seamless looping and variable-speed scrub, deterministic offline renderer (real-time vs offline null residual <= -100 dBFS), polyphase Kaiser sinc resampler (44.1 -> 48 -> 44.1 null > 120 dB SNR), and TPDF / Lipshitz noise-shaped dither; 78 workspace tests passing, 8 browser tests green; just ci green.
 
 - 2026-11-03: P1.2-a implemented microphone capture, raw constraints, input level meter with clip indicator hold, pre-roll ring buffer, and crash-safe chunked streaming to OPFS with bit-exact recovery; 67 workspace tests passing, Playwright browser test passing (max error 2.96e-8); just ci green.
 
@@ -106,11 +108,11 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P1.1-d Video audio extraction and FFmpeg fallback
 - [x] P1.1-e Metadata and cover art read and preserve
 - [x] P1.2-a Recording: capture, device selection, meter, crash-safe chunked writes
-- [ ] P1.3-a Effect graph, node trait, parameter smoothing, latency compensation
-- [ ] P1.3-b Real-time engine in AudioWorklet (`EngineHost`), transport, seamless loop, scrub
-- [ ] P1.3-c Offline renderer; real-time vs offline null test
-- [ ] P1.3-d Resampler with quality presets and fractional delay
-- [ ] P1.3-e Dither (TPDF, noise-shaped)
+- [x] P1.3-a Effect graph, node trait, parameter smoothing, latency compensation
+- [x] P1.3-b Real-time engine in AudioWorklet (`EngineHost`), transport, seamless loop, scrub
+- [x] P1.3-c Offline renderer; real-time vs offline null test
+- [x] P1.3-d Resampler with quality presets and fractional delay
+- [x] P1.3-e Dither (TPDF, noise-shaped)
 - [ ] P1.4-a Export WAV and FLAC with region, tail and fade options
 - [ ] P1.4-b Export MP3, AAC, Vorbis, Opus
 - [ ] P1.4-c Normalization on export, destination presets, metadata editor

@@ -3,10 +3,14 @@
 
 use flux_dsp::binaural::BinauralNode;
 use flux_dsp::biquad::{BiquadChain, BiquadType};
+use flux_dsp::dither::{BitDepth, Dither, DitherType};
 use flux_dsp::node::DspNode;
+use flux_dsp::resampler::{Resampler, ResamplerQuality};
 use flux_dsp::stretch::StretchNode;
 use flux_engine::capture::{ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
+use flux_engine::render::{EngineCommand, EngineHost};
+use flux_engine::transport::Transport;
 use wasm_bindgen::prelude::*;
 
 /// Returns the Flux DSP engine version string.
@@ -673,6 +677,232 @@ impl WasmChunkedRecordWriter {
     }
 }
 
+/// WebAssembly wrapper for arbitrary audio resampling.
+#[wasm_bindgen]
+pub struct WasmResampler {
+    inner: Resampler,
+}
+
+#[wasm_bindgen]
+impl WasmResampler {
+    /// Creates a new `WasmResampler`. Quality: 0 = Fast, 1 = High, 2 = Mastering.
+    #[wasm_bindgen(constructor)]
+    pub fn new(from_rate: u32, to_rate: u32, quality: u32) -> Self {
+        let q = match quality {
+            0 => ResamplerQuality::Fast,
+            2 => ResamplerQuality::Mastering,
+            _ => ResamplerQuality::High,
+        };
+        Self {
+            inner: Resampler::new(from_rate, to_rate, q),
+        }
+    }
+
+    /// Resamples a single planar channel.
+    pub fn resample_channel(&self, input: &[f32]) -> Vec<f32> {
+        self.inner.resample_channel(input)
+    }
+}
+
+/// WebAssembly wrapper for audio dither.
+#[wasm_bindgen]
+pub struct WasmDither {
+    inner: Dither,
+}
+
+#[wasm_bindgen]
+impl WasmDither {
+    /// Creates a new `WasmDither`. DitherType: 0 = None, 1 = TPDF, 2 = NoiseShaped. BitDepth: 16 = 16-bit, 24 = 24-bit, 32 = Float32.
+    #[wasm_bindgen(constructor)]
+    pub fn new(dither_type: u32, bit_depth: u32, channels: usize) -> Self {
+        let dt = match dither_type {
+            1 => DitherType::Tpdf,
+            2 => DitherType::NoiseShaped,
+            _ => DitherType::None,
+        };
+        let bd = match bit_depth {
+            16 => BitDepth::Bits16,
+            24 => BitDepth::Bits24,
+            _ => BitDepth::Float32,
+        };
+        Self {
+            inner: Dither::new(dt, bd, channels),
+        }
+    }
+
+    /// Processes a single planar channel slice in-place.
+    pub fn process_channel(&mut self, samples: &mut [f32]) {
+        self.inner.process(&mut [samples]);
+    }
+}
+
+/// WebAssembly wrapper for playback transport.
+#[wasm_bindgen]
+pub struct WasmTransport {
+    inner: Transport,
+}
+
+#[wasm_bindgen]
+impl WasmTransport {
+    /// Creates a new `WasmTransport`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(sample_rate: u32) -> Self {
+        Self {
+            inner: Transport::new(sample_rate),
+        }
+    }
+
+    /// Plays or resumes.
+    pub fn play(&mut self) {
+        self.inner.play();
+    }
+
+    /// Pauses.
+    pub fn pause(&mut self) {
+        self.inner.pause();
+    }
+
+    /// Stops.
+    pub fn stop(&mut self) {
+        self.inner.stop();
+    }
+
+    /// Seeks to frame.
+    pub fn seek(&mut self, frame: u64) {
+        self.inner.seek(frame);
+    }
+
+    /// Configures loop range.
+    pub fn set_loop(&mut self, enabled: bool, start: u64, end: u64) {
+        self.inner.set_loop(enabled, start, end);
+    }
+
+    /// Sets scrub speed.
+    pub fn set_scrub_speed(&mut self, speed: f32) {
+        self.inner.set_scrub_speed(speed);
+    }
+
+    /// Current playhead position in frames.
+    pub fn playhead(&self) -> u64 {
+        self.inner.playhead()
+    }
+
+    /// Advances playhead by `frames`.
+    pub fn advance(&mut self, frames: usize) -> u64 {
+        self.inner.advance(frames);
+        self.inner.playhead()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// C ABI Real-Time AudioWorklet Exports for EngineHost
+// ---------------------------------------------------------------------------
+
+/// Creates a new `EngineHost` instance.
+#[no_mangle]
+pub extern "C" fn engine_create(sample_rate: f32, quantum_frames: usize) -> *mut EngineHost {
+    let host = Box::new(EngineHost::new(sample_rate, quantum_frames));
+    Box::into_raw(host)
+}
+
+/// Destroys an `EngineHost` instance.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by `engine_create`.
+#[no_mangle]
+pub unsafe extern "C" fn engine_destroy(ptr: *mut EngineHost) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Enqueues Play command.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn engine_command_play(ptr: *mut EngineHost) {
+    if let Some(host) = ptr.as_mut() {
+        host.commands.push(EngineCommand::Play);
+    }
+}
+
+/// Enqueues Pause command.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn engine_command_pause(ptr: *mut EngineHost) {
+    if let Some(host) = ptr.as_mut() {
+        host.commands.push(EngineCommand::Pause);
+    }
+}
+
+/// Enqueues Seek command.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn engine_command_seek(ptr: *mut EngineHost, frame: u64) {
+    if let Some(host) = ptr.as_mut() {
+        host.commands.push(EngineCommand::Seek(frame));
+    }
+}
+
+/// Enqueues SetLoop command.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn engine_command_set_loop(
+    ptr: *mut EngineHost,
+    enabled: bool,
+    start: u64,
+    end: u64,
+) {
+    if let Some(host) = ptr.as_mut() {
+        host.commands.push(EngineCommand::SetLoop {
+            enabled,
+            start,
+            end,
+        });
+    }
+}
+
+/// Enqueues SetScrub command.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn engine_command_set_scrub(ptr: *mut EngineHost, speed: f32) {
+    if let Some(host) = ptr.as_mut() {
+        host.commands.push(EngineCommand::SetScrub(speed));
+    }
+}
+
+/// Processes a quantum render block in real time.
+///
+/// # Safety
+/// `ptr` must be valid; buffer pointers must point to valid slices of length `frames`.
+#[no_mangle]
+pub unsafe extern "C" fn engine_process_quantum(
+    ptr: *mut EngineHost,
+    in_l_ptr: *const f32,
+    in_r_ptr: *const f32,
+    out_l_ptr: *mut f32,
+    out_r_ptr: *mut f32,
+    frames: usize,
+) {
+    if let Some(host) = ptr.as_mut() {
+        let in_l = std::slice::from_raw_parts(in_l_ptr, frames);
+        let in_r = std::slice::from_raw_parts(in_r_ptr, frames);
+        let out_l = std::slice::from_raw_parts_mut(out_l_ptr, frames);
+        let out_r = std::slice::from_raw_parts_mut(out_r_ptr, frames);
+
+        host.render_quantum(&[in_l, in_r], &mut [out_l, out_r]);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -858,5 +1088,61 @@ mod tests {
         assert_eq!(recovered, vec![0.1, 0.2, 0.3, 0.4]);
         let wav = WasmChunkedRecordWriter::to_wav(&chunk_bytes).unwrap();
         assert!(wav.starts_with(b"RIFF"));
+    }
+
+    #[test]
+    fn test_wasm_engine_core_wrappers() {
+        // Resampler test
+        let resampler = WasmResampler::new(44100, 48000, 1);
+        let in_sine = vec![0.5f32; 441];
+        let out_sine = resampler.resample_channel(&in_sine);
+        assert_eq!(out_sine.len(), 480);
+
+        // Dither test
+        let mut dither = WasmDither::new(1, 16, 1);
+        let mut samples = vec![0.25f32; 100];
+        dither.process_channel(&mut samples);
+        assert!(!samples[50].is_nan());
+
+        // Transport test
+        let mut transport = WasmTransport::new(48000);
+        assert_eq!(transport.playhead(), 0);
+        transport.play();
+        transport.advance(480);
+        assert_eq!(transport.playhead(), 480);
+        transport.seek(100);
+        assert_eq!(transport.playhead(), 100);
+    }
+
+    #[test]
+    fn test_c_abi_engine_quantum() {
+        unsafe {
+            let host = engine_create(48000.0, 128);
+            assert!(!host.is_null());
+
+            engine_command_play(host);
+            engine_command_seek(host, 500);
+            engine_command_set_loop(host, true, 100, 2000);
+            engine_command_set_scrub(host, 1.5);
+
+            let in_l = vec![0.5f32; 128];
+            let in_r = vec![0.5f32; 128];
+            let mut out_l = vec![0.0f32; 128];
+            let mut out_r = vec![0.0f32; 128];
+
+            engine_process_quantum(
+                host,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+
+            assert!(!out_l[0].is_nan());
+            assert!(!out_r[0].is_nan());
+
+            engine_destroy(host);
+        }
     }
 }

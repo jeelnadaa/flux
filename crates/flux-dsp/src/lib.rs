@@ -3,13 +3,21 @@
 
 pub mod binaural;
 pub mod biquad;
+pub mod delay;
+pub mod dither;
 pub mod node;
+pub mod param;
+pub mod resampler;
 pub mod sample;
 pub mod stretch;
 
 pub use binaural::BinauralNode;
 pub use biquad::{BiquadChain, BiquadCoeffs, BiquadState, BiquadType};
+pub use delay::DelayLine;
+pub use dither::{BitDepth, Dither, DitherType};
 pub use node::{DspNode, GainNode, PassthroughNode};
+pub use param::{AutomationLane, AutomationPoint, SmoothedParameter, SmoothingMode};
+pub use resampler::{Resampler, ResamplerQuality};
 pub use sample::Sample;
 pub use stretch::StretchNode;
 

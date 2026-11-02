@@ -4,6 +4,9 @@
 pub mod capture;
 pub mod codec;
 pub mod decoder;
+pub mod graph;
+pub mod render;
+pub mod transport;
 
 pub use capture::{ChannelMeter, ChunkHeader, ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 
@@ -15,9 +18,9 @@ pub use decoder::{
     SeekIndex, SymphoniaDecoder, WavDecoder, WavEncoding, WavWriter,
 };
 pub use flux_dsp;
-
-/// Engine host placeholder.
-pub struct EngineHost;
+pub use graph::{AudioGraph, Bus, EngineNode, NodeId, PanLaw, PluginDelayCompensation};
+pub use render::{CommandQueue, EngineCommand, EngineHost, OfflineRenderer};
+pub use transport::{Transport, TransportState};
 
 #[cfg(test)]
 mod tests {
@@ -25,7 +28,8 @@ mod tests {
 
     #[test]
     fn test_engine_init() {
-        let _ = EngineHost;
+        let host = EngineHost::new(48000.0, 128);
+        assert_eq!(host.transport.state(), TransportState::Stopped);
         let _ = symphonia::default::get_probe();
         let _ = symphonia::default::get_codecs();
     }
