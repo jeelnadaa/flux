@@ -1,19 +1,31 @@
 //! Flux DSP core processing library.
 #![deny(missing_docs)]
 
-/// Sample processing constants and primitives.
-pub mod sample {
-    /// Audio sample type used across Flux: 32-bit floating point.
-    pub type Sample = f32;
-}
+pub mod node;
+pub mod sample;
+
+pub use node::{DspNode, GainNode, PassthroughNode};
+pub use sample::Sample;
 
 #[cfg(test)]
 mod tests {
-    use super::sample::Sample;
+    use super::*;
 
     #[test]
     fn test_sample_type_precision() {
         let s: Sample = 0.0;
         assert_eq!(s, 0.0);
+    }
+
+    #[test]
+    fn test_gain_node_basic() {
+        let mut gain = GainNode::new(0.5);
+        gain.prepare(48000.0, 1);
+        let in_buf = vec![1.0; 128];
+        let mut out_buf = vec![0.0; 128];
+
+        gain.process(&[&in_buf], &mut [&mut out_buf]);
+        // With smoothing from 0.5 to 0.5, gain stays ~0.5
+        assert!((out_buf[127] - 0.5).abs() < 0.01);
     }
 }

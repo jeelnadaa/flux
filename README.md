@@ -11,6 +11,7 @@ A professional audio editor that runs in your browser: non-destructive editing, 
 - **License compliance & audit (P0.1-c):** Automated license scanners (`cargo-deny` and `license-checker-rseidelsohn`) running in `just ci` with zero disallowed licenses; comprehensive legal audit recorded in `LICENSES.md`.
 - **Architecture, Quality Targets & Privacy Standards (P0.1-d):** Formalized ADRs 0001–0011 in `docs/adr/`, living numerical quality targets in `docs/QUALITY_TARGETS.md`, and ephemeral cloud privacy data-flow specification in `docs/PRIVACY_DATA_FLOW.md`.
 - **DSP Testkit & Measurement Harness (P0.2-a):** Implemented `flux-testkit` with signal generators (sine, linear/log chirp, deterministic seeded white/pink noise, impulse, multitone, DC, silence), signal analyzers (RMS, peak, BS.1770 4x oversampled true-peak, FFT magnitude, IEEE 1057 THD+N, group delay, BS.1770-4 K-weighted LUFS), and comparison metrics (SNR, spectral distance, null residual) with 100% passing self-tests.
+- **Universal DSP Invariant Harness (P0.2-b):** Implemented automated validation harness verifying all 13 core DSP invariants (PLAN.md §5.2) across arbitrary `DspNode` implementations (bypass identity, silence-in/silence-out, no-NaN/Inf under hot inputs, block-size invariance, sample-rate invariance across 22.05–192 kHz, mono/stereo handling, click-free parameter smoothing, latency accuracy, tail correctness, state reset, cross-run determinism, real-time safety, and real-time == offline null residuals).
 
 ## What Flux will do
 

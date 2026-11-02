@@ -4,12 +4,39 @@
 pub mod analyzers;
 pub mod compare;
 pub mod generators;
+pub mod invariants;
+
+pub use invariants::{run_dsp_invariants, InvariantConfig, InvariantSuiteResult};
 
 #[cfg(test)]
 mod tests {
     use crate::analyzers::*;
     use crate::compare::*;
     use crate::generators::*;
+    use crate::invariants::{run_dsp_invariants, InvariantConfig};
+    use flux_dsp::{GainNode, PassthroughNode};
+
+    #[test]
+    fn test_passthrough_node_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(PassthroughNode::new()), &config);
+        assert!(
+            result.all_passed(),
+            "Passthrough node failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_gain_node_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(GainNode::new(0.8)), &config);
+        assert!(
+            result.all_passed(),
+            "Gain node failed invariants: {:?}",
+            result
+        );
+    }
 
     #[test]
     fn test_sine_generator_and_spectrum() {
@@ -129,7 +156,6 @@ mod tests {
         // but true reconstructed analog waveform peaks above 1.0 (inter-sample peak)
         let sample_rate = 48000.0;
         let freq = 12000.0; // Fs / 4
-                            // With phase offset of PI / 4, samples hit sin(pi/4) = 0.7071
         let sig = sine(freq, sample_rate, 0.05, 1.0, std::f32::consts::PI / 4.0);
 
         let (tp, tp_db) = true_peak(&sig);
@@ -184,8 +210,6 @@ mod tests {
         }
 
         let degraded_snr = snr(&sig_a, &degraded);
-        // Clean sine RMS is ~0.707 (-3 dB), noise RMS is 0.001/sqrt(3) ~ 0.000577 (-64 dB)
-        // SNR should be roughly 55-65 dB
         assert!(
             degraded_snr > 50.0 && degraded_snr < 70.0,
             "SNR was {}",
