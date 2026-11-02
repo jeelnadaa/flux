@@ -6,9 +6,10 @@ pub mod decoder;
 
 pub use codec::{AudioMetadata, ExportFormat, Mp3Encoder, OpusEncoder, VorbisEncoder};
 pub use decoder::{
-    decode_buffer, open_decoder, AiffDecoder, AiffEncoding, AiffWriter, AudioBuffer, AudioDecoder,
-    AudioFileInfo, BwfInfo, ContainerFormat, ContainerMetadata, DecodeError, SampleFormat,
-    WavDecoder, WavEncoding, WavWriter,
+    decode_buffer, is_ffmpeg_available, open_decoder, AiffDecoder, AiffEncoding, AiffWriter,
+    AudioBuffer, AudioDecoder, AudioFileInfo, BwfInfo, ContainerFormat, ContainerMetadata,
+    CoverArt, DecodeError, FfmpegDecoder, GaplessInfo, OpusDecoder, SampleFormat, SeekEntry,
+    SeekIndex, SymphoniaDecoder, WavDecoder, WavEncoding, WavWriter,
 };
 pub use flux_dsp;
 
@@ -22,5 +23,7 @@ mod tests {
     #[test]
     fn test_engine_init() {
         let _ = EngineHost;
+        let _ = symphonia::default::get_probe();
+        let _ = symphonia::default::get_codecs();
     }
 }

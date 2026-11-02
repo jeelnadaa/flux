@@ -46,8 +46,9 @@ Scanned and verified by `cargo-deny`.
 | `flux-wasm` | WebAssembly bindings | MIT OR Apache-2.0 | First-party | Web target exports |
 | `flux-testkit` | Signal generators & DSP test harness | MIT OR Apache-2.0 | First-party | Verification fixtures and invariants |
 | `proptest` | Property-based testing framework | MIT OR Apache-2.0 | Allowed | Development and test runner |
+| `symphonia` | Multi-format audio container and decoder | MPL-2.0 | Allowed | Permissive media decoding (FLAC, MP3, AAC, Vorbis, MP4, MKV) |
+| `opus1` | RFC 6716 Opus audio codec decoder | BSD-3-Clause | Allowed | Pure-Rust Opus decoding |
 | `wasm-bindgen` | WASM interop | MIT OR Apache-2.0 | Allowed | Standard WebAssembly binding toolchain |
-| `symphonia` *(Planned P1)* | Multi-format audio decoder | MPL-2.0 / MIT / Apache-2.0 | Allowed | Permissive audio decoding |
 | `signalsmith-stretch` *(Planned P3)* | Pitch-shift and time-stretch | MIT | Allowed | Avoids GPL-restricted Rubber Band |
 | `rubato` *(Planned P1)* | High-quality resampling | MIT | Allowed | Bandlimited interpolation |
 | `realfft` / `rustfft` *(Planned P4)* | Partitioned convolution / FFT | MIT OR Apache-2.0 | Allowed | Ambisonics and impulse response processing |

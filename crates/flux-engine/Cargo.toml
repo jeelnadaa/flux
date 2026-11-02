@@ -7,6 +7,8 @@ description = "Flux audio playback engine and graph orchestration"
 
 [dependencies]
 flux-dsp = { path = "../flux-dsp" }
+symphonia = { version = "0.6.1", default-features = false, features = ["flac", "mp3", "aac", "vorbis", "ogg", "isomp4", "mkv", "pcm", "all-meta"] }
+opus1 = { version = "0.3.0", default-features = false, features = ["std", "heap"] }
 
 [dev-dependencies]
 flux-testkit = { path = "../flux-testkit" }
