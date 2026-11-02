@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 1 — Core engine & I/O
-- **Next item:** P1.2-a
+- **Next item:** P1.3 (P1.3-a Effect graph, node trait, parameter smoothing, latency compensation)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -16,7 +16,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
-| 1 | Core engine & I/O | In progress | 5 / 18 |
+| 1 | Core engine & I/O | In progress | 6 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P1.2-a implemented microphone capture, raw constraints, input level meter with clip indicator hold, pre-roll ring buffer, and crash-safe chunked streaming to OPFS with bit-exact recovery; 67 workspace tests passing, Playwright browser test passing (max error 2.96e-8); just ci green.
 
 - 2026-11-03: P1.1-b, P1.1-c, P1.1-d, P1.1-e implemented streaming compressed decoders (FLAC 16/24-bit, MP3 CBR/VBR with gapless delay/padding, AAC ADTS, OGG Vorbis, pure-Rust RFC 6716 OGG Opus with preskip trimming), video container audio extraction (MP4/MOV, WebM/MKV), sample-accurate seek index, and rich container metadata parser (ID3v2, Vorbis Comments, cover art); 63 workspace tests passing; just ci green.
 - 2026-11-03: P1.1-a implemented bit-exact WAV (PCM 8/16/24/32, Float 32/64, RF64/ds64, BWF bext, Extensible) and AIFF/AIFC (PCM 8/16/24/32, Float 32, 80-bit IEEE float) streaming decoders/writers; verified bit-exact (0.00e0 delta) against libsndfile 1.2.2 across 13 format variants and 15 corpus fixtures; just ci green.
@@ -103,7 +105,7 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P1.1-c Streaming decode and sample-accurate seek index
 - [x] P1.1-d Video audio extraction and FFmpeg fallback
 - [x] P1.1-e Metadata and cover art read and preserve
-- [ ] P1.2-a Recording: capture, device selection, meter, crash-safe chunked writes
+- [x] P1.2-a Recording: capture, device selection, meter, crash-safe chunked writes
 - [ ] P1.3-a Effect graph, node trait, parameter smoothing, latency compensation
 - [ ] P1.3-b Real-time engine in AudioWorklet (`EngineHost`), transport, seamless loop, scrub
 - [ ] P1.3-c Offline renderer; real-time vs offline null test

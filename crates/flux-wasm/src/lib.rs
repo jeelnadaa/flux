@@ -5,6 +5,7 @@ use flux_dsp::binaural::BinauralNode;
 use flux_dsp::biquad::{BiquadChain, BiquadType};
 use flux_dsp::node::DspNode;
 use flux_dsp::stretch::StretchNode;
+use flux_engine::capture::{ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
 use wasm_bindgen::prelude::*;
 
@@ -461,6 +462,217 @@ pub unsafe extern "C" fn biquad_reset(ptr: *mut BiquadChain) {
     }
 }
 
+/// WebAssembly wrapper for input level meter.
+#[wasm_bindgen]
+pub struct WasmLevelMeter {
+    inner: InputLevelMeter,
+    last_peaks: Vec<f32>,
+    last_rms: Vec<f32>,
+    last_clipped: Vec<bool>,
+    last_clip_held: Vec<bool>,
+}
+
+#[wasm_bindgen]
+impl WasmLevelMeter {
+    /// Creates a new `WasmLevelMeter`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(num_channels: usize, sample_rate: u32) -> Self {
+        Self {
+            inner: InputLevelMeter::new(num_channels, sample_rate),
+            last_peaks: vec![-120.0; num_channels],
+            last_rms: vec![-120.0; num_channels],
+            last_clipped: vec![false; num_channels],
+            last_clip_held: vec![false; num_channels],
+        }
+    }
+
+    /// Processes an interleaved audio buffer of length `frames * channels`.
+    pub fn process_interleaved(&mut self, input: &[f32], channels: usize) {
+        if channels == 0 || input.is_empty() {
+            return;
+        }
+        let num_frames = input.len() / channels;
+        let mut deinterleaved = vec![Vec::with_capacity(num_frames); channels];
+        for frame in 0..num_frames {
+            let base = frame * channels;
+            for ch in 0..channels {
+                deinterleaved[ch].push(input[base + ch]);
+            }
+        }
+        let channel_refs: Vec<&[f32]> = deinterleaved.iter().map(|c| c.as_slice()).collect();
+        let readings = self.inner.process(&channel_refs);
+        for (i, r) in readings.into_iter().enumerate() {
+            if i < self.last_peaks.len() {
+                self.last_peaks[i] = r.peak_db;
+                self.last_rms[i] = r.rms_db;
+                self.last_clipped[i] = r.clipped;
+                self.last_clip_held[i] = r.clip_held;
+            }
+        }
+    }
+
+    /// Gets peak level in dBFS for channel.
+    pub fn get_peak_db(&self, channel: usize) -> f32 {
+        self.last_peaks.get(channel).copied().unwrap_or(-120.0)
+    }
+
+    /// Gets RMS level in dBFS for channel.
+    pub fn get_rms_db(&self, channel: usize) -> f32 {
+        self.last_rms.get(channel).copied().unwrap_or(-120.0)
+    }
+
+    /// Returns whether channel is currently clipping.
+    pub fn is_clipped(&self, channel: usize) -> bool {
+        self.last_clipped.get(channel).copied().unwrap_or(false)
+    }
+
+    /// Returns whether channel has a held clip indication.
+    pub fn is_clip_held(&self, channel: usize) -> bool {
+        self.last_clip_held.get(channel).copied().unwrap_or(false)
+    }
+
+    /// Clears held clip indicators.
+    pub fn clear_clips(&mut self) {
+        self.inner.clear_clips();
+        self.last_clip_held.fill(false);
+    }
+}
+
+/// WebAssembly wrapper for pre-roll circular audio buffer.
+#[wasm_bindgen]
+pub struct WasmPreRollBuffer {
+    inner: PreRollBuffer,
+    channels: usize,
+}
+
+#[wasm_bindgen]
+impl WasmPreRollBuffer {
+    /// Creates a new `WasmPreRollBuffer`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(num_channels: usize, sample_rate: u32, duration_seconds: f64) -> Self {
+        Self {
+            inner: PreRollBuffer::new(num_channels, sample_rate, duration_seconds),
+            channels: num_channels,
+        }
+    }
+
+    /// Appends interleaved frames to pre-roll buffer.
+    pub fn append_interleaved(&mut self, input: &[f32]) {
+        if self.channels == 0 || input.is_empty() {
+            return;
+        }
+        let num_frames = input.len() / self.channels;
+        let mut deinterleaved = vec![Vec::with_capacity(num_frames); self.channels];
+        for frame in 0..num_frames {
+            let base = frame * self.channels;
+            for ch in 0..self.channels {
+                deinterleaved[ch].push(input[base + ch]);
+            }
+        }
+        let refs: Vec<&[f32]> = deinterleaved.iter().map(|c| c.as_slice()).collect();
+        self.inner.append(&refs);
+    }
+
+    /// Drains all buffered pre-roll audio as an interleaved vector.
+    pub fn drain_interleaved(&mut self) -> Vec<f32> {
+        let planar = self.inner.drain();
+        if planar.is_empty() || planar[0].is_empty() {
+            return Vec::new();
+        }
+        let num_frames = planar[0].len();
+        let mut interleaved = Vec::with_capacity(num_frames * self.channels);
+        for frame in 0..num_frames {
+            for ch in planar.iter().take(self.channels) {
+                interleaved.push(ch[frame]);
+            }
+        }
+        interleaved
+    }
+
+    /// Number of frames currently in pre-roll buffer.
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Whether buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Clears pre-roll buffer.
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
+}
+
+/// WebAssembly wrapper for crash-safe chunked recording stream.
+#[wasm_bindgen]
+pub struct WasmChunkedRecordWriter {
+    inner: ChunkedRecordWriter,
+    channels: usize,
+}
+
+#[wasm_bindgen]
+impl WasmChunkedRecordWriter {
+    /// Creates a new `WasmChunkedRecordWriter`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(sample_rate: u32, channels: u16) -> Self {
+        Self {
+            inner: ChunkedRecordWriter::new(sample_rate, channels),
+            channels: channels as usize,
+        }
+    }
+
+    /// Encodes an interleaved audio block into a self-contained, crash-safe chunk.
+    pub fn encode_chunk(&mut self, input: &[f32]) -> Result<Vec<u8>, JsValue> {
+        if self.channels == 0 || input.is_empty() {
+            return Ok(Vec::new());
+        }
+        let num_frames = input.len() / self.channels;
+        let mut deinterleaved = vec![Vec::with_capacity(num_frames); self.channels];
+        for frame in 0..num_frames {
+            let base = frame * self.channels;
+            for ch in 0..self.channels {
+                deinterleaved[ch].push(input[base + ch]);
+            }
+        }
+        let refs: Vec<&[f32]> = deinterleaved.iter().map(|c| c.as_slice()).collect();
+        let mut out = Vec::new();
+        self.inner
+            .write_chunk(&mut out, &refs)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(out)
+    }
+
+    /// Recovers all valid audio chunks from a stream buffer, returning interleaved float samples.
+    pub fn recover_interleaved(data: &[u8]) -> Result<Vec<f32>, JsValue> {
+        let mut cursor = std::io::Cursor::new(data);
+        let audio = ChunkedRecordWriter::recover_from_stream(&mut cursor)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        let num_channels = audio.channels.len();
+        let num_frames = audio.num_frames();
+        let mut interleaved = Vec::with_capacity(num_frames * num_channels);
+
+        for frame in 0..num_frames {
+            for ch in audio.channels.iter().take(num_channels) {
+                interleaved.push(ch[frame]);
+            }
+        }
+
+        Ok(interleaved)
+    }
+
+    /// Converts a stream of chunked recording bytes into a standard WAV file.
+    pub fn to_wav(data: &[u8]) -> Result<Vec<u8>, JsValue> {
+        let mut cursor = std::io::Cursor::new(data);
+        let mut wav_out = std::io::Cursor::new(Vec::new());
+        ChunkedRecordWriter::convert_chunks_to_wav(&mut cursor, &mut wav_out)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(wav_out.into_inner())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -618,5 +830,33 @@ mod tests {
 
             codec_free_audio_buffer(audio_ptr, out_samples_len);
         }
+    }
+
+    #[test]
+    fn test_wasm_capture_wrappers() {
+        // Meter test
+        let mut meter = WasmLevelMeter::new(2, 48000);
+        let interleaved = vec![0.5f32, -0.5f32, 0.5f32, -0.5f32];
+        meter.process_interleaved(&interleaved, 2);
+        assert!((meter.get_peak_db(0) - (-6.02)).abs() < 0.1);
+        assert!(!meter.is_clipped(0));
+
+        // PreRollBuffer test
+        let mut preroll = WasmPreRollBuffer::new(2, 48000, 0.1);
+        assert!(preroll.is_empty());
+        preroll.append_interleaved(&[0.1, 0.2, 0.3, 0.4]);
+        assert_eq!(preroll.len(), 2);
+        let drained = preroll.drain_interleaved();
+        assert_eq!(drained, vec![0.1, 0.2, 0.3, 0.4]);
+        assert!(preroll.is_empty());
+
+        // ChunkedRecordWriter test
+        let mut writer = WasmChunkedRecordWriter::new(48000, 2);
+        let chunk_bytes = writer.encode_chunk(&[0.1, 0.2, 0.3, 0.4]).unwrap();
+        assert!(!chunk_bytes.is_empty());
+        let recovered = WasmChunkedRecordWriter::recover_interleaved(&chunk_bytes).unwrap();
+        assert_eq!(recovered, vec![0.1, 0.2, 0.3, 0.4]);
+        let wav = WasmChunkedRecordWriter::to_wav(&chunk_bytes).unwrap();
+        assert!(wav.starts_with(b"RIFF"));
     }
 }

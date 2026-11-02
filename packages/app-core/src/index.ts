@@ -22,3 +22,5 @@ export function createProjectMetadata(name: string, sampleRate = 48000): Project
     updatedAt: now,
   };
 }
+
+export * from "./capture/AudioCaptureManager.js";
