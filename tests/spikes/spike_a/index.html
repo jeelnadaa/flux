@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flux Spike A: AudioWorklet + WASM Biquad Chain</title>
+  </head>
+  <body>
+    <h1>Flux Spike A: AudioWorklet + WASM Biquad Chain</h1>
+    <div id="status">Ready</div>
+    <pre id="output"></pre>
+
+    <script>
+      async function runSpikeATest() {
+        const outputEl = document.getElementById("output");
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = "Running...";
+
+        try {
+          // Fetch and compile WASM module
+          const wasmResponse = await fetch("/target/wasm32-unknown-unknown/debug/flux_wasm.wasm");
+          if (!wasmResponse.ok) {
+            throw new Error("Failed to fetch WASM binary: HTTP " + wasmResponse.status);
+          }
+          const wasmBytes = await wasmResponse.arrayBuffer();
+          const wasmModule = await WebAssembly.compile(wasmBytes);
+
+          // Run direct benchmark of 1,000 x 128-sample blocks through 8-stage biquad chain
+          const importObj = {
+            __wbindgen_placeholder__: new Proxy({}, { get: () => () => {} }),
+            __wbindgen_externref_xform__: new Proxy({}, { get: () => () => {} }),
+          };
+          const benchInstance = await WebAssembly.instantiate(wasmModule, importObj);
+          const exp = benchInstance.exports;
+          const chain = exp.biquad_create(48000.0, 8);
+          exp.biquad_configure_peaking(chain, 0, 1000.0, 1.0, 3.0);
+          exp.biquad_configure_highpass(chain, 1, 40.0, 0.707);
+          exp.biquad_configure_lowpass(chain, 2, 18000.0, 0.707);
+
+          const inBuf = exp.biquad_alloc_buffer(128);
+          const outBuf = exp.biquad_alloc_buffer(128);
+
+          // Populate inBuf with 1 kHz sine
+          const inView = new Float32Array(exp.memory.buffer, inBuf, 128);
+          for (let i = 0; i < 128; i++) {
+            inView[i] = Math.sin((2 * Math.PI * 1000 * i) / 48000);
+          }
+
+          // Benchmark 1,000 blocks
+          const t0 = performance.now();
+          const numBlocks = 1000;
+          for (let b = 0; b < numBlocks; b++) {
+            exp.biquad_process_quantum(chain, inBuf, outBuf, 128);
+          }
+          const t1 = performance.now();
+          const totalMs = t1 - t0;
+          const avgBlockMs = totalMs / numBlocks;
+          // 128 samples at 48 kHz is 2.667 ms
+          const blockBudgetMs = (128 / 48000) * 1000;
+          const cpuPercent = (avgBlockMs / blockBudgetMs) * 100;
+
+          // OfflineAudioContext smoke test with AudioWorklet
+          const sampleRate = 48000;
+          const renderFrames = sampleRate; // 1.0 second of audio (48,000 samples)
+          const offlineCtx = new OfflineAudioContext(1, renderFrames, sampleRate);
+
+          await offlineCtx.audioWorklet.addModule("/tests/spikes/spike_a/processor.js");
+
+          const workletNode = new AudioWorkletNode(offlineCtx, "flux-biquad-processor");
+          workletNode.connect(offlineCtx.destination);
+
+          // Wait for AudioWorkletProcessor to initialize WASM
+          const initPromise = new Promise((resolve, reject) => {
+            workletNode.port.onmessage = (e) => {
+              if (e.data.type === "READY") resolve();
+              else if (e.data.type === "ERROR") reject(new Error(e.data.error));
+            };
+          });
+
+          workletNode.port.postMessage({
+            type: "INIT",
+            sampleRate: sampleRate,
+            wasmModule: wasmModule,
+          });
+
+          await initPromise;
+
+          // Render 1.0 second through AudioWorklet
+          const renderedBuffer = await offlineCtx.startRendering();
+          const samples = renderedBuffer.getChannelData(0);
+
+          // Analyze rendered audio:
+          // 1. Check for NaN / Infinity
+          let nanCount = 0;
+          let minSample = Infinity;
+          let maxSample = -Infinity;
+          let sumSq = 0;
+          for (let i = 0; i < samples.length; i++) {
+            const s = samples[i];
+            if (isNaN(s) || !isFinite(s)) {
+              nanCount++;
+            }
+            if (s < minSample) minSample = s;
+            if (s > maxSample) maxSample = s;
+            sumSq += s * s;
+          }
+
+          const rms = Math.sqrt(sumSq / samples.length);
+          const rmsDb = 20 * Math.log10(rms);
+          const peak = Math.max(Math.abs(minSample), Math.abs(maxSample));
+          const peakDb = 20 * Math.log10(peak);
+
+          // 2. Estimate frequency via zero-crossing rate over steady-state (skip initial 10 ms transient)
+          const startIndex = Math.floor(sampleRate * 0.01);
+          let zeroCrossings = 0;
+          for (let i = startIndex; i < samples.length - 1; i++) {
+            if (
+              (samples[i] >= 0 && samples[i + 1] < 0) ||
+              (samples[i] < 0 && samples[i + 1] >= 0)
+            ) {
+              zeroCrossings++;
+            }
+          }
+          const analyzedDuration = (samples.length - 1 - startIndex) / sampleRate;
+          // Each full cycle has 2 zero crossings -> f = crossings / (2 * duration)
+          const measuredFreq = zeroCrossings / (2 * analyzedDuration);
+
+          const result = {
+            success: nanCount === 0 && Math.abs(measuredFreq - 1000.0) < 5.0 && cpuPercent < 30.0,
+            sampleRate: sampleRate,
+            renderedFrames: samples.length,
+            measuredFreqHz: Math.round(measuredFreq * 100) / 100,
+            peakDb: Math.round(peakDb * 100) / 100,
+            rmsDb: Math.round(rmsDb * 100) / 100,
+            nanCount: nanCount,
+            avgBlockUs: Math.round(avgBlockMs * 1000 * 100) / 100,
+            cpuPercent: Math.round(cpuPercent * 100) / 100,
+            cpuBudgetMs: Math.round(blockBudgetMs * 100) / 100,
+            stages: 8,
+          };
+
+          window.spikeAResult = result;
+          statusEl.textContent = result.success ? "PASSED" : "FAILED";
+          outputEl.textContent = JSON.stringify(result, null, 2);
+
+          exp.biquad_free_buffer(inBuf, 128);
+          exp.biquad_free_buffer(outBuf, 128);
+          exp.biquad_destroy(chain);
+
+          return result;
+        } catch (err) {
+          statusEl.textContent = "ERROR: " + err.message;
+          outputEl.textContent = err.stack;
+          window.spikeAResult = { success: false, error: err.message };
+          throw err;
+        }
+      }
+
+      // Auto-run if requested
+      if (window.location.search.includes("autorun=true")) {
+        window.addEventListener("load", runSpikeATest);
+      }
+    </script>
+  </body>
+</html>

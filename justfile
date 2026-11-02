@@ -6,8 +6,8 @@ npm_cmd := if os() == "windows" { "npm.cmd" } else { "npm" }
 default:
     @just --list
 
-# The local CI gate: format, lint, typos, licenses, unit, property, golden, null, integration, E2E, WASM build, Python eval
-ci: fmt-check lint typos license-scan check-rust test-rust test-python build-wasm check-ts
+# The local CI gate: format, lint, typos, licenses, unit, property, golden, null, integration, E2E, WASM build, Python eval, browser smoke test
+ci: fmt-check lint typos license-scan check-rust test-rust test-python test-browser build-wasm check-ts
 
 # Format check across Rust and TypeScript
 fmt-check:
@@ -44,6 +44,10 @@ test-rust:
 # Run Python evaluation harness unit tests
 test-python:
     python -m pytest tools/eval/tests
+
+# Run headless browser AudioWorklet + WASM smoke tests
+test-browser:
+    python -m pytest tests/spikes/spike_a/test_spike_a.py
 
 # Run full Python evaluation benchmark suite and update dashboards
 eval:

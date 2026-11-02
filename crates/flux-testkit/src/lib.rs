@@ -23,7 +23,28 @@ mod tests {
     use crate::compare::*;
     use crate::generators::*;
     use crate::invariants::{run_dsp_invariants, InvariantConfig};
-    use flux_dsp::{GainNode, PassthroughNode};
+    use flux_dsp::{BiquadChain, BiquadType, GainNode, PassthroughNode};
+
+    #[test]
+    fn test_biquad_chain_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(
+            || {
+                let mut chain = BiquadChain::new(4);
+                chain.configure_stage(0, BiquadType::Highpass, 40.0, 0.707, 0.0);
+                chain.configure_stage(1, BiquadType::Peaking, 1000.0, 1.0, 3.0);
+                chain.configure_stage(2, BiquadType::Peaking, 4000.0, 1.5, -2.0);
+                chain.configure_stage(3, BiquadType::Lowpass, 18000.0, 0.707, 0.0);
+                Box::new(chain)
+            },
+            &config,
+        );
+        assert!(
+            result.all_passed(),
+            "Biquad chain failed invariants: {:?}",
+            result
+        );
+    }
 
     #[test]
     fn test_passthrough_node_universal_invariants() {

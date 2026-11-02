@@ -1,9 +1,11 @@
 //! Flux DSP core processing library.
 #![deny(missing_docs)]
 
+pub mod biquad;
 pub mod node;
 pub mod sample;
 
+pub use biquad::{BiquadChain, BiquadCoeffs, BiquadState, BiquadType};
 pub use node::{DspNode, GainNode, PassthroughNode};
 pub use sample::Sample;
 
