@@ -2,7 +2,7 @@
 
 A professional audio editor that runs in your browser: non-destructive editing, real 3D and 8D spatial audio, creative effects, and on-device AI for stems, voice cleanup, and editing audio by editing text.
 
-> **Status: pre-alpha.** Foundations in progress. Monorepo skeleton and automated CI harness established. See [What works today](#what-works-today).
+> **Status: pre-alpha.** Phase 0 (Foundations) is **Agent-complete** (13 / 13 items completed; human legal/trademark reviews queued). Monorepo skeleton, automated CI gate, DSP testkit, objective metric harness, and all 6 de-risking spikes verified. See [What works today](#what-works-today) and [docs/SPIKES_REPORT.md](docs/SPIKES_REPORT.md).
 
 ## What works today
 
@@ -18,6 +18,7 @@ A professional audio editor that runs in your browser: non-destructive editing, 
 - **ONNX Runtime Web In-Browser ML Benchmarks (P0.3-b / Spike B):** Multi-backend ONNX Runtime Web integration (WebGPU with WASM SIMD fallback) tested in headless browser; verified real-time inference on RNNoise-class frame speech model (100 frames, 0.068 ms/frame, RTF 0.0073 vs <0.5 budget) and chunked 4-stem HTDemucs-class model (4 x 1.0s chunks, 8.42 ms/chunk, RTF 0.0135, zero memory leak).
 - **Binaural 3D/8D Spatializer & 2-Hour OPFS Streaming (P0.3-c / Spikes C & D):** Spherical head acoustic model (`BinauralNode` in Rust `flux-dsp` verified via all 13 universal DSP invariants) with Woodworth fractional ITD delays, head shadow ILD shelf filtering, and continuous 8D auto-orbit in AudioWorklet (measured 11.8 µs block time / 0.44% CPU utilization, 4.55 dB ILD separation, zero clicks); OPFS streaming reader scrubbing 2-hour timeline with 0.34 ms random seek latency, 9.54 MB heap utilization (well below 300 MB budget), and sub-millisecond multi-resolution peak pyramid zoom.
 - **Signalsmith Stretcher, WASM Audio Encoders & WebCodecs AAC (P0.3-d / Spike F):** Time-stretching & pitch-shifting engine (`StretchNode` in Rust `flux-dsp` verified via all 13 universal DSP invariants) running in WASM with 15.8 µs block time / 0.59% CPU utilization and zero NaNs; in-WASM encoders for MP3, Ogg Opus, and Ogg Vorbis with valid headers and framing; WebCodecs `AudioEncoder` AAC-LC platform encoding verified in browser.
+- **Storage Durability, Crash Recovery & Spikes Go/No-Go Report (P0.3-e / Spike G):** Browser storage persistence and quota evaluation (10 GB available); append-only project command journaling with simulated mid-write tab termination recovery in 1.5 ms with zero data loss; comprehensive architecture Go/No-Go evaluation report compiled in `docs/SPIKES_REPORT.md` (all 6 prototypes marked GO).
 
 ## What Flux will do
 

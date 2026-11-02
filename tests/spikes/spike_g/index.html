@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flux Spike G: Storage Durability &amp; Crash Recovery</title>
+  </head>
+  <body>
+    <h1>Flux Spike G: Storage Durability &amp; Journal Crash Recovery</h1>
+    <div id="status">Ready</div>
+    <pre id="output"></pre>
+
+    <script>
+      async function runSpikeGTest() {
+        const outputEl = document.getElementById("output");
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = "Running...";
+
+        function log(msg) {
+          console.log(msg);
+          outputEl.textContent += msg + "\n";
+        }
+
+        try {
+          // -------------------------------------------------------------
+          // 1. Storage Durability & Quota Estimation
+          // -------------------------------------------------------------
+          log("--- 1. Storage Durability & Quota ---");
+          let persistSupported = false;
+          let isPersisted = false;
+
+          if (navigator.storage && navigator.storage.persist) {
+            persistSupported = true;
+            try {
+              isPersisted = await navigator.storage.persisted();
+              // Request persistence
+              const granted = await navigator.storage.persist();
+              log(
+                "Storage persist() requested. Granted: " +
+                  granted +
+                  ", initially persisted: " +
+                  isPersisted,
+              );
+            } catch (err) {
+              log("persist() call notice: " + err.message);
+            }
+          }
+
+          let quotaBytes = 0;
+          let usageBytes = 0;
+          if (navigator.storage && navigator.storage.estimate) {
+            const estimate = await navigator.storage.estimate();
+            quotaBytes = estimate.quota || 0;
+            usageBytes = estimate.usage || 0;
+            log(
+              "Storage quota estimate: " +
+                (quotaBytes / (1024 * 1024 * 1024)).toFixed(2) +
+                " GB, usage: " +
+                (usageBytes / (1024 * 1024)).toFixed(2) +
+                " MB",
+            );
+          }
+
+          // -------------------------------------------------------------
+          // 2. Kill-Mid-Write Journal Crash Recovery in OPFS
+          // -------------------------------------------------------------
+          log("\n--- 2. Journal Crash Recovery in OPFS ---");
+          if (!navigator.storage || !navigator.storage.getDirectory) {
+            throw new Error("OPFS not available");
+          }
+          const opfsRoot = await navigator.storage.getDirectory();
+          const projDir = await opfsRoot.getDirectoryHandle("test_crash_recovery_proj", {
+            create: true,
+          });
+
+          // Write initial journal.jsonl
+          const journalHandle = await projDir.getFileHandle("journal.jsonl", {
+            create: true,
+          });
+          const writable = await journalHandle.createWritable();
+
+          const validCommands = [
+            { id: 1, command: "InitProject", sample_rate: 48000, channels: 2 },
+            { id: 2, command: "CreateTrack", name: "Vocals", color: "#FF5500" },
+            { id: 3, command: "InsertClip", track_id: 1, start_frame: 0, duration: 96000 },
+            { id: 4, command: "SetGain", track_id: 1, gain_db: -3.0 },
+            { id: 5, command: "AddBiquadPeaking", track_id: 1, freq: 1000.0, q: 1.0, gain_db: 4.0 },
+          ];
+
+          let journalContent = "";
+          for (const cmd of validCommands) {
+            journalContent += JSON.stringify(cmd) + "\n";
+          }
+
+          // Simulate a kill mid-write by appending an incomplete truncated JSON string at the end
+          journalContent += '{"id": 6, "command": "SplitClip", "track_id": 1, "frame_pos": 480'; // Truncated mid-write
+
+          await writable.write(journalContent);
+          await writable.close();
+          log(
+            "Simulated crashed project journal written with 5 committed commands + 1 truncated mid-write command.",
+          );
+
+          // Simulate application startup and recovery
+          const t0_rec = performance.now();
+          const recoveredFile = await journalHandle.getFile();
+          const recoveredText = await recoveredFile.text();
+
+          const recoveredCommands = [];
+          const discardedLines = [];
+
+          const lines = recoveredText.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            try {
+              const parsed = JSON.parse(line);
+              recoveredCommands.push(parsed);
+            } catch (_err) {
+              discardedLines.push({ lineIndex: i, text: line });
+            }
+          }
+          const t1_rec = performance.now();
+          const recoveryTimeMs = t1_rec - t0_rec;
+
+          log(
+            "Recovery completed in " +
+              recoveryTimeMs.toFixed(3) +
+              " ms: recovered " +
+              recoveredCommands.length +
+              " commands, discarded " +
+              discardedLines.length +
+              " corrupted trailing line.",
+          );
+
+          if (recoveredCommands.length !== validCommands.length) {
+            throw new Error(
+              "Expected " +
+                validCommands.length +
+                " recovered commands, got " +
+                recoveredCommands.length,
+            );
+          }
+          if (discardedLines.length !== 1) {
+            throw new Error("Expected 1 discarded corrupted line, got " + discardedLines.length);
+          }
+
+          // Clean up test directory in OPFS
+          try {
+            await opfsRoot.removeEntry("test_crash_recovery_proj", { recursive: true });
+          } catch (_e) {
+            // Ignore cleanup failure
+          }
+
+          const result = {
+            success: true,
+            durability: {
+              persistSupported,
+              isPersisted,
+              quotaBytes,
+              usageBytes,
+            },
+            journalRecovery: {
+              validCommandsCount: validCommands.length,
+              recoveredCommandsCount: recoveredCommands.length,
+              discardedCorruptedLinesCount: discardedLines.length,
+              recoveryTimeMs: recoveryTimeMs,
+            },
+          };
+
+          window.spikeGResult = result;
+          statusEl.textContent = "PASSED";
+          log("\nSpike G completed successfully!");
+        } catch (err) {
+          statusEl.textContent = "FAILED: " + err.message;
+          log("Error: " + (err.stack || err.message));
+          window.spikeGResult = {
+            success: false,
+            error: err.message,
+            stack: err.stack,
+          };
+        }
+      }
+
+      if (new URLSearchParams(window.location.search).get("autorun") === "true") {
+        window.addEventListener("load", runSpikeGTest);
+      }
+    </script>
+  </body>
+</html>
