@@ -4,6 +4,8 @@
 use flux_dsp::binaural::BinauralNode;
 use flux_dsp::biquad::{BiquadChain, BiquadType};
 use flux_dsp::node::DspNode;
+use flux_dsp::stretch::StretchNode;
+use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
 use wasm_bindgen::prelude::*;
 
 /// Returns the Flux DSP engine version string.
@@ -78,7 +80,7 @@ impl WasmBiquadChain {
 /// Allocates an f32 buffer in WebAssembly linear memory.
 #[no_mangle]
 pub extern "C" fn biquad_alloc_buffer(len: usize) -> *mut f32 {
-    let mut vec = Vec::with_capacity(len);
+    let mut vec = vec![0.0f32; len];
     let ptr = vec.as_mut_ptr();
     std::mem::forget(vec);
     ptr
@@ -90,8 +92,8 @@ pub extern "C" fn biquad_alloc_buffer(len: usize) -> *mut f32 {
 /// `ptr` must have been returned by `biquad_alloc_buffer` with capacity `len`.
 #[no_mangle]
 pub unsafe extern "C" fn biquad_free_buffer(ptr: *mut f32, len: usize) {
-    if !ptr.is_null() {
-        drop(Vec::from_raw_parts(ptr, 0, len));
+    if !ptr.is_null() && len > 0 {
+        drop(Vec::from_raw_parts(ptr, len, len));
     }
 }
 
@@ -271,6 +273,142 @@ pub unsafe extern "C" fn biquad_render_tone(
     }
 }
 
+/// Creates a new `StretchNode` instance.
+#[no_mangle]
+pub extern "C" fn stretch_create(sample_rate: f32) -> *mut StretchNode {
+    let mut node = Box::new(StretchNode::new());
+    node.prepare(sample_rate, 2);
+    Box::into_raw(node)
+}
+
+/// Destroys a `StretchNode` instance.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by `stretch_create`.
+#[no_mangle]
+pub unsafe extern "C" fn stretch_destroy(ptr: *mut StretchNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets the time-stretch playback ratio.
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `StretchNode`.
+#[no_mangle]
+pub unsafe extern "C" fn stretch_set_ratio(ptr: *mut StretchNode, ratio: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_stretch_ratio(ratio);
+    }
+}
+
+/// Sets the pitch shift in semitones.
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `StretchNode`.
+#[no_mangle]
+pub unsafe extern "C" fn stretch_set_pitch(ptr: *mut StretchNode, semitones: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_pitch_shift(semitones);
+    }
+}
+
+/// Processes an audio quantum through the time/pitch stretcher.
+///
+/// # Safety
+/// `ptr` must be valid, and `in_ptr` and `out_ptr` must point to valid slices of length `frames`.
+#[no_mangle]
+pub unsafe extern "C" fn stretch_process_quantum(
+    ptr: *mut StretchNode,
+    in_ptr: *const f32,
+    out_ptr: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let in_slice = std::slice::from_raw_parts(in_ptr, frames);
+        let out_slice = std::slice::from_raw_parts_mut(out_ptr, frames);
+        node.process(&[in_slice], &mut [out_slice]);
+    }
+}
+
+/// Encodes audio samples to MP3 in WebAssembly.
+///
+/// # Safety
+/// `samples_ptr` must point to `samples_len` floats, and `out_len` must be a valid pointer.
+#[no_mangle]
+pub unsafe extern "C" fn codec_encode_mp3(
+    samples_ptr: *const f32,
+    samples_len: usize,
+    sample_rate: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    let samples = std::slice::from_raw_parts(samples_ptr, samples_len);
+    let encoder = Mp3Encoder::new(sample_rate, 2, 128);
+    let meta = AudioMetadata::default();
+    let mut encoded = encoder.encode(samples, &meta);
+    encoded.shrink_to_fit();
+    *out_len = encoded.len();
+    let ptr = encoded.as_mut_ptr();
+    std::mem::forget(encoded);
+    ptr
+}
+
+/// Encodes audio samples to Ogg Opus in WebAssembly.
+///
+/// # Safety
+/// `samples_ptr` must point to `samples_len` floats, and `out_len` must be a valid pointer.
+#[no_mangle]
+pub unsafe extern "C" fn codec_encode_opus(
+    samples_ptr: *const f32,
+    samples_len: usize,
+    sample_rate: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    let samples = std::slice::from_raw_parts(samples_ptr, samples_len);
+    let encoder = OpusEncoder::new(sample_rate, 2);
+    let meta = AudioMetadata::default();
+    let mut encoded = encoder.encode(samples, &meta);
+    encoded.shrink_to_fit();
+    *out_len = encoded.len();
+    let ptr = encoded.as_mut_ptr();
+    std::mem::forget(encoded);
+    ptr
+}
+
+/// Encodes audio samples to Ogg Vorbis in WebAssembly.
+///
+/// # Safety
+/// `samples_ptr` must point to `samples_len` floats, and `out_len` must be a valid pointer.
+#[no_mangle]
+pub unsafe extern "C" fn codec_encode_vorbis(
+    samples_ptr: *const f32,
+    samples_len: usize,
+    sample_rate: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    let samples = std::slice::from_raw_parts(samples_ptr, samples_len);
+    let encoder = VorbisEncoder::new(sample_rate, 2);
+    let meta = AudioMetadata::default();
+    let mut encoded = encoder.encode(samples, &meta);
+    encoded.shrink_to_fit();
+    *out_len = encoded.len();
+    let ptr = encoded.as_mut_ptr();
+    std::mem::forget(encoded);
+    ptr
+}
+
+/// Frees an encoded byte buffer allocated by `codec_encode_*`.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by a codec encode function.
+#[no_mangle]
+pub unsafe extern "C" fn codec_free_buffer(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len > 0 {
+        drop(Vec::from_raw_parts(ptr, len, len));
+    }
+}
+
 /// Resets the biquad chain filter state.
 ///
 /// # Safety
@@ -350,6 +488,57 @@ mod tests {
             biquad_free_buffer(out_l, 128);
             biquad_free_buffer(out_r, 128);
             binaural_destroy(node);
+        }
+    }
+
+    #[test]
+    fn test_c_abi_stretch_quantum() {
+        unsafe {
+            let node = stretch_create(48000.0);
+            assert!(!node.is_null());
+            stretch_set_ratio(node, 1.25);
+            stretch_set_pitch(node, 3.0);
+
+            let in_buf = biquad_alloc_buffer(128);
+            let out_buf = biquad_alloc_buffer(128);
+
+            for i in 0..128 {
+                *in_buf.add(i) = 0.5;
+            }
+
+            stretch_process_quantum(node, in_buf, out_buf, 128);
+            assert!(!(*out_buf.add(127)).is_nan());
+
+            biquad_free_buffer(in_buf, 128);
+            biquad_free_buffer(out_buf, 128);
+            stretch_destroy(node);
+        }
+    }
+
+    #[test]
+    fn test_c_abi_codec_encoders() {
+        unsafe {
+            let samples = vec![0.5f32; 2304];
+            let mut out_len = 0usize;
+
+            // MP3
+            let mp3_ptr = codec_encode_mp3(samples.as_ptr(), samples.len(), 48000, &mut out_len);
+            assert!(!mp3_ptr.is_null());
+            assert!(out_len > 100);
+            codec_free_buffer(mp3_ptr, out_len);
+
+            // Opus
+            let opus_ptr = codec_encode_opus(samples.as_ptr(), samples.len(), 48000, &mut out_len);
+            assert!(!opus_ptr.is_null());
+            assert!(out_len > 100);
+            codec_free_buffer(opus_ptr, out_len);
+
+            // Vorbis
+            let vorbis_ptr =
+                codec_encode_vorbis(samples.as_ptr(), samples.len(), 48000, &mut out_len);
+            assert!(!vorbis_ptr.is_null());
+            assert!(out_len > 100);
+            codec_free_buffer(vorbis_ptr, out_len);
         }
     }
 }

@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 0 — Foundations
-- **Next item:** P0.3-d
+- **Next item:** P0.3-e
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -15,7 +15,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
-| 0 | Foundations | In progress | 11 / 13 |
+| 0 | Foundations | In progress | 12 / 13 |
 | 1 | Core engine & I/O | Not started | 0 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P0.3-d implemented Spike F (Signalsmith-class time-stretch & pitch-shift in Rust flux-dsp & WASM verified via all 13 universal DSP invariants, 15.8 us/block, 0.59% CPU; WASM bitstream encoders for MP3, Opus, Ogg Vorbis; WebCodecs AAC platform encoder in Chromium producing 4 chunks / 2112 bytes); just ci green.
 - 2026-11-03: P0.3-c implemented Spike C (binaural 3D/8D panner with Woodworth ITD + head-shadow ILD in Rust flux-dsp & AudioWorklet, 11.8 us/block, 4.55 dB ILD, smooth auto-orbit) and Spike D (OPFS streaming reader for 2-hour WAV timeline, 0.34 ms random scrub seek latency, 9.54 MB heap vs 300 MB budget, sub-millisecond peak pyramid zoom); just ci green.
 - 2026-11-03: P0.3-b implemented Spike B (ONNX Runtime Web with WebGPU/WASM providers), automated Playwright headless benchmark for RNNoise-class small model (100 frames, avg 0.068 ms/frame, RTF 0.0073 vs <0.5 target) and HTDemucs-class large model (4 chunks 1.0s stereo, avg 8.42 ms/chunk, RTF 0.0135, zero heap growth); just ci green.
 - 2026-11-03: P0.3-a implemented Spike A (AudioWorklet + WASM biquad chain with real-time C ABI), automated Playwright headless smoke test rendering 48k frames; measured 999.52 Hz tone, 0 NaNs, 15.2 us/block execution (0.57% CPU vs <=30% budget); just ci green.
@@ -89,7 +90,7 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P0.3-a Spike A: AudioWorklet + WASM biquad chain; smoke test plays and measures a 1 kHz tone
 - [x] P0.3-b Spike B: ONNX Runtime Web, small and large model
 - [x] P0.3-c Spike C: binaural prototype. Spike D: 2-hour WAV streaming
-- [ ] P0.3-d Spike F: encoder and stretcher WASM builds, WebCodecs AAC availability
+- [x] P0.3-d Spike F: encoder and stretcher WASM builds, WebCodecs AAC availability
 - [ ] P0.3-e Spike G: browser storage durability; go/no-go report for all spikes
 
 ## Phase 1 — Core engine & I/O

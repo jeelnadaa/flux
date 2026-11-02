@@ -10,6 +10,8 @@ extend-exclude = [
 
 [default.extend-words]
 ba = "ba"
+TPE = "TPE"
+TPE1 = "TPE1"
 formant = "formant"
 Formant = "Formant"
 symphonia = "symphonia"
