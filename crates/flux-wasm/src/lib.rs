@@ -1,6 +1,7 @@
 //! Flux WebAssembly bindings for browser execution and AudioWorklet rendering.
 #![deny(missing_docs)]
 
+use flux_dsp::binaural::BinauralNode;
 use flux_dsp::biquad::{BiquadChain, BiquadType};
 use flux_dsp::node::DspNode;
 use wasm_bindgen::prelude::*;
@@ -180,6 +181,67 @@ pub unsafe extern "C" fn biquad_process_quantum(
     }
 }
 
+/// Creates a new `BinauralNode` instance.
+#[no_mangle]
+pub extern "C" fn binaural_create(sample_rate: f32) -> *mut BinauralNode {
+    let mut node = Box::new(BinauralNode::new());
+    node.prepare(sample_rate, 2);
+    Box::into_raw(node)
+}
+
+/// Destroys a `BinauralNode` instance.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by `binaural_create`.
+#[no_mangle]
+pub unsafe extern "C" fn binaural_destroy(ptr: *mut BinauralNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets the azimuth angle in degrees.
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `BinauralNode`.
+#[no_mangle]
+pub unsafe extern "C" fn binaural_set_azimuth(ptr: *mut BinauralNode, azimuth_deg: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_azimuth(azimuth_deg);
+    }
+}
+
+/// Sets automated 8D orbit speed in Hz.
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `BinauralNode`.
+#[no_mangle]
+pub unsafe extern "C" fn binaural_set_orbit_speed(ptr: *mut BinauralNode, speed_hz: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_orbit_speed(speed_hz);
+    }
+}
+
+/// Processes an AudioWorklet render quantum (128 frames) through the binaural panner.
+///
+/// # Safety
+/// `ptr` must be valid, and `in_ptr`, `out_l_ptr`, `out_r_ptr` must point to valid slices of length `frames`.
+#[no_mangle]
+pub unsafe extern "C" fn binaural_process_quantum(
+    ptr: *mut BinauralNode,
+    in_ptr: *const f32,
+    out_l_ptr: *mut f32,
+    out_r_ptr: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let in_slice = std::slice::from_raw_parts(in_ptr, frames);
+        let out_l_slice = std::slice::from_raw_parts_mut(out_l_ptr, frames);
+        let out_r_slice = std::slice::from_raw_parts_mut(out_r_ptr, frames);
+        node.process(&[in_slice], &mut [out_l_slice, out_r_slice]);
+    }
+}
+
 /// Renders a synthesized test tone through the biquad chain.
 ///
 /// # Safety
@@ -261,6 +323,33 @@ mod tests {
             biquad_free_buffer(in_buf, 128);
             biquad_free_buffer(out_buf, 128);
             biquad_destroy(chain);
+        }
+    }
+
+    #[test]
+    fn test_c_abi_binaural_quantum() {
+        unsafe {
+            let node = binaural_create(48000.0);
+            assert!(!node.is_null());
+            binaural_set_azimuth(node, 45.0);
+            binaural_set_orbit_speed(node, 0.2);
+
+            let in_buf = biquad_alloc_buffer(128);
+            let out_l = biquad_alloc_buffer(128);
+            let out_r = biquad_alloc_buffer(128);
+
+            for i in 0..128 {
+                *in_buf.add(i) = 0.5;
+            }
+
+            binaural_process_quantum(node, in_buf, out_l, out_r, 128);
+            assert!(!(*out_l.add(127)).is_nan());
+            assert!(!(*out_r.add(127)).is_nan());
+
+            biquad_free_buffer(in_buf, 128);
+            biquad_free_buffer(out_l, 128);
+            biquad_free_buffer(out_r, 128);
+            binaural_destroy(node);
         }
     }
 }
