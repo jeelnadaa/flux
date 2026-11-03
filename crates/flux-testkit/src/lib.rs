@@ -270,6 +270,18 @@ mod tests {
     }
 
     #[test]
+    fn test_stereo_spatializer_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result =
+            run_dsp_invariants(|| Box::new(flux_dsp::StereoSpatializerNode::new()), &config);
+        assert!(
+            result.all_passed(),
+            "StereoSpatializerNode failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_sine_generator_and_spectrum() {
         let sample_rate = 48000.0;
         let freq = 1000.0;

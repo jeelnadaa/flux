@@ -8,6 +8,10 @@ import {
   generateOrbitPosition,
   generateFigureEightPosition,
   generateSpiralPosition,
+  calculateVirtualSpeakerPositions,
+  calculateMidSideSignals,
+  reconstructFromMidSide,
+  DEFAULT_STEREO_SPATIAL_CONFIG,
   HRTF_PROFILES,
   DEFAULT_HEAD_WIDTH_CM,
 } from "../SpatialModels.js";
@@ -111,5 +115,45 @@ describe("Spatial Domain Models and Coordinates", () => {
     assert.equal(profiles.length, 6);
     assert.equal(HRTF_PROFILES.C.name, "Profile C");
     assert.equal(HRTF_PROFILES.C.description, "Medium, strong rear cue");
+  });
+
+  it("calculates virtual speaker positions with angular spread", () => {
+    // 0 deg azimuth with 60 deg spread -> Left at 330 deg (-30 deg), Right at 30 deg
+    const sp0 = calculateVirtualSpeakerPositions(0, 60, 1.5, 5);
+    assert.equal(sp0.left.azimuthDeg, 330);
+    assert.equal(sp0.right.azimuthDeg, 30);
+    assert.equal(sp0.left.distanceM, 1.5);
+    assert.equal(sp0.right.distanceM, 1.5);
+    assert.equal(sp0.left.elevationDeg, 5);
+
+    // 90 deg azimuth with 90 deg spread -> Left at 45 deg, Right at 135 deg
+    const sp90 = calculateVirtualSpeakerPositions(90, 90, 2.0);
+    assert.equal(sp90.left.azimuthDeg, 45);
+    assert.equal(sp90.right.azimuthDeg, 135);
+  });
+
+  it("encodes and decodes Mid/Side signals bit-accurately", () => {
+    const l = new Float32Array([1.0, 0.5, -0.5, 0.0, 0.8]);
+    const r = new Float32Array([0.2, 0.5, 0.5, -0.6, 0.4]);
+
+    const { mid, side } = calculateMidSideSignals(l, r);
+    // mid = 0.5 * (1.0 + 0.2) = 0.6
+    assert.ok(Math.abs(mid[0] - 0.6) < 1e-6);
+    // side = 0.5 * (1.0 - 0.2) = 0.4
+    assert.ok(Math.abs(side[0] - 0.4) < 1e-6);
+
+    const reconstructed = reconstructFromMidSide(mid, side);
+    for (let i = 0; i < l.length; i++) {
+      assert.ok(Math.abs(reconstructed.left[i] - l[i]) < 1e-6);
+      assert.ok(Math.abs(reconstructed.right[i] - r[i]) < 1e-6);
+    }
+  });
+
+  it("validates default stereo spatializer configuration", () => {
+    assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.mode, "Two speakers");
+    assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.spreadDeg, 60);
+    assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.monoBassEnabled, true);
+    assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.monoBassCrossoverHz, 120);
+    assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.profile, "C");
   });
 });

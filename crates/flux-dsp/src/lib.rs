@@ -48,7 +48,8 @@ pub use sample::Sample;
 pub use spatial::{
     compute_spherical_harmonics, AmbisonicRenderer, DirectHrtfRenderer, DistanceCues,
     FractionalDelay, HrtfDataset, HrtfPair, HrtfProfile, MonoBassFilter, PartitionedConvolver,
-    AMBISONIC_CHANNELS, AMBISONIC_ORDER, DEFAULT_HEAD_RADIUS, HRTF_IR_LENGTH, SPEED_OF_SOUND,
+    StereoInputMode, StereoSpatializerNode, AMBISONIC_CHANNELS, AMBISONIC_ORDER,
+    DEFAULT_HEAD_RADIUS, HRTF_IR_LENGTH, SPEED_OF_SOUND,
 };
 pub use spatial_analysis::{GoniometerPoint, StereoAnalysisResult, StereoAnalyzer};
 pub use spectrogram::{

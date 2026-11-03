@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 4 — Spatial audio
-- **Next item:** P4.2 (P4.2-a Stereo inputs: virtual speakers, mid/side, mono bass)
+- **Next item:** P4.3 (P4.3-a 3D static placement and presets)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -19,7 +19,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
 | 3 | Core processing | Agent-complete | 22 / 22 |
-| 4 | Spatial audio | In progress | 6 / 18 |
+| 4 | Spatial audio | In progress | 7 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
 | 7 | Advanced AI | Not started | 0 / 11 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P4.2-a implemented stereo spatializer with VirtualSpeakers mode (adjustable spread rotating together), Mid/Side mode (anchored frontal center with orbiting sides), and 8th-order Linkwitz-Riley (LR8) mono bass management with flat magnitude reconstruction and <= -60 dB low-frequency null below crossover; registered StereoSpatializerNode in universal DSP invariant harness (13/13 passing); added WASM C ABI exports and TypeScript domain utilities; verified 100% test pass (81 TS unit tests, 118 Playwright & pytest tests, 49 dsp cargo tests, 38 testkit invariant tests) with visual diff match >= 95% across Desktop, Tablet, and Phone; full just ci gate green.
 - 2026-11-03: P4.1-a, P4.1-b, P4.1-c, P4.1-d, P4.1-e, P4.1-f implemented binaural spatial rendering core: HrtfDataset with 6 profiles (A through F) decomposed into minimum-phase IRs and Woodworth fractional ITDs (600-700 µs at 90° azimuth); PartitionedConvolver with zero latency and cosine crossfading; DirectHrtfRenderer (Renderer A); AmbisonicRenderer (Renderer B) with 3rd-order Higher-Order Ambisonics (16 channels) spherical harmonic encoding and MagLS binaural decoding; DistanceCues with 1/r law, air absorption filtering, near-field ILD boost, and Doppler; MonoBassFilter 120 Hz crossover; Headphone Check screen (#hpcheck) and HRTF Profile screen (#hrtf); verified 100% test pass (77 TS unit tests, 116 Playwright/pytest tests green, 45 dsp cargo tests, 37 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green.
 
 - 2026-11-03: P3.5-a, P3.5-b, P3.5-c implemented utility suite, comprehensive metering panel, signal generators, fade processor, and versioned preset system: ToneGenerator (sine, triangle, square, saw with click-free smoothing), NoiseGenerator (seeded white, 1/f pink), SilenceGenerator, FadeProcessor (Linear, EqualPower, SCurve, Exp, Log), SpectrumAnalyzerNode (STFT with Hann window, coherent gain normalization 4/N, peak hold decay 12 dB/s); target configurations (-14, -16, -23 LUFS); .fluxpreset v1 schema with JSON import/export, hostile-input validation, 8 factory presets, and ComparisonSlotManager; MetersScreen (#meters) and PresetsScreen (#presets); verified 100% test pass (71 TS unit tests, 106 Playwright/pytest tests green, 39 dsp cargo tests, 35 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green; Phase 3 Agent-complete.
@@ -203,7 +204,7 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P4.1-d Renderer B: ambisonic encode, rotate, MagLS decode
 - [x] P4.1-e Distance cues, Doppler, level stability, headphone compensation
 - [x] P4.1-f Head-width control and "pick your HRTF" test
-- [ ] P4.2-a Stereo inputs (virtual speakers, mid/side), mono bass
+- [x] P4.2-a Stereo inputs (virtual speakers, mid/side), mono bass
 - [ ] P4.3-a 3D static placement and presets
 - [ ] P4.3-b 8D auto-orbit with all controls, tempo sync
 - [ ] P4.3-c 16D paths: spiral, figure-eight, vertical loop, swarm, Lissajous

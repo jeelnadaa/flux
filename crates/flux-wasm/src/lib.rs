@@ -8,6 +8,7 @@ use flux_dsp::loudness::LoudnessMeter;
 use flux_dsp::node::DspNode;
 use flux_dsp::pyramid::PeakPyramid;
 use flux_dsp::resampler::{Resampler, ResamplerQuality};
+use flux_dsp::spatial::{StereoInputMode, StereoSpatializerNode};
 use flux_dsp::spatial_analysis::StereoAnalyzer;
 use flux_dsp::spectrogram::{
     ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTileGenerator,
@@ -260,6 +261,107 @@ pub unsafe extern "C" fn binaural_process_quantum(
         let out_l_slice = std::slice::from_raw_parts_mut(out_l_ptr, frames);
         let out_r_slice = std::slice::from_raw_parts_mut(out_r_ptr, frames);
         node.process(&[in_slice], &mut [out_l_slice, out_r_slice]);
+    }
+}
+
+/// Creates a new `StereoSpatializerNode` instance.
+#[no_mangle]
+pub extern "C" fn stereo_spatializer_create(sample_rate: f32) -> *mut StereoSpatializerNode {
+    let mut node = Box::new(StereoSpatializerNode::new());
+    node.prepare(sample_rate, 2);
+    Box::into_raw(node)
+}
+
+/// Destroys a `StereoSpatializerNode` instance.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by `stereo_spatializer_create`.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_destroy(ptr: *mut StereoSpatializerNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets the stereo spatialization mode (0 = VirtualSpeakers, 1 = MidSide).
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `StereoSpatializerNode`.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_mode(ptr: *mut StereoSpatializerNode, mode: u32) {
+    if let Some(node) = ptr.as_mut() {
+        let m = if mode == 1 {
+            StereoInputMode::MidSide
+        } else {
+            StereoInputMode::VirtualSpeakers
+        };
+        node.set_mode(m);
+    }
+}
+
+/// Sets center azimuth in degrees.
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `StereoSpatializerNode`.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_azimuth(
+    ptr: *mut StereoSpatializerNode,
+    azimuth_deg: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_azimuth(azimuth_deg);
+    }
+}
+
+/// Sets stereo angular spread in degrees (default 60 deg).
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `StereoSpatializerNode`.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_spread(
+    ptr: *mut StereoSpatializerNode,
+    spread_deg: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_spread(spread_deg);
+    }
+}
+
+/// Configures mono bass management.
+///
+/// # Safety
+/// `ptr` must be a valid pointer to a `StereoSpatializerNode`.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_mono_bass(
+    ptr: *mut StereoSpatializerNode,
+    enabled: bool,
+    crossover_hz: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_mono_bass_enabled(enabled);
+        node.set_mono_bass_crossover(crossover_hz);
+    }
+}
+
+/// Processes stereo audio frames through the stereo spatializer.
+///
+/// # Safety
+/// `ptr` must be valid, and all buffer pointers must point to valid slices of length `frames`.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_process(
+    ptr: *mut StereoSpatializerNode,
+    in_l_ptr: *const f32,
+    in_r_ptr: *const f32,
+    out_l_ptr: *mut f32,
+    out_r_ptr: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let in_l = std::slice::from_raw_parts(in_l_ptr, frames);
+        let in_r = std::slice::from_raw_parts(in_r_ptr, frames);
+        let out_l = std::slice::from_raw_parts_mut(out_l_ptr, frames);
+        let out_r = std::slice::from_raw_parts_mut(out_r_ptr, frames);
+        node.process(&[in_l, in_r], &mut [out_l, out_r]);
     }
 }
 
@@ -1565,6 +1667,44 @@ mod tests {
             biquad_free_buffer(out_l, 128);
             biquad_free_buffer(out_r, 128);
             binaural_destroy(node);
+        }
+    }
+
+    #[test]
+    fn test_c_abi_stereo_spatializer() {
+        unsafe {
+            let node = stereo_spatializer_create(48000.0);
+            assert!(!node.is_null());
+            stereo_spatializer_set_mode(node, 0); // VirtualSpeakers
+            stereo_spatializer_set_azimuth(node, 30.0);
+            stereo_spatializer_set_spread(node, 60.0);
+            stereo_spatializer_set_mono_bass(node, true, 120.0);
+
+            let in_l = biquad_alloc_buffer(128);
+            let in_r = biquad_alloc_buffer(128);
+            let out_l = biquad_alloc_buffer(128);
+            let out_r = biquad_alloc_buffer(128);
+
+            for i in 0..128 {
+                *in_l.add(i) = 0.5;
+                *in_r.add(i) = -0.5;
+            }
+
+            stereo_spatializer_process(node, in_l, in_r, out_l, out_r, 128);
+            assert!(!(*out_l.add(127)).is_nan());
+            assert!(!(*out_r.add(127)).is_nan());
+
+            // Switch to Mid/Side
+            stereo_spatializer_set_mode(node, 1);
+            stereo_spatializer_process(node, in_l, in_r, out_l, out_r, 128);
+            assert!(!(*out_l.add(127)).is_nan());
+            assert!(!(*out_r.add(127)).is_nan());
+
+            biquad_free_buffer(in_l, 128);
+            biquad_free_buffer(in_r, 128);
+            biquad_free_buffer(out_l, 128);
+            biquad_free_buffer(out_r, 128);
+            stereo_spatializer_destroy(node);
         }
     }
 

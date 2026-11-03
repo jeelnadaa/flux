@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 #![allow(clippy::needless_range_loop, clippy::field_reassign_with_default)]
 
+use crate::biquad::{BiquadCoeffs, BiquadState, BiquadType};
 use crate::node::DspNode;
 use std::f32::consts::PI;
 
@@ -789,17 +790,22 @@ impl DistanceCues {
     }
 }
 
-/// Mono bass management filter keeping frequencies below 120 Hz centered to avoid phase wobble.
+/// Mono bass management filter keeping frequencies below crossover centered to avoid phase wobble.
+/// Uses a cascaded 8th-order Linkwitz-Riley (LR8) crossover with flat magnitude reconstruction
+/// and steep 48 dB/oct attenuation for out-of-phase low-frequency content.
 #[derive(Debug, Clone)]
 pub struct MonoBassFilter {
     sample_rate: f32,
     crossover_hz: f32,
     enabled: bool,
-    // 2nd-order Linkwitz-Riley low-pass for mono bass
-    lp_state1_l: f32,
-    lp_state2_l: f32,
-    lp_state1_r: f32,
-    lp_state2_r: f32,
+    lp_coeffs1: BiquadCoeffs,
+    lp_coeffs2: BiquadCoeffs,
+    hp_coeffs1: BiquadCoeffs,
+    hp_coeffs2: BiquadCoeffs,
+    lp_states_l: [BiquadState; 4],
+    lp_states_r: [BiquadState; 4],
+    hp_states_l: [BiquadState; 4],
+    hp_states_r: [BiquadState; 4],
 }
 
 impl Default for MonoBassFilter {
@@ -811,20 +817,60 @@ impl Default for MonoBassFilter {
 impl MonoBassFilter {
     /// Creates a new mono bass filter with the given crossover frequency (typically 120 Hz).
     pub fn new(crossover_hz: f32) -> Self {
-        Self {
+        let mut filter = Self {
             sample_rate: 48000.0,
             crossover_hz,
             enabled: true,
-            lp_state1_l: 0.0,
-            lp_state2_l: 0.0,
-            lp_state1_r: 0.0,
-            lp_state2_r: 0.0,
-        }
+            lp_coeffs1: BiquadCoeffs::default(),
+            lp_coeffs2: BiquadCoeffs::default(),
+            hp_coeffs1: BiquadCoeffs::default(),
+            hp_coeffs2: BiquadCoeffs::default(),
+            lp_states_l: [BiquadState::default(); 4],
+            lp_states_r: [BiquadState::default(); 4],
+            hp_states_l: [BiquadState::default(); 4],
+            hp_states_r: [BiquadState::default(); 4],
+        };
+        filter.update_coeffs();
+        filter
+    }
+
+    fn update_coeffs(&mut self) {
+        let sr = self.sample_rate as f64;
+        let fc = (self.crossover_hz as f64).clamp(20.0, 500.0);
+        let q1 = 0.54119610;
+        let q2 = 1.3065630;
+        self.lp_coeffs1 = BiquadCoeffs::calculate(BiquadType::Lowpass, sr, fc, q1, 0.0);
+        self.lp_coeffs2 = BiquadCoeffs::calculate(BiquadType::Lowpass, sr, fc, q2, 0.0);
+        self.hp_coeffs1 = BiquadCoeffs::calculate(BiquadType::Highpass, sr, fc, q1, 0.0);
+        self.hp_coeffs2 = BiquadCoeffs::calculate(BiquadType::Highpass, sr, fc, q2, 0.0);
+    }
+
+    /// Prepares filter for the given sample rate.
+    pub fn prepare(&mut self, sample_rate: f32) {
+        self.sample_rate = sample_rate.max(1.0);
+        self.update_coeffs();
+        self.reset();
+    }
+
+    /// Sets the crossover frequency in Hz.
+    pub fn set_crossover_hz(&mut self, crossover_hz: f32) {
+        self.crossover_hz = crossover_hz.clamp(20.0, 500.0);
+        self.update_coeffs();
+    }
+
+    /// Returns current crossover frequency in Hz.
+    pub fn crossover_hz(&self) -> f32 {
+        self.crossover_hz
     }
 
     /// Enables or disables mono bass management.
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    /// Returns whether mono bass management is currently enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
     }
 
     /// Processes stereo samples in-place.
@@ -834,25 +880,34 @@ impl MonoBassFilter {
         }
 
         let n = left.len().min(right.len());
-        let omega = 2.0 * PI * self.crossover_hz / self.sample_rate;
-        let alpha = omega / (1.0 + omega);
-
         for i in 0..n {
-            // Low-pass extract
-            self.lp_state1_l += alpha * (left[i] - self.lp_state1_l);
-            self.lp_state2_l += alpha * (self.lp_state1_l - self.lp_state2_l);
-            let bass_l = self.lp_state2_l;
+            let in_l = left[i];
+            let in_r = right[i];
 
-            self.lp_state1_r += alpha * (right[i] - self.lp_state1_r);
-            self.lp_state2_r += alpha * (self.lp_state1_r - self.lp_state2_r);
-            let bass_r = self.lp_state2_r;
+            // 4-stage low-pass (LR8)
+            let l1 = self.lp_states_l[0].process_sample(in_l, &self.lp_coeffs1);
+            let l2 = self.lp_states_l[1].process_sample(l1, &self.lp_coeffs2);
+            let l3 = self.lp_states_l[2].process_sample(l2, &self.lp_coeffs1);
+            let low_l = self.lp_states_l[3].process_sample(l3, &self.lp_coeffs2);
 
-            // Average bass to mono
-            let mono_bass = 0.5 * (bass_l + bass_r);
+            let r1 = self.lp_states_r[0].process_sample(in_r, &self.lp_coeffs1);
+            let r2 = self.lp_states_r[1].process_sample(r1, &self.lp_coeffs2);
+            let r3 = self.lp_states_r[2].process_sample(r2, &self.lp_coeffs1);
+            let low_r = self.lp_states_r[3].process_sample(r3, &self.lp_coeffs2);
 
-            // Highs retain stereo separation
-            let high_l = left[i] - bass_l;
-            let high_r = right[i] - bass_r;
+            // 4-stage high-pass (LR8)
+            let h1 = self.hp_states_l[0].process_sample(in_l, &self.hp_coeffs1);
+            let h2 = self.hp_states_l[1].process_sample(h1, &self.hp_coeffs2);
+            let h3 = self.hp_states_l[2].process_sample(h2, &self.hp_coeffs1);
+            let high_l = self.hp_states_l[3].process_sample(h3, &self.hp_coeffs2);
+
+            let hr1 = self.hp_states_r[0].process_sample(in_r, &self.hp_coeffs1);
+            let hr2 = self.hp_states_r[1].process_sample(hr1, &self.hp_coeffs2);
+            let hr3 = self.hp_states_r[2].process_sample(hr2, &self.hp_coeffs1);
+            let high_r = self.hp_states_r[3].process_sample(hr3, &self.hp_coeffs2);
+
+            // Mono bass summation
+            let mono_bass = 0.5 * (low_l + low_r);
 
             left[i] = high_l + mono_bass;
             right[i] = high_r + mono_bass;
@@ -861,10 +916,451 @@ impl MonoBassFilter {
 
     /// Resets filter states.
     pub fn reset(&mut self) {
-        self.lp_state1_l = 0.0;
-        self.lp_state2_l = 0.0;
-        self.lp_state1_r = 0.0;
-        self.lp_state2_r = 0.0;
+        for s in &mut self.lp_states_l {
+            s.reset();
+        }
+        for s in &mut self.lp_states_r {
+            s.reset();
+        }
+        for s in &mut self.hp_states_l {
+            s.reset();
+        }
+        for s in &mut self.hp_states_r {
+            s.reset();
+        }
+    }
+}
+
+/// Stereo input handling mode for spatialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StereoInputMode {
+    /// Virtual speakers: Left and Right channels rendered as virtual point sources
+    /// with configurable angular spread, rotating together.
+    #[default]
+    VirtualSpeakers,
+    /// Mid/Side mode: Mid (center) channel stays frontal, Side channels orbit.
+    MidSide,
+}
+
+/// Production-grade stereo spatializer supporting Virtual Speakers, Mid/Side orbiting,
+/// and Linkwitz-Riley mono bass management.
+#[derive(Debug, Clone)]
+pub struct StereoSpatializerNode {
+    mode: StereoInputMode,
+    azimuth_deg: f32,
+    elevation_deg: f32,
+    distance_m: f32,
+    spread_deg: f32,
+    head_width_m: f32,
+    profile: HrtfProfile,
+    bypassed: bool,
+    sample_rate: f32,
+    channels: usize,
+
+    renderer_l: DirectHrtfRenderer,
+    renderer_r: DirectHrtfRenderer,
+    renderer_mid: DirectHrtfRenderer,
+
+    bass_filter: MonoBassFilter,
+
+    // Preallocated internal scratch buffers to guarantee zero allocation on audio thread
+    scratch_mid: Vec<f32>,
+    scratch_side_l: Vec<f32>,
+    scratch_side_r: Vec<f32>,
+    scratch_out_l1: Vec<f32>,
+    scratch_out_r1: Vec<f32>,
+    scratch_out_l2: Vec<f32>,
+    scratch_out_r2: Vec<f32>,
+    scratch_out_lm: Vec<f32>,
+    scratch_out_rm: Vec<f32>,
+}
+
+impl Default for StereoSpatializerNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl StereoSpatializerNode {
+    /// Creates a new `StereoSpatializerNode` with default settings (VirtualSpeakers, 60° spread, 120 Hz mono bass).
+    pub fn new() -> Self {
+        Self {
+            mode: StereoInputMode::VirtualSpeakers,
+            azimuth_deg: 0.0,
+            elevation_deg: 0.0,
+            distance_m: 1.0,
+            spread_deg: 60.0,
+            head_width_m: DEFAULT_HEAD_RADIUS * 2.0,
+            profile: HrtfProfile::ProfileC,
+            bypassed: false,
+            sample_rate: 48000.0,
+            channels: 2,
+            renderer_l: DirectHrtfRenderer::new(),
+            renderer_r: DirectHrtfRenderer::new(),
+            renderer_mid: DirectHrtfRenderer::new(),
+            bass_filter: MonoBassFilter::new(120.0),
+            scratch_mid: vec![0.0; 4096],
+            scratch_side_l: vec![0.0; 4096],
+            scratch_side_r: vec![0.0; 4096],
+            scratch_out_l1: vec![0.0; 4096],
+            scratch_out_r1: vec![0.0; 4096],
+            scratch_out_l2: vec![0.0; 4096],
+            scratch_out_r2: vec![0.0; 4096],
+            scratch_out_lm: vec![0.0; 4096],
+            scratch_out_rm: vec![0.0; 4096],
+        }
+    }
+
+    /// Sets the stereo spatialization mode.
+    pub fn set_mode(&mut self, mode: StereoInputMode) {
+        self.mode = mode;
+    }
+
+    /// Returns current stereo spatialization mode.
+    pub fn mode(&self) -> StereoInputMode {
+        self.mode
+    }
+
+    /// Sets the center azimuth in degrees (0..360).
+    pub fn set_azimuth(&mut self, azimuth_deg: f32) {
+        self.azimuth_deg = azimuth_deg.rem_euclid(360.0);
+    }
+
+    /// Returns center azimuth in degrees.
+    pub fn azimuth(&self) -> f32 {
+        self.azimuth_deg
+    }
+
+    /// Sets elevation in degrees (-90..90).
+    pub fn set_elevation(&mut self, elevation_deg: f32) {
+        self.elevation_deg = elevation_deg.clamp(-90.0, 90.0);
+    }
+
+    /// Returns elevation in degrees.
+    pub fn elevation(&self) -> f32 {
+        self.elevation_deg
+    }
+
+    /// Sets listener distance in meters (0.1..10.0).
+    pub fn set_distance(&mut self, distance_m: f32) {
+        self.distance_m = distance_m.clamp(0.1, 10.0);
+    }
+
+    /// Returns listener distance in meters.
+    pub fn distance(&self) -> f32 {
+        self.distance_m
+    }
+
+    /// Sets stereo angular spread in degrees (0..180, default 60).
+    pub fn set_spread(&mut self, spread_deg: f32) {
+        self.spread_deg = spread_deg.clamp(0.0, 180.0);
+    }
+
+    /// Returns stereo angular spread in degrees.
+    pub fn spread(&self) -> f32 {
+        self.spread_deg
+    }
+
+    /// Enables or disables mono bass management.
+    pub fn set_mono_bass_enabled(&mut self, enabled: bool) {
+        self.bass_filter.set_enabled(enabled);
+    }
+
+    /// Returns whether mono bass management is enabled.
+    pub fn is_mono_bass_enabled(&self) -> bool {
+        self.bass_filter.is_enabled()
+    }
+
+    /// Sets mono bass crossover frequency in Hz (typically 120 Hz).
+    pub fn set_mono_bass_crossover(&mut self, crossover_hz: f32) {
+        self.bass_filter.set_crossover_hz(crossover_hz);
+    }
+
+    /// Returns mono bass crossover frequency in Hz.
+    pub fn mono_bass_crossover(&self) -> f32 {
+        self.bass_filter.crossover_hz()
+    }
+
+    /// Sets head width in meters (0.08..0.30).
+    pub fn set_head_width(&mut self, width_m: f32) {
+        self.head_width_m = width_m.clamp(0.08, 0.30);
+        self.renderer_l.set_head_width(self.head_width_m);
+        self.renderer_r.set_head_width(self.head_width_m);
+        self.renderer_mid.set_head_width(self.head_width_m);
+    }
+
+    /// Returns head width in meters.
+    pub fn head_width(&self) -> f32 {
+        self.head_width_m
+    }
+
+    /// Sets HRTF profile.
+    pub fn set_profile(&mut self, profile: HrtfProfile) {
+        self.profile = profile;
+        self.renderer_l.set_profile(profile);
+        self.renderer_r.set_profile(profile);
+        self.renderer_mid.set_profile(profile);
+    }
+
+    /// Returns current HRTF profile.
+    pub fn profile(&self) -> HrtfProfile {
+        self.profile
+    }
+}
+
+impl DspNode for StereoSpatializerNode {
+    fn name(&self) -> &str {
+        "StereoSpatializerNode"
+    }
+
+    fn prepare(&mut self, sample_rate: f32, channels: usize) {
+        self.sample_rate = sample_rate;
+        self.channels = channels;
+        self.renderer_l.prepare(sample_rate, 1);
+        self.renderer_r.prepare(sample_rate, 1);
+        self.renderer_mid.prepare(sample_rate, 1);
+        self.bass_filter.prepare(sample_rate);
+
+        let initial_cap = 4096;
+        if self.scratch_mid.len() < initial_cap {
+            self.scratch_mid.resize(initial_cap, 0.0);
+            self.scratch_side_l.resize(initial_cap, 0.0);
+            self.scratch_side_r.resize(initial_cap, 0.0);
+            self.scratch_out_l1.resize(initial_cap, 0.0);
+            self.scratch_out_r1.resize(initial_cap, 0.0);
+            self.scratch_out_l2.resize(initial_cap, 0.0);
+            self.scratch_out_r2.resize(initial_cap, 0.0);
+            self.scratch_out_lm.resize(initial_cap, 0.0);
+            self.scratch_out_rm.resize(initial_cap, 0.0);
+        }
+        self.reset();
+    }
+
+    fn reset(&mut self) {
+        let az_left = (self.azimuth_deg - self.spread_deg * 0.5).rem_euclid(360.0);
+        let az_right = (self.azimuth_deg + self.spread_deg * 0.5).rem_euclid(360.0);
+        self.renderer_l.set_azimuth(az_left);
+        self.renderer_r.set_azimuth(az_right);
+        self.renderer_mid.set_azimuth(0.0);
+        self.renderer_l.reset();
+        self.renderer_r.reset();
+        self.renderer_mid.reset();
+        self.bass_filter.reset();
+    }
+
+    fn parameter_count(&self) -> usize {
+        9
+    }
+
+    fn set_parameter(&mut self, index: usize, value: f32) {
+        match index {
+            0 => {
+                if value >= 0.5 {
+                    self.set_mode(StereoInputMode::MidSide);
+                } else {
+                    self.set_mode(StereoInputMode::VirtualSpeakers);
+                }
+            }
+            1 => self.set_azimuth(value),
+            2 => self.set_elevation(value),
+            3 => self.set_distance(value),
+            4 => self.set_spread(value),
+            5 => self.set_mono_bass_enabled(value >= 0.5),
+            6 => self.set_mono_bass_crossover(value),
+            7 => self.set_head_width(value),
+            8 => {
+                let p = match value.round() as usize {
+                    0 => HrtfProfile::ProfileA,
+                    1 => HrtfProfile::ProfileB,
+                    2 => HrtfProfile::ProfileC,
+                    3 => HrtfProfile::ProfileD,
+                    4 => HrtfProfile::ProfileE,
+                    _ => HrtfProfile::ProfileF,
+                };
+                self.set_profile(p);
+            }
+            _ => {}
+        }
+    }
+
+    fn get_parameter(&self, index: usize) -> f32 {
+        match index {
+            0 => match self.mode {
+                StereoInputMode::VirtualSpeakers => 0.0,
+                StereoInputMode::MidSide => 1.0,
+            },
+            1 => self.azimuth_deg,
+            2 => self.elevation_deg,
+            3 => self.distance_m,
+            4 => self.spread_deg,
+            5 => {
+                if self.bass_filter.is_enabled() {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            6 => self.bass_filter.crossover_hz(),
+            7 => self.head_width_m,
+            8 => match self.profile {
+                HrtfProfile::ProfileA => 0.0,
+                HrtfProfile::ProfileB => 1.0,
+                HrtfProfile::ProfileC => 2.0,
+                HrtfProfile::ProfileD => 3.0,
+                HrtfProfile::ProfileE => 4.0,
+                HrtfProfile::ProfileF => 5.0,
+            },
+            _ => 0.0,
+        }
+    }
+
+    fn set_bypass(&mut self, bypassed: bool) {
+        self.bypassed = bypassed;
+    }
+
+    fn is_bypassed(&self) -> bool {
+        self.bypassed
+    }
+
+    fn process(&mut self, inputs: &[&[f32]], outputs: &mut [&mut [f32]]) {
+        if self.bypassed || inputs.is_empty() || outputs.is_empty() {
+            for ch in 0..outputs.len() {
+                let in_ch = ch.min(inputs.len().saturating_sub(1));
+                if !inputs.is_empty() {
+                    let n = outputs[ch].len().min(inputs[in_ch].len());
+                    outputs[ch][..n].copy_from_slice(&inputs[in_ch][..n]);
+                } else {
+                    outputs[ch].fill(0.0);
+                }
+            }
+            return;
+        }
+
+        if outputs.len() < 2 {
+            let in_ch = 0;
+            let n = outputs[0].len().min(inputs[in_ch].len());
+            outputs[0][..n].copy_from_slice(&inputs[in_ch][..n]);
+            return;
+        }
+
+        let in_l = inputs[0];
+        let in_r = if inputs.len() > 1 {
+            inputs[1]
+        } else {
+            inputs[0]
+        };
+        let n_samples = in_l.len().min(outputs[0].len()).min(outputs[1].len());
+
+        if self.scratch_mid.len() < n_samples {
+            self.scratch_mid.resize(n_samples, 0.0);
+            self.scratch_side_l.resize(n_samples, 0.0);
+            self.scratch_side_r.resize(n_samples, 0.0);
+            self.scratch_out_l1.resize(n_samples, 0.0);
+            self.scratch_out_r1.resize(n_samples, 0.0);
+            self.scratch_out_l2.resize(n_samples, 0.0);
+            self.scratch_out_r2.resize(n_samples, 0.0);
+            self.scratch_out_lm.resize(n_samples, 0.0);
+            self.scratch_out_rm.resize(n_samples, 0.0);
+        }
+
+        let az_left = (self.azimuth_deg - self.spread_deg * 0.5).rem_euclid(360.0);
+        let az_right = (self.azimuth_deg + self.spread_deg * 0.5).rem_euclid(360.0);
+
+        match self.mode {
+            StereoInputMode::VirtualSpeakers => {
+                self.renderer_l.set_azimuth(az_left);
+                self.renderer_l.set_elevation(self.elevation_deg);
+                self.renderer_l.set_distance(self.distance_m);
+
+                self.renderer_r.set_azimuth(az_right);
+                self.renderer_r.set_elevation(self.elevation_deg);
+                self.renderer_r.set_distance(self.distance_m);
+
+                let in_l_slice = [&in_l[..n_samples]];
+                let mut out_l_slice = [
+                    &mut self.scratch_out_l1[..n_samples],
+                    &mut self.scratch_out_r1[..n_samples],
+                ];
+                self.renderer_l.process(&in_l_slice, &mut out_l_slice);
+
+                let in_r_slice = [&in_r[..n_samples]];
+                let mut out_r_slice = [
+                    &mut self.scratch_out_l2[..n_samples],
+                    &mut self.scratch_out_r2[..n_samples],
+                ];
+                self.renderer_r.process(&in_r_slice, &mut out_r_slice);
+
+                let (out_l_buf, out_r_buf) = outputs.split_at_mut(1);
+                let out_l = &mut out_l_buf[0][..n_samples];
+                let out_r = &mut out_r_buf[0][..n_samples];
+
+                for i in 0..n_samples {
+                    out_l[i] = self.scratch_out_l1[i] + self.scratch_out_l2[i];
+                    out_r[i] = self.scratch_out_r1[i] + self.scratch_out_r2[i];
+                }
+
+                self.bass_filter.process(out_l, out_r);
+            }
+            StereoInputMode::MidSide => {
+                for i in 0..n_samples {
+                    let mid = 0.5 * (in_l[i] + in_r[i]);
+                    let side = 0.5 * (in_l[i] - in_r[i]);
+                    self.scratch_mid[i] = mid;
+                    self.scratch_side_l[i] = side;
+                    self.scratch_side_r[i] = -side;
+                }
+
+                // Mid source is anchored frontally at azimuth 0
+                self.renderer_mid.set_azimuth(0.0);
+                self.renderer_mid.set_elevation(0.0);
+                self.renderer_mid.set_distance(self.distance_m);
+
+                // Sides orbit around azimuth
+                self.renderer_l.set_azimuth(az_left);
+                self.renderer_l.set_elevation(self.elevation_deg);
+                self.renderer_l.set_distance(self.distance_m);
+
+                self.renderer_r.set_azimuth(az_right);
+                self.renderer_r.set_elevation(self.elevation_deg);
+                self.renderer_r.set_distance(self.distance_m);
+
+                let in_mid_slice = [&self.scratch_mid[..n_samples]];
+                let mut out_mid_slice = [
+                    &mut self.scratch_out_lm[..n_samples],
+                    &mut self.scratch_out_rm[..n_samples],
+                ];
+                self.renderer_mid.process(&in_mid_slice, &mut out_mid_slice);
+
+                let in_side_l_slice = [&self.scratch_side_l[..n_samples]];
+                let mut out_side_l_slice = [
+                    &mut self.scratch_out_l1[..n_samples],
+                    &mut self.scratch_out_r1[..n_samples],
+                ];
+                self.renderer_l
+                    .process(&in_side_l_slice, &mut out_side_l_slice);
+
+                let in_side_r_slice = [&self.scratch_side_r[..n_samples]];
+                let mut out_side_r_slice = [
+                    &mut self.scratch_out_l2[..n_samples],
+                    &mut self.scratch_out_r2[..n_samples],
+                ];
+                self.renderer_r
+                    .process(&in_side_r_slice, &mut out_side_r_slice);
+
+                let (out_l_buf, out_r_buf) = outputs.split_at_mut(1);
+                let out_l = &mut out_l_buf[0][..n_samples];
+                let out_r = &mut out_r_buf[0][..n_samples];
+
+                for i in 0..n_samples {
+                    out_l[i] =
+                        self.scratch_out_lm[i] + self.scratch_out_l1[i] + self.scratch_out_l2[i];
+                    out_r[i] =
+                        self.scratch_out_rm[i] + self.scratch_out_r1[i] + self.scratch_out_r2[i];
+                }
+
+                self.bass_filter.process(out_l, out_r);
+            }
+        }
     }
 }
 
@@ -957,8 +1453,122 @@ mod tests {
         let last_l = left[4095];
         let last_r = right[4095];
         assert!(
-            (last_l - last_r).abs() < 0.05,
-            "Mono bass filter should align low-frequency content towards zero difference, got L={last_l}, R={last_r}"
+            (last_l - last_r).abs() < 1e-4,
+            "Mono bass filter should cancel out-of-phase DC to zero difference, got L={last_l}, R={last_r}"
         );
+    }
+
+    #[test]
+    fn test_mono_bass_crossover_null_below_crossover() {
+        let mut bass_filter = MonoBassFilter::new(120.0);
+        let sample_rate = 48000.0;
+        let num_samples = 9600; // 0.2s
+        let freq = 40.0; // 40 Hz (well below 120 Hz crossover)
+
+        let mut left = vec![0.0f32; num_samples];
+        let mut right = vec![0.0f32; num_samples];
+
+        // Generate out-of-phase 40 Hz tone (worst case stereo bass)
+        for i in 0..num_samples {
+            let t = i as f32 / sample_rate;
+            let val = (2.0 * PI * freq * t).sin();
+            left[i] = val;
+            right[i] = -val;
+        }
+
+        bass_filter.process(&mut left, &mut right);
+
+        // Measure RMS of difference (L - R) in steady state (last 4800 samples)
+        let steady_start = 4800;
+        let steady_count = num_samples - steady_start;
+        let mut diff_sum_sq = 0.0f32;
+        for i in steady_start..num_samples {
+            let diff = left[i] - right[i];
+            diff_sum_sq += diff * diff;
+        }
+        let rms_diff = (diff_sum_sq / steady_count as f32).sqrt();
+        // 2 * sin has RMS of 2 / sqrt(2) = sqrt(2)
+        let ref_rms = std::f32::consts::SQRT_2;
+        let diff_db = 20.0 * (rms_diff / ref_rms).log10();
+
+        assert!(
+            diff_db <= -60.0,
+            "Mono bass filter difference null below crossover must be <= -60 dB, got {:.2} dB",
+            diff_db
+        );
+    }
+
+    #[test]
+    fn test_stereo_spatializer_virtual_speakers() {
+        let mut spatializer = StereoSpatializerNode::new();
+        spatializer.set_mode(StereoInputMode::VirtualSpeakers);
+        spatializer.set_azimuth(0.0);
+        spatializer.set_spread(60.0); // L at 330 deg (-30 deg), R at 30 deg
+        spatializer.set_mono_bass_enabled(false);
+
+        let n = 256;
+        let mut in_l = vec![0.0f32; n];
+        let in_r = vec![0.0f32; n];
+        in_l[0] = 1.0; // Left impulse
+
+        let mut out_l = vec![0.0f32; n];
+        let mut out_r = vec![0.0f32; n];
+
+        let inputs = [&in_l[..], &in_r[..]];
+        let mut outputs = [&mut out_l[..], &mut out_r[..]];
+        spatializer.process(&inputs, &mut outputs);
+
+        // Left speaker at 330 (-30 deg): left ear should receive sound earlier and louder than right ear
+        let peak_l = out_l.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
+        let peak_r = out_r.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
+        assert!(
+            peak_l > peak_r,
+            "Left virtual speaker should be louder in left ear: L={peak_l}, R={peak_r}"
+        );
+    }
+
+    #[test]
+    fn test_stereo_spatializer_midside_anchored_center() {
+        let mut spatializer = StereoSpatializerNode::new();
+        spatializer.set_mode(StereoInputMode::MidSide);
+        // Even when azimuth orbits to 90 degrees:
+        spatializer.set_azimuth(90.0);
+        spatializer.set_mono_bass_enabled(false);
+
+        // Feed pure mono signal (Mid only, Side is 0)
+        let n = 256;
+        let in_mono = vec![0.5f32; n];
+        let mut out_l = vec![0.0f32; n];
+        let mut out_r = vec![0.0f32; n];
+
+        let inputs = [&in_mono[..], &in_mono[..]];
+        let mut outputs = [&mut out_l[..], &mut out_r[..]];
+        spatializer.process(&inputs, &mut outputs);
+
+        // In Mid/Side mode, center is anchored frontally (azimuth 0), so left and right ears are equal
+        for i in 0..n {
+            assert!(
+                (out_l[i] - out_r[i]).abs() < 1e-4,
+                "Mid/Side anchored center must produce equal L and R, sample {i}: L={}, R={}",
+                out_l[i],
+                out_r[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_stereo_spatializer_bypass() {
+        let mut spatializer = StereoSpatializerNode::new();
+        spatializer.set_bypass(true);
+
+        let in_l = [0.1, 0.2, 0.3, 0.4];
+        let in_r = [-0.1, -0.2, -0.3, -0.4];
+        let mut out_l = [0.0; 4];
+        let mut out_r = [0.0; 4];
+
+        spatializer.process(&[&in_l, &in_r], &mut [&mut out_l, &mut out_r]);
+
+        assert_eq!(out_l, in_l);
+        assert_eq!(out_r, in_r);
     }
 }

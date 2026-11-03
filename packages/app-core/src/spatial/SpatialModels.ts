@@ -242,3 +242,97 @@ export function generateSpiralPosition(
     distanceM: dist,
   };
 }
+
+/**
+ * Calculates 3D virtual speaker coordinates for Left and Right channels given a central azimuth
+ * and angular spread (default 60 deg, +/-30 deg).
+ */
+export function calculateVirtualSpeakerPositions(
+  azimuthDeg: number,
+  spreadDeg = 60.0,
+  distanceM = 1.0,
+  elevationDeg = 0.0,
+): { left: SphericalCoord; right: SphericalCoord } {
+  const halfSpread = spreadDeg * 0.5;
+  let leftAz = (azimuthDeg - halfSpread) % 360.0;
+  if (leftAz < 0) {
+    leftAz += 360.0;
+  }
+  let rightAz = (azimuthDeg + halfSpread) % 360.0;
+  if (rightAz < 0) {
+    rightAz += 360.0;
+  }
+
+  return {
+    left: { azimuthDeg: leftAz, elevationDeg, distanceM },
+    right: { azimuthDeg: rightAz, elevationDeg, distanceM },
+  };
+}
+
+/**
+ * Encodes stereo Left and Right channels into Mid (sum) and Side (difference) channels.
+ */
+export function calculateMidSideSignals(
+  left: Float32Array,
+  right: Float32Array,
+): { mid: Float32Array; side: Float32Array } {
+  const n = Math.min(left.length, right.length);
+  const mid = new Float32Array(n);
+  const side = new Float32Array(n);
+
+  for (let i = 0; i < n; i++) {
+    mid[i] = 0.5 * (left[i] + right[i]);
+    side[i] = 0.5 * (left[i] - right[i]);
+  }
+
+  return { mid, side };
+}
+
+/**
+ * Decodes Mid and Side channels back into Left and Right stereo channels.
+ */
+export function reconstructFromMidSide(
+  mid: Float32Array,
+  side: Float32Array,
+): { left: Float32Array; right: Float32Array } {
+  const n = Math.min(mid.length, side.length);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  for (let i = 0; i < n; i++) {
+    left[i] = mid[i] + side[i];
+    right[i] = mid[i] - side[i];
+  }
+
+  return { left, right };
+}
+
+/**
+ * Configuration for the stereo spatializer.
+ */
+export interface StereoSpatialConfig {
+  mode: StereoInputMode;
+  azimuthDeg: number;
+  elevationDeg: number;
+  distanceM: number;
+  spreadDeg: number;
+  monoBassEnabled: boolean;
+  monoBassCrossoverHz: number;
+  headWidthCm: number;
+  profile: HrtfProfileId;
+}
+
+/**
+ * Default stereo spatializer configuration.
+ */
+export const DEFAULT_STEREO_SPATIAL_CONFIG: StereoSpatialConfig = {
+  mode: "Two speakers",
+  azimuthDeg: 0,
+  elevationDeg: 0,
+  distanceM: 1.0,
+  spreadDeg: 60.0,
+  monoBassEnabled: true,
+  monoBassCrossoverHz: 120.0,
+  headWidthCm: DEFAULT_HEAD_WIDTH_CM,
+  profile: "C",
+};

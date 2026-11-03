@@ -62,7 +62,7 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
     });""")
     page_proto.goto(f'http://127.0.0.1:{port}/design/app.html#{screen}', wait_until='domcontentloaded')
     page_proto.wait_for_selector('#stage > *', timeout=25000)
-    page_proto.evaluate("""() => {
+    page_proto.evaluate("""async () => {
         const rv = document.getElementById('rv');
         if (rv) rv.remove();
         const frame = document.getElementById('frame');
@@ -72,8 +72,11 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
         if (window.Viz && typeof window.Viz.redraw === 'function') {
             window.Viz.redraw(document);
         }
+        if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+        }
     }""")
-    page_proto.wait_for_timeout(350)
+    page_proto.wait_for_timeout(500)
     proto_img = ARTIFACTS_DIR / f'proto_{screen}_{name}_{width}.png'
     page_proto.locator('#stage').screenshot(path=str(proto_img))
     ctx_proto.close()
@@ -83,14 +86,17 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
     page_prod = ctx_prod.new_page()
     page_prod.goto(f'http://127.0.0.1:{port}/apps/web/index.html#{screen}', wait_until='domcontentloaded')
     page_prod.wait_for_selector('#stage > *', timeout=25000)
-    page_prod.evaluate("""() => {
+    page_prod.evaluate("""async () => {
         const m = document.getElementById('m');
         if (m) m.scrollTop = 0;
         if (window.Viz && typeof window.Viz.redraw === 'function') {
             window.Viz.redraw(document);
         }
+        if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+        }
     }""")
-    page_prod.wait_for_timeout(350)
+    page_prod.wait_for_timeout(500)
     prod_img = ARTIFACTS_DIR / f'prod_{screen}_{name}_{width}.png'
     page_prod.locator('#stage').screenshot(path=str(prod_img))
     ctx_prod.close()
