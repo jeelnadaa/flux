@@ -54,6 +54,12 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
     # 1. Prototype screen
     ctx_proto = browser.new_context(viewport={'width': width, 'height': height})
     page_proto = ctx_proto.new_page()
+    page_proto.add_init_script("""document.addEventListener('DOMContentLoaded', () => {
+        const rv = document.getElementById('rv');
+        if (rv) rv.remove();
+        const frame = document.getElementById('frame');
+        if (frame) frame.style.inset = '0';
+    });""")
     page_proto.goto(f'http://127.0.0.1:{port}/design/app.html#{screen}', wait_until='domcontentloaded')
     page_proto.wait_for_selector('#stage > *', timeout=25000)
     page_proto.evaluate("""() => {
@@ -63,6 +69,9 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
         if (frame) frame.style.inset = '0';
         const m = document.getElementById('m');
         if (m) m.scrollTop = 0;
+        if (window.Viz && typeof window.Viz.redraw === 'function') {
+            window.Viz.redraw(document);
+        }
     }""")
     page_proto.wait_for_timeout(350)
     proto_img = ARTIFACTS_DIR / f'proto_{screen}_{name}_{width}.png'
@@ -77,6 +86,9 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
     page_prod.evaluate("""() => {
         const m = document.getElementById('m');
         if (m) m.scrollTop = 0;
+        if (window.Viz && typeof window.Viz.redraw === 'function') {
+            window.Viz.redraw(document);
+        }
     }""")
     page_prod.wait_for_timeout(350)
     prod_img = ARTIFACTS_DIR / f'prod_{screen}_{name}_{width}.png'
@@ -1094,7 +1106,7 @@ def test_dynamics_interactive(browser_instance, test_server):
     'width,height,name',
     [
         (1440, 900, 'desktop'),
-        (820, 1180, 'tablet'),
+        (820, 1024, 'tablet'),
         (390, 844, 'phone'),
     ],
 )
@@ -1157,6 +1169,138 @@ def test_speed_pitch_interactive(browser_instance, test_server):
     assert keep_pitch_tg.get_attribute('aria-pressed') != init_pressed
 
     context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_cleanup(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'fx-clean', width, height, name)
+    print(f"CleanUp [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"CleanUp [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_cleanup_interactive(browser_instance, test_server):
+    """Verifies interactivity on the CleanUp screen: tab switching across all 6 restoration tools, sliders, toggles."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fx-clean')
+    page.wait_for_selector('.tabs')
+
+    # Initial tab is Noise
+    noise_tab = page.locator('.tabs button:has-text("Noise")')
+    assert 'on' in (noise_tab.get_attribute('class') or '')
+    assert page.locator('span.lab:has-text("Before")').count() == 1
+
+    # Switch to Hum tab
+    hum_tab = page.locator('.tabs button:has-text("Hum")')
+    hum_tab.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (hum_tab.get_attribute('class') or '')
+    assert page.locator('.sec h4:has-text("Fundamental")').count() == 1
+
+    # Switch to Clicks tab
+    clicks_tab = page.locator('.tabs button:has-text("Clicks")')
+    clicks_tab.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (clicks_tab.get_attribute('class') or '')
+
+    # Switch to Clipping tab
+    clipping_tab = page.locator('.tabs button:has-text("Clipping")')
+    clipping_tab.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (clipping_tab.get_attribute('class') or '')
+
+    # Switch to Wind tab
+    wind_tab = page.locator('.tabs button:has-text("Wind")')
+    wind_tab.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (wind_tab.get_attribute('class') or '')
+
+    # Switch to Stereo tools tab
+    stereo_tab = page.locator('.tabs button:has-text("Stereo tools")')
+    stereo_tab.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (stereo_tab.get_attribute('class') or '')
+    assert page.locator('span:has-text("Phase correlation")').count() == 1
+
+    # Switch back to Noise
+    noise_tab.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (noise_tab.get_attribute('class') or '')
+
+    # Test learn from selection button
+    learn_btn = page.locator('button:has-text("Learn from selection")')
+    learn_btn.click()
+    page.wait_for_timeout(100)
+
+    # Test Listen to what is removed toggle
+    listen_tg = page.locator('button.tg:has-text("Listen to what is removed")')
+    listen_tg.click()
+    page.wait_for_timeout(100)
+    assert listen_tg.get_attribute('aria-pressed') == 'true'
+
+    context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_silence_remover(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'fx-silence', width, height, name)
+    print(f"SilenceRemover [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"SilenceRemover [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_silence_remover_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Silence Remover screen: pause list toggles, sliders, apply button."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fx-silence')
+    page.wait_for_selector('.lst')
+
+    # Verify stat and pause list count
+    assert page.locator('.stat:has-text("−4:12")').count() == 1
+    pause_rows = page.locator('.lst > div')
+    assert pause_rows.count() >= 4
+
+    # Toggle pause inclusion
+    first_toggle = pause_rows.first.locator('button.tg')
+    init_pressed = first_toggle.get_attribute('aria-pressed')
+    first_toggle.click()
+    page.wait_for_timeout(100)
+    assert first_toggle.get_attribute('aria-pressed') != init_pressed
+
+    # Switch detect mode
+    detect_btn = page.locator('.seg button:has-text("Any audio")')
+    detect_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (detect_btn.get_attribute('class') or '')
+
+    # Click Apply to all button
+    apply_btn = page.locator('button:has-text("Apply to all")')
+    apply_btn.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.pill:has-text("Applied")').count() == 1
+
+    context.close()
+
 
 
 

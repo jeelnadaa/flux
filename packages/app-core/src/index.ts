@@ -40,3 +40,4 @@ export * from "./effects/EffectRack.js";
 export * from "./effects/ParametricEq.js";
 export * from "./effects/Dynamics.js";
 export * from "./tempo/TempoMap.js";
+export * from "./restoration/Restoration.js";

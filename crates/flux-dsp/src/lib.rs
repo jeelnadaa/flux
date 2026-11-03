@@ -12,6 +12,7 @@ pub mod node;
 pub mod param;
 pub mod pyramid;
 pub mod resampler;
+pub mod restoration;
 pub mod sample;
 pub mod spatial_analysis;
 pub mod spectrogram;
@@ -37,6 +38,10 @@ pub use node::{DspNode, GainNode, PassthroughNode};
 pub use param::{AutomationLane, AutomationPoint, SmoothedParameter, SmoothingMode};
 pub use pyramid::{PeakBin, PeakPyramid, PyramidLevel};
 pub use resampler::{Resampler, ResamplerQuality};
+pub use restoration::{
+    DcOffsetFilter, DeClicker, DeClipper, DeWindFilter, HumRemover, PanLaw, PauseInterval,
+    SilenceRemover, SpectralRepair, StationaryNoiseReduction, StereoTools,
+};
 pub use sample::Sample;
 pub use spatial_analysis::{GoniometerPoint, StereoAnalysisResult, StereoAnalyzer};
 pub use spectrogram::{

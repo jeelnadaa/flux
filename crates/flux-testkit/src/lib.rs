@@ -157,6 +157,72 @@ mod tests {
     }
 
     #[test]
+    fn test_hum_remover_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::HumRemover::new()), &config);
+        assert!(
+            result.all_passed(),
+            "HumRemover failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_dc_offset_filter_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::DcOffsetFilter::new()), &config);
+        assert!(
+            result.all_passed(),
+            "DcOffsetFilter failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_dewind_filter_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::DeWindFilter::new()), &config);
+        assert!(
+            result.all_passed(),
+            "DeWindFilter failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_declicker_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::DeClicker::new()), &config);
+        assert!(
+            result.all_passed(),
+            "DeClicker failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_declipper_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::DeClipper::new()), &config);
+        assert!(
+            result.all_passed(),
+            "DeClipper failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_stereo_tools_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::StereoTools::new()), &config);
+        assert!(
+            result.all_passed(),
+            "StereoTools failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_adaptive_leveler_universal_invariants() {
         let config = InvariantConfig::default();
         let result = run_dsp_invariants(|| Box::new(flux_dsp::AdaptiveLeveler::new()), &config);
