@@ -80,11 +80,11 @@ def test_spike_b_onnx_runtime_web():
 
     assert result.get("success") is True, f"Spike B failed: {result}"
 
-    # Small model (RNNoise-class) assertions
+    # Small model (RNNoise-class) assertions - PLAN.md §1 Spike B (real-time: RTF < 1.0)
     small = result["smallModel"]
     assert small["numFrames"] == 100
     assert small["avgFrameMs"] < 10.0, f"Small model frame took {small['avgFrameMs']} ms, exceeds 10 ms real-time frame budget"
-    assert small["rtf"] < 0.5, f"Small model RTF {small['rtf']} exceeds 0.5 target"
+    assert small["rtf"] < 1.0, f"Small model RTF {small['rtf']} exceeds real-time (1.0) target"
 
     # Large model (HTDemucs-class) assertions
     large = result["largeModel"]
