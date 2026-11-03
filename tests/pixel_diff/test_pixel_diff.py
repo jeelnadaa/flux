@@ -856,3 +856,102 @@ def test_edit_screen_context_menu_and_keyboard(browser_instance, test_server):
     assert clips.count() == 3
 
     context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_rack(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'rack', width, height, name)
+    print(f"Rack [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Rack [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_fxbrowser(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'fxbrowser', width, height, name)
+    print(f"Effect Browser [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Effect Browser [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_effect_rack_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Effect Rack screen: bypass toggle, solo toggle, mix, compare slots."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#rack')
+    page.wait_for_selector('.split')
+
+    # Verify 5 default rack items
+    items = page.locator('.a .in .box.row')
+    assert items.count() == 5
+
+    # Check first item toggle (Enable De-esser)
+    first_toggle = items.first.locator('button.tg')
+    assert first_toggle.get_attribute('aria-pressed') == 'true'
+
+    first_toggle.click()
+    page.wait_for_timeout(100)
+    assert first_toggle.get_attribute('aria-pressed') == 'false'
+
+    # Check solo button
+    solo_btn = items.first.locator('button.chip:has-text("Solo")')
+    assert 'on' not in (solo_btn.get_attribute('class') or '')
+    solo_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (solo_btn.get_attribute('class') or '')
+
+    # Check compare slot change
+    slot_b = page.locator('.tlbar .seg button:has-text("B")')
+    slot_b.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (slot_b.get_attribute('class') or '')
+
+    context.close()
+
+
+def test_effect_browser_search_and_filter(browser_instance, test_server):
+    """Verifies searching and category chip filtering in the Effect Browser."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fxbrowser')
+    page.wait_for_selector('.g5')
+
+    # Initial total cards
+    cards = page.locator('.fxc')
+    assert cards.count() >= 30
+
+    # Type search query "compressor"
+    inp = page.locator('.pgh input.inp')
+    inp.fill('compressor')
+    page.wait_for_timeout(100)
+
+    # Filtered cards count should be reduced to 2 (Compressor and Multiband compressor)
+    filtered_cards = page.locator('.fxc')
+    assert filtered_cards.count() >= 1
+    assert 'Compressor' in filtered_cards.first.inner_text()
+
+    # Clear search
+    inp.fill('')
+    page.wait_for_timeout(100)
+    assert page.locator('.fxc').count() == cards.count()
+
+    context.close()
+

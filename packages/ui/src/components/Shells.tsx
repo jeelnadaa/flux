@@ -474,3 +474,91 @@ export const Dialog: React.FC<DialogProps> = ({
     </div>
   );
 };
+
+export interface EffectPanelShellProps {
+  currentTab?: string;
+  projectName?: string;
+  projectStatus?: string;
+  title: string;
+  isSimple?: boolean;
+  onModeChange?: (mode: string, index: number) => void;
+  compareSlotIndex?: number;
+  onCompareSlotChange?: (slot: string, index: number) => void;
+  isBypassed?: boolean;
+  onToggleBypass?: () => void;
+  closeGo?: string;
+  main: React.ReactNode;
+  aside: React.ReactNode;
+  className?: string;
+}
+
+export const EffectPanelShell: React.FC<EffectPanelShellProps> = ({
+  currentTab = "fxbrowser",
+  projectName = "Harbor Lights",
+  projectStatus = "Saved 12 seconds ago",
+  title,
+  isSimple = false,
+  onModeChange,
+  compareSlotIndex = 0,
+  onCompareSlotChange,
+  isBypassed = false,
+  onToggleBypass,
+  closeGo = "rack",
+  main,
+  aside,
+  className = "",
+}) => {
+  return (
+    <ProjectLayout currentTab={currentTab} projectName={projectName} projectStatus={projectStatus}>
+      <div className={`split ${className}`}>
+        <div className="a">
+          <div className="tlbar">
+            <b style={{ fontSize: "15px", fontWeight: 800, whiteSpace: "nowrap" }}>{title}</b>
+            <SegmentedControl
+              items={["Simple", "Advanced"]}
+              selectedIndex={isSimple ? 0 : 1}
+              onChange={(item, idx) => onModeChange?.(item, idx)}
+            />
+            <span className="sp" />
+            <SegmentedControl
+              items={["A", "B", "C"]}
+              selectedIndex={compareSlotIndex}
+              onChange={(item, idx) => onCompareSlotChange?.(item, idx)}
+            />
+            <Button label="Presets" dataGo="presets" href="#presets" />
+            <button
+              className={`btn ${isBypassed ? "on" : ""}`}
+              type="button"
+              data-toggle=""
+              aria-pressed={isBypassed}
+              onClick={onToggleBypass}
+            >
+              <span>Bypass</span>
+            </button>
+            <Button
+              variant="ghost"
+              iconOnly
+              icon="x"
+              ariaLabel="Close effect"
+              dataGo={closeGo}
+              href={`#${closeGo}`}
+            />
+          </div>
+          <div
+            className="in"
+            style={{
+              padding: "14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+              flex: 1,
+            }}
+          >
+            {main}
+          </div>
+        </div>
+        <aside className="b in">{aside}</aside>
+      </div>
+    </ProjectLayout>
+  );
+};

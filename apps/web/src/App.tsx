@@ -19,6 +19,8 @@ import { CommandPaletteDialogScreen } from "./screens/CommandPaletteDialogScreen
 import { KeyboardSettingsScreen } from "./screens/KeyboardSettingsScreen.js";
 import { LibraryScreen } from "./screens/LibraryScreen.js";
 import { EmptyProjectScreen } from "./screens/EmptyProjectScreen.js";
+import { EffectRackScreen } from "./screens/EffectRackScreen.js";
+import { EffectBrowserScreen } from "./screens/EffectBrowserScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -58,6 +60,10 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <LibraryScreen />;
     case "empty":
       return <EmptyProjectScreen />;
+    case "rack":
+      return <EffectRackScreen />;
+    case "fxbrowser":
+      return <EffectBrowserScreen />;
     case "home":
     default:
       return <HomeScreen />;

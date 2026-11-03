@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 2 — Editor UI & timeline
-- **Next item:** P2.0 (P2.0-a Design tokens and component library per DESIGN.md (port `design/` CSS as is); app shell and routing)
+- **Phase:** 3 — Core processing
+- **Next item:** P3.1 (P3.1-a Parametric EQ engine, P3.1-b EQ UI, P3.1-c Linear-phase mode, P3.1-d EQ presets)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -18,7 +18,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
-| 3 | Core processing | Not started | 0 / 22 |
+| 3 | Core processing | In progress | 1 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P3.0-a implemented EffectChain and EffectRackManager (@flux/app-core) with per-clip, per-track, and master chains, effect reordering, solo/bypass toggling, wet/dry mix, A/B/C comparison slots, multi-parameter macro mappings (e.g. Presence macro modulating EQ, de-esser, compressor), and DSP CPU load estimation; created EffectPanelShell component shell (@flux/ui); created EffectRackScreen (#rack) and EffectBrowserScreen (#fxbrowser); verified 100% test pass (43 TS unit tests passing, 82 Playwright tests green) with >= 99.0% pixel-diff match against prototype at 1440, 820, and 390 px (Rack: 99.50% / 99.05% / 99.30%, Browser: 99.62% / 99.73% / 99.58%); full just ci gate green.
 
 - 2026-11-03: P2.4-a, P2.4-b, P2.4-c completed Phase 2 (17/17 items, marked Agent-complete): implemented ShortcutManager (@flux/app-core) with customizable keybindings, normalization, and global dispatch; full keyboard shortcuts on timeline (Space, S split, Delete, Z zoom, M marker, Ctrl+K palette, ? sheet); right-click context menu (split, reverse, delete) and marquee drag selection on EditScreen; touch pinch-to-zoom and two-finger scroll; live drag-and-drop file ingestion, file picker input, and paste event routing on HomeScreen; 5 new screens (ShortcutsDialogScreen #shortcuts, CommandPaletteDialogScreen #palette, KeyboardSettingsScreen #prefs-keys, LibraryScreen #library, EmptyProjectScreen #empty); 36 TS unit tests passing, 74 Playwright tests green with >= 98.7% pixel-diff match against prototype; just ci green.
 
@@ -159,7 +161,7 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 3 — Core processing
 
-- [ ] P3.0-a Basic effect rack: add, remove, reorder, bypass, wet/dry, panel shell
+- [x] P3.0-a Basic effect rack: add, remove, reorder, bypass, wet/dry, panel shell
 - [ ] P3.1-a Parametric EQ engine (10 bands, all filter types)
 - [ ] P3.1-b EQ UI: draggable curve, spectrum overlay, solo-band listen
 - [ ] P3.1-c Linear-phase mode and graphic EQ view

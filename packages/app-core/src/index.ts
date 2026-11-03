@@ -36,3 +36,4 @@ export * from "./project/ProjectJournal.js";
 export * from "./project/FluxPackage.js";
 export * from "./project/StorageDurability.js";
 export * from "./input/ShortcutManager.js";
+export * from "./effects/EffectRack.js";
