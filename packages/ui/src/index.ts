@@ -1,20 +1,16 @@
 /**
- * Flux UI package - design tokens and components.
+ * Flux UI package - design tokens, icons, and components.
+ * 1:1 replica of design/ specification per DESIGN.md.
  */
 
-export const FLUX_DEFAULT_THEME = "cassette";
-export const FLUX_DEFAULT_FONT = "bricolage";
-
-export interface ThemeConfig {
-  id: string;
-  name: string;
-  ground: string;
-  ink: string;
-}
-
-export const CASSETTE_THEME: ThemeConfig = {
-  id: "cassette",
-  name: "Cassette",
-  ground: "#DCCBA3",
-  ink: "#1E1A10",
-};
+export * from "./tokens.js";
+export * from "./icons.js";
+export * from "./components/Button.js";
+export * from "./components/SegmentedControl.js";
+export * from "./components/Slider.js";
+export * from "./components/Toggle.js";
+export * from "./components/Controls.js";
+export * from "./components/EffectCard.js";
+export * from "./components/KineticText.js";
+export * from "./components/CanvasViz.js";
+export * from "./components/Shells.js";

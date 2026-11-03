@@ -45,9 +45,9 @@ test-rust:
 test-python:
     python -m pytest tools/eval/tests
 
-# Run headless browser smoke tests (Spikes, Recording, Engine, Export, Analysis)
+# Run headless browser smoke tests (Spikes, Recording, Engine, Export, Analysis, Pixel-Diff)
 test-browser:
-    python -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py tests/spikes/spike_c/test_spike_c.py tests/spikes/spike_d/test_spike_d.py tests/spikes/spike_f/test_spike_f.py tests/spikes/spike_g/test_spike_g.py tests/recording/test_recording.py tests/engine/test_engine.py tests/export/test_export.py tests/analysis/test_analysis.py
+    python -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py tests/spikes/spike_c/test_spike_c.py tests/spikes/spike_d/test_spike_d.py tests/spikes/spike_f/test_spike_f.py tests/spikes/spike_g/test_spike_g.py tests/recording/test_recording.py tests/engine/test_engine.py tests/export/test_export.py tests/analysis/test_analysis.py tests/pixel_diff/test_pixel_diff.py
 
 # Run full Python evaluation benchmark suite and update dashboards
 eval:

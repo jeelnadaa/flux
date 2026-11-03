@@ -62,6 +62,9 @@ Scanned and verified by `license-checker-rseidelsohn`.
 | Package / Library | Role | Licence | Status | Notes |
 |---|---|---|---|---|
 | `typescript` | Build tooling / compiler | Apache-2.0 | Allowed | Microsoft Corporation |
+| `esbuild` | Fast web bundler | MIT | Allowed | Evan Wallace |
+| `react` / `react-dom` | UI component runtime & DOM renderer | MIT | Allowed | Meta Platforms, Inc. |
+| `@types/react` / `@types/react-dom` | React TypeScript definitions | MIT | Allowed | DefinitelyTyped contributors |
 | `eslint` / `typescript-eslint` | Code quality & static analysis | MIT / Apache-2.0 | Allowed | Development gate |
 | `prettier` | Code formatting | MIT | Allowed | Development gate |
 | `license-checker-rseidelsohn` | License compliance auditing | MIT | Allowed | Development gate |

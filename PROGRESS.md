@@ -17,7 +17,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
-| 2 | Editor UI & timeline | Not started | 0 / 17 |
+| 2 | Editor UI & timeline | In progress | 3 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P2.0-a, P2.0-b, P2.0-c implemented design tokens and complete UI component library (@flux/ui), app shell with hash routing and View Transitions, 13 themes (Cassette default), 6 bundled fonts (Bricolage Grotesque default) with 950ms circular reveal animation, and automated pixel-diff visual regression harness (tests/pixel_diff) verifying >= 95% match against design/ prototype at 1440px (Kit 98.56%, Themes 98.56%, Fonts 99.29%), 820px (Kit 99.07%, Themes 98.70%, Fonts 98.26%), and 390px (Kit 98.64%, Themes 98.70%, Fonts 98.85%); 12 pixel-diff tests passing, just ci green.
 
 - 2026-11-03: P1.5-a, P1.5-b, P1.5-c implemented analysis foundations and completed Phase 1: multi-resolution PeakPyramid with binary FPYR serialization, STFT SpectrogramTileGenerator (Linear/Log/Mel scales, Magma/Viridis/Inferno colormaps, RGBA rendering), ITU-R BS.1770-4 / EBU R128 loudness meter (momentary M, short-term S, gated integrated I, LRA EBU Tech 3342, 4x True Peak within +/-0.15 LU and +/-0.3 dB), StereoAnalyzer (phase correlation rho in [-1, +1], stereo width, mid/side RMS, goniometer point cloud), hostile-input decoder fuzzer (empty, truncated, corrupted magic, decompression bombs, 0Hz/0ch parameter rejection, 500 pseudorandom fuzz bitstreams), WASM bindings, and TypeScript AnalysisManager; Phase 1 marked Agent-complete (18/18 items); 58 cargo tests passing, 14 eval pytest, 10 Playwright browser tests; just ci green.
 
@@ -127,9 +129,9 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 2 — Editor UI & timeline
 
-- [ ] P2.0-a Design tokens and component library per DESIGN.md (port `design/` CSS as is); app shell and routing
-- [ ] P2.0-b Pixel-diff harness against the `design/` prototype at 1440, 820 and 390 px
-- [ ] P2.0-c Themes and Fonts settings: 13 themes (default Cassette), 6 bundled fonts (default Bricolage Grotesque), circular reveal
+- [x] P2.0-a Design tokens and component library per DESIGN.md (port `design/` CSS as is); app shell and routing
+- [x] P2.0-b Pixel-diff harness against the `design/` prototype at 1440, 820 and 390 px
+- [x] P2.0-c Themes and Fonts settings: 13 themes (default Cassette), 6 bundled fonts (default Bricolage Grotesque), circular reveal
 - [ ] P2.1-a Waveform view: zoom whole-file to sample level, scales, clipping
 - [ ] P2.1-b Spectrogram and hybrid view; spectral selection
 - [ ] P2.1-c Playhead, scrub, loop region, markers, snapping

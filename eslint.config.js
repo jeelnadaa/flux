@@ -20,4 +20,13 @@ export default tseslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
     },
   },
+  {
+    files: ["scripts/**/*.js"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+      },
+    },
+  },
 );

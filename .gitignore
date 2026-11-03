@@ -62,6 +62,7 @@ corpus/*
 *.opus
 
 # Test artifacts
+tests/pixel_diff/artifacts/
 *.proptest-regressions
 *.m4a
 !tests/fixtures/**
