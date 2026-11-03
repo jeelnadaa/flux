@@ -4,6 +4,7 @@
 pub mod capture;
 pub mod codec;
 pub mod decoder;
+pub mod export;
 pub mod graph;
 pub mod render;
 pub mod transport;

@@ -9,8 +9,16 @@ use flux_dsp::resampler::{Resampler, ResamplerQuality};
 use flux_dsp::stretch::StretchNode;
 use flux_engine::capture::{ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
+use flux_engine::decoder::{open_decoder, AudioBuffer, ContainerMetadata};
+use flux_engine::export::{
+    AacBitrate, ExportChannelMode, ExportJob, ExportOptions, ExportPresetId, ExportTargetFormat,
+    FlacCompressionLevel, FormatConvertOptions, FormatConverter, Mp3Bitrate, NormalizationMode,
+    OpusApplication, VorbisQuality, WavBitsPerSample,
+};
 use flux_engine::render::{EngineCommand, EngineHost};
 use flux_engine::transport::Transport;
+use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
 /// Returns the Flux DSP engine version string.
@@ -903,6 +911,360 @@ pub unsafe extern "C" fn engine_process_quantum(
     }
 }
 
+// ----------------------------------------------------------------------------
+// Audio Export & Format Conversion WASM APIs
+// ----------------------------------------------------------------------------
+
+/// JSON payload structure for export parameters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmExportConfig {
+    /// Target format identifier (e.g. "wav_16", "wav_24", "wav_32f", "flac_16", "flac_24", "mp3_128", "mp3_320", "aac_128", "opus_128", "vorbis_q6").
+    pub format: Option<String>,
+    /// Optional preset identifier (e.g. "streaming", "podcast_stereo", "podcast_mono", "youtube", "cd_audio", "archival").
+    pub preset: Option<String>,
+    /// Target sample rate (Hz), or None to preserve source rate.
+    pub sample_rate: Option<u32>,
+    /// Channel mode ("keep", "mono", "stereo").
+    pub channel_mode: Option<String>,
+    /// Region start frame.
+    pub region_start: Option<usize>,
+    /// Region end frame.
+    pub region_end: Option<usize>,
+    /// Tail decay frames to append.
+    pub tail_frames: Option<usize>,
+    /// Fade-out frames at the end.
+    pub fade_out_frames: Option<usize>,
+    /// Normalization mode ("off", "peak:-0.3", "lufs:-14.0,-1.0").
+    pub normalization: Option<String>,
+    /// Dither type ("none", "tpdf", "noise_shaped").
+    pub dither: Option<String>,
+    /// Track title.
+    pub title: Option<String>,
+    /// Artist name.
+    pub artist: Option<String>,
+    /// Album title.
+    pub album: Option<String>,
+    /// Release year or date.
+    pub date: Option<String>,
+    /// Musical genre.
+    pub genre: Option<String>,
+    /// Track number.
+    pub track_number: Option<u32>,
+    /// Free-form comment.
+    pub comment: Option<String>,
+    /// Force RF64 chunk header for WAV.
+    pub force_rf64: Option<bool>,
+}
+
+/// JSON payload structure for preset descriptions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmPresetInfo {
+    /// Preset ID key.
+    pub id: String,
+    /// Display name.
+    pub name: String,
+    /// Description.
+    pub description: String,
+    /// Target sample rate (Hz).
+    pub sample_rate: Option<u32>,
+    /// Bit depth.
+    pub bit_depth: Option<u8>,
+    /// Target LUFS if applicable.
+    pub target_lufs: Option<f32>,
+    /// True peak ceiling in dBTP if applicable.
+    pub true_peak_ceiling: Option<f32>,
+    /// Target peak in dBFS if applicable.
+    pub target_peak_dbfs: Option<f32>,
+    /// Recommended file extension.
+    pub file_extension: String,
+}
+
+/// Returns all export presets formatted as a JSON array string.
+#[wasm_bindgen]
+pub fn wasm_get_export_presets() -> String {
+    let presets: Vec<WasmPresetInfo> = ExportPresetId::all()
+        .iter()
+        .map(|id| {
+            let cfg = id.config();
+            let (target_lufs, true_peak_ceiling, target_peak_dbfs) = match cfg.normalization {
+                NormalizationMode::Lufs {
+                    target_lufs,
+                    true_peak_ceiling_dbtp,
+                } => (Some(target_lufs), Some(true_peak_ceiling_dbtp), None),
+                NormalizationMode::Peak { target_dbfs } => (None, None, Some(target_dbfs)),
+                NormalizationMode::Off => (None, None, None),
+            };
+
+            let id_str = match id {
+                ExportPresetId::Streaming => "streaming",
+                ExportPresetId::PodcastStereo => "podcast_stereo",
+                ExportPresetId::PodcastMono => "podcast_mono",
+                ExportPresetId::YouTube => "youtube",
+                ExportPresetId::CdAudio => "cd_audio",
+                ExportPresetId::Archival => "archival",
+            };
+
+            WasmPresetInfo {
+                id: id_str.to_string(),
+                name: cfg.name.to_string(),
+                description: cfg.description.to_string(),
+                sample_rate: cfg.sample_rate,
+                bit_depth: cfg.bit_depth,
+                target_lufs,
+                true_peak_ceiling,
+                target_peak_dbfs,
+                file_extension: cfg.file_extension.to_string(),
+            }
+        })
+        .collect();
+
+    serde_json::to_string(&presets).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Encodes an interleaved audio buffer to the requested format and destination configuration.
+#[wasm_bindgen]
+pub fn wasm_export_audio(
+    samples: &[f32],
+    num_channels: usize,
+    sample_rate: u32,
+    config_json: &str,
+) -> Result<Vec<u8>, JsValue> {
+    if num_channels == 0 || samples.is_empty() {
+        return Err(JsValue::from_str("Invalid audio buffer parameters"));
+    }
+
+    let cfg: WasmExportConfig = serde_json::from_str(config_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid config JSON: {}", e)))?;
+
+    let buffer = AudioBuffer::from_interleaved(samples, num_channels, sample_rate);
+
+    // 1. Resolve preset defaults if specified
+    let mut resolved_opts = ExportOptions::default();
+
+    if let Some(preset_name) = &cfg.preset {
+        let preset_id = match preset_name.to_lowercase().as_str() {
+            "streaming" => Some(ExportPresetId::Streaming),
+            "podcast_stereo" | "podcaststereo" => Some(ExportPresetId::PodcastStereo),
+            "podcast_mono" | "podcastmono" => Some(ExportPresetId::PodcastMono),
+            "youtube" => Some(ExportPresetId::YouTube),
+            "cd_audio" | "cdaudio" => Some(ExportPresetId::CdAudio),
+            "archival" => Some(ExportPresetId::Archival),
+            _ => None,
+        };
+
+        if let Some(p_id) = preset_id {
+            let p_cfg = p_id.config();
+            resolved_opts.sample_rate = p_cfg.sample_rate;
+            resolved_opts.dither = p_cfg.dither;
+            resolved_opts.normalization = p_cfg.normalization;
+            if p_cfg.force_mono {
+                resolved_opts.channel_mode = ExportChannelMode::ForceMono;
+            }
+            if p_id == ExportPresetId::Archival {
+                resolved_opts.format = ExportTargetFormat::Flac(FlacCompressionLevel::Level5, 24);
+            } else if p_id == ExportPresetId::CdAudio {
+                resolved_opts.format = ExportTargetFormat::Wav(WavBitsPerSample::Bits16);
+            }
+        }
+    }
+
+    // 2. Format override or explicit format
+    if let Some(fmt_str) = &cfg.format {
+        resolved_opts.format = parse_export_format(fmt_str);
+    }
+
+    // 3. Explicit options overrides
+    if let Some(sr) = cfg.sample_rate {
+        resolved_opts.sample_rate = Some(sr);
+    }
+
+    if let Some(cm) = &cfg.channel_mode {
+        resolved_opts.channel_mode = match cm.to_lowercase().as_str() {
+            "mono" => ExportChannelMode::ForceMono,
+            "stereo" => ExportChannelMode::ForceStereo,
+            _ => ExportChannelMode::Keep,
+        };
+    }
+
+    if let (Some(start), Some(end)) = (cfg.region_start, cfg.region_end) {
+        resolved_opts.region = Some(start..end);
+    }
+
+    resolved_opts.tail_frames = cfg.tail_frames.unwrap_or(0);
+    resolved_opts.fade_out_frames = cfg.fade_out_frames.unwrap_or(0);
+
+    if let Some(norm_str) = &cfg.normalization {
+        resolved_opts.normalization = parse_normalization_mode(norm_str);
+    }
+
+    if let Some(dit_str) = &cfg.dither {
+        resolved_opts.dither = match dit_str.to_lowercase().as_str() {
+            "tpdf" => DitherType::Tpdf,
+            "noise_shaped" | "noiseshaped" => DitherType::NoiseShaped,
+            _ => DitherType::None,
+        };
+    }
+
+    resolved_opts.force_rf64 = cfg.force_rf64.unwrap_or(false);
+
+    // Build metadata container
+    let mut meta = ContainerMetadata::default();
+    let mut has_meta = false;
+    if let Some(t) = cfg.title {
+        meta.title = Some(t);
+        has_meta = true;
+    }
+    if let Some(a) = cfg.artist {
+        meta.artist = Some(a);
+        has_meta = true;
+    }
+    if let Some(al) = cfg.album {
+        meta.album = Some(al);
+        has_meta = true;
+    }
+    if let Some(d) = cfg.date {
+        meta.date = Some(d);
+        has_meta = true;
+    }
+    if let Some(g) = cfg.genre {
+        meta.genre = Some(g);
+        has_meta = true;
+    }
+    if let Some(tr) = cfg.track_number {
+        meta.track_number = Some(tr);
+        has_meta = true;
+    }
+    if let Some(c) = cfg.comment {
+        meta.comment = Some(c);
+        has_meta = true;
+    }
+    if has_meta {
+        resolved_opts.metadata = Some(meta);
+    }
+
+    // Run export job
+    ExportJob::run(&buffer, &resolved_opts, None, |_| {})
+        .map_err(|e| JsValue::from_str(&format!("Export failed: {:?}", e)))
+}
+
+/// Converts audio file bytes into the target audio format.
+#[wasm_bindgen]
+pub fn wasm_convert_audio_format(
+    input_bytes: &[u8],
+    config_json: &str,
+) -> Result<Vec<u8>, JsValue> {
+    let mut decoder = open_decoder(Cursor::new(input_bytes.to_vec()))
+        .map_err(|e| JsValue::from_str(&format!("Decode failed: {:?}", e)))?;
+
+    let buffer = decoder
+        .decode_all()
+        .map_err(|e| JsValue::from_str(&format!("Decode failed: {:?}", e)))?;
+    let orig_meta = Some(decoder.info().metadata.clone());
+
+    let cfg: WasmExportConfig = serde_json::from_str(config_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid config JSON: {}", e)))?;
+
+    let target_format = cfg
+        .format
+        .as_deref()
+        .map(parse_export_format)
+        .unwrap_or(ExportTargetFormat::Wav(WavBitsPerSample::Bits16));
+
+    let channel_mode = match cfg.channel_mode.as_deref().unwrap_or("keep") {
+        "mono" => ExportChannelMode::ForceMono,
+        "stereo" => ExportChannelMode::ForceStereo,
+        _ => ExportChannelMode::Keep,
+    };
+
+    let norm = cfg
+        .normalization
+        .as_deref()
+        .map(parse_normalization_mode)
+        .unwrap_or(NormalizationMode::Off);
+
+    let dither = match cfg.dither.as_deref().unwrap_or("none") {
+        "tpdf" => DitherType::Tpdf,
+        "noise_shaped" | "noiseshaped" => DitherType::NoiseShaped,
+        _ => DitherType::None,
+    };
+
+    let convert_opts = FormatConvertOptions {
+        target_format,
+        target_sample_rate: cfg.sample_rate,
+        target_channel_mode: channel_mode,
+        override_metadata: None,
+        normalization: norm,
+        dither,
+    };
+
+    FormatConverter::convert(&buffer, orig_meta.as_ref(), &convert_opts, None, |_| {})
+        .map_err(|e| JsValue::from_str(&format!("Format conversion failed: {:?}", e)))
+}
+
+fn parse_export_format(fmt_str: &str) -> ExportTargetFormat {
+    match fmt_str.to_lowercase().as_str() {
+        "wav_24" | "wav24" => ExportTargetFormat::Wav(WavBitsPerSample::Bits24),
+        "wav_32f" | "wav_float" | "wav32f" => ExportTargetFormat::Wav(WavBitsPerSample::Float32),
+        "flac_16" | "flac16" => ExportTargetFormat::Flac(FlacCompressionLevel::Level5, 16),
+        "flac_24" | "flac24" | "flac" => ExportTargetFormat::Flac(FlacCompressionLevel::Level5, 24),
+        "mp3_192" => ExportTargetFormat::Mp3(Mp3Bitrate::Cbr192),
+        "mp3_256" => ExportTargetFormat::Mp3(Mp3Bitrate::Cbr256),
+        "mp3_320" => ExportTargetFormat::Mp3(Mp3Bitrate::Cbr320),
+        "mp3_v0" => ExportTargetFormat::Mp3(Mp3Bitrate::VbrV0),
+        "mp3" | "mp3_128" => ExportTargetFormat::Mp3(Mp3Bitrate::Cbr128),
+        "aac_96" => ExportTargetFormat::Aac(AacBitrate::Kbps96),
+        "aac_192" => ExportTargetFormat::Aac(AacBitrate::Kbps192),
+        "aac_256" => ExportTargetFormat::Aac(AacBitrate::Kbps256),
+        "aac" | "aac_128" => ExportTargetFormat::Aac(AacBitrate::Kbps128),
+        "vorbis_q3" => ExportTargetFormat::Vorbis(VorbisQuality::Q3),
+        "vorbis_q9" => ExportTargetFormat::Vorbis(VorbisQuality::Q9),
+        "vorbis" | "vorbis_q6" => ExportTargetFormat::Vorbis(VorbisQuality::Q6),
+        "opus_voice" | "opus_voip" => ExportTargetFormat::Opus(OpusApplication::Voip, 64),
+        "opus_64" => ExportTargetFormat::Opus(OpusApplication::Audio, 64),
+        "opus_192" => ExportTargetFormat::Opus(OpusApplication::Audio, 192),
+        "opus" | "opus_128" => ExportTargetFormat::Opus(OpusApplication::Audio, 128),
+        _ => ExportTargetFormat::Wav(WavBitsPerSample::Bits16),
+    }
+}
+
+fn parse_normalization_mode(norm_str: &str) -> NormalizationMode {
+    let lower = norm_str.to_lowercase();
+    if lower.starts_with("peak") {
+        let parts: Vec<&str> = lower.split(':').collect();
+        let target = parts
+            .get(1)
+            .and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(-0.3);
+        NormalizationMode::Peak {
+            target_dbfs: target,
+        }
+    } else if lower.starts_with("lufs") {
+        let parts: Vec<&str> = lower.split(':').collect();
+        if let Some(sub) = parts.get(1) {
+            let vals: Vec<&str> = sub.split(',').collect();
+            let target_lufs = vals
+                .first()
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(-14.0);
+            let tp = vals
+                .get(1)
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(-1.0);
+            NormalizationMode::Lufs {
+                target_lufs,
+                true_peak_ceiling_dbtp: tp,
+            }
+        } else {
+            NormalizationMode::Lufs {
+                target_lufs: -14.0,
+                true_peak_ceiling_dbtp: -1.0,
+            }
+        }
+    } else {
+        NormalizationMode::Off
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1144,5 +1506,33 @@ mod tests {
 
             engine_destroy(host);
         }
+    }
+
+    #[test]
+    fn test_wasm_export_and_converter_apis() {
+        // Presets JSON test
+        let presets_json = wasm_get_export_presets();
+        assert!(presets_json.contains("streaming"));
+        assert!(presets_json.contains("podcast_stereo"));
+        assert!(presets_json.contains("cd_audio"));
+        assert!(presets_json.contains("archival"));
+
+        // Export WAV with preset test
+        let samples = vec![0.5f32; 2400]; // 1200 frames stereo
+        let config = r#"{"preset":"cd_audio","title":"Test CD Track"}"#;
+        let wav_bytes = wasm_export_audio(&samples, 2, 48000, config).expect("WASM export failed");
+        assert!(wav_bytes.starts_with(b"RIFF"));
+
+        // Export FLAC test
+        let flac_config = r#"{"format":"flac_16","title":"Test FLAC Track"}"#;
+        let flac_bytes =
+            wasm_export_audio(&samples, 2, 48000, flac_config).expect("WASM FLAC export failed");
+        assert!(flac_bytes.starts_with(b"fLaC"));
+
+        // Format conversion test
+        let conv_config = r#"{"format":"wav_24"}"#;
+        let conv_bytes =
+            wasm_convert_audio_format(&wav_bytes, conv_config).expect("WASM convert failed");
+        assert!(conv_bytes.starts_with(b"RIFF"));
     }
 }
