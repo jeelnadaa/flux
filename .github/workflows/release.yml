@@ -153,30 +153,50 @@ jobs:
   release:
     name: Publish to GitHub Releases
     needs: [build-windows, build-macos]
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Determine release version
+        id: rel_ver
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${{ github.ref_name }}"
+            VER="${TAG#v}"
+          else
+            TAG="v1.0.0"
+            VER="1.0.0"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VER" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+          merge-multiple: true
+
+      - name: Display downloaded assets
+        run: ls -laR release-assets
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/**/*.zip*
-          name: Flux ${{ github.ref_name }} — Native Standalone
+          tag_name: ${{ steps.rel_ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Flux v${{ steps.rel_ver.outputs.version }} — Native Standalone
+          make_latest: true
+          overwrite_files: true
+          files: release-assets/*
           body: |
-            ## Flux Native Audio Editor ${{ github.ref_name }}
+            ## Flux Native Audio Editor v${{ steps.rel_ver.outputs.version }}
 
             Standalone, self-contained native builds for Windows and macOS with all audio codecs and DSP primitives bundled.
 
             ### Downloads
-            - **Windows (x64 Portable):** `Flux-${{ github.ref_name }}-win-x64.zip` — unpack anywhere and run `Flux.exe`
-            - **macOS (Universal):** `Flux-${{ github.ref_name }}-macos-universal.zip` — unpack and run `Flux.app`
+            - **Windows (x64 Portable):** `Flux-${{ steps.rel_ver.outputs.version }}-win-x64.zip` — unpack anywhere and run `Flux.exe`
+            - **macOS (Universal):** `Flux-v${{ steps.rel_ver.outputs.version }}-macos-universal.zip` — unpack and run `Flux.app`
             - **Linux (Build from Source):** `make && sudo make install`
 
             ### Verification
