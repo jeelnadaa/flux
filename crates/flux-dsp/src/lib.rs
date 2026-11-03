@@ -5,6 +5,7 @@ pub mod binaural;
 pub mod biquad;
 pub mod delay;
 pub mod dither;
+pub mod eq;
 pub mod loudness;
 pub mod node;
 pub mod param;
@@ -19,6 +20,10 @@ pub use binaural::BinauralNode;
 pub use biquad::{BiquadChain, BiquadCoeffs, BiquadState, BiquadType};
 pub use delay::DelayLine;
 pub use dither::{BitDepth, Dither, DitherType};
+pub use eq::{
+    EqBandConfig, EqFilterType, EqMode, EqPresetDefinition, EqPresets, GraphicEqPresets, MatchEq,
+    ParametricEq, LINEAR_PHASE_FIR_LENGTH, MAX_EQ_BANDS,
+};
 pub use loudness::{LoudnessMeasurement, LoudnessMeter};
 pub use node::{DspNode, GainNode, PassthroughNode};
 pub use param::{AutomationLane, AutomationPoint, SmoothedParameter, SmoothingMode};

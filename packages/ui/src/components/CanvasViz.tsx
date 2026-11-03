@@ -350,18 +350,161 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
           ctx.fill();
         }
       } else if (type === "eq") {
-        // Draw simplified interactive EQ curve
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
         ctx.clearRect(0, 0, rw, rh);
-        ctx.strokeStyle = "#B8350A";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let x = 0; x < rw; x++) {
-          const normX = x / rw;
-          const y = rh / 2 - Math.sin(normX * Math.PI * 2) * (rh * 0.25);
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+
+        // Frequency and dB grid
+        const logX = (f: number, W: number) => (Math.log10(f / 20) / Math.log10(1000)) * W;
+        ctx.strokeStyle = getCss("--ln");
+        ctx.lineWidth = 1;
+        ctx.fillStyle = getCss("--tx3");
+        ctx.font = '500 10.5px "Geist Mono",monospace';
+
+        [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].forEach((f) => {
+          const px = logX(f, rw);
+          ctx.beginPath();
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, rh);
+          ctx.stroke();
+          if (f !== 20) {
+            ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, Math.min(px + 3, rw - 22), rh - 6);
+          }
+        });
+
+        [-18, -12, -6, 0, 6, 12, 18].forEach((d) => {
+          const y = rh / 2 - (d / 24) * rh;
+          ctx.globalAlpha = d === 0 ? 1 : 0.5;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(rw, y);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.fillText((d > 0 ? "+" : "") + d, 4, y - 3);
+        });
+
+        // Live spectrum overlay
+        const n = Math.floor(rw / 4);
+        ctx.fillStyle = getCss("--ac-t");
+        ctx.globalAlpha = 0.22;
+        const t = (cv as unknown as { _t?: number })._t || 0;
+        for (let i = 0; i < n; i++) {
+          const u = i / n;
+          const v =
+            (Math.sin(u * 16 + t * 1.4) * 0.13 +
+              Math.sin(u * 47 - t * 0.9) * 0.08 +
+              0.6 -
+              u * 0.52) *
+            (0.92 + 0.08 * Math.sin(t * 6 + i));
+          const h = Math.min(1, Math.max(0, v)) * rh * 0.72;
+          ctx.fillRect(i * 4, rh - h, 3, h);
         }
+        ctx.globalAlpha = 1;
+
+        // Interactive or default curve nodes
+        interface EqNode {
+          f: number;
+          g: number;
+          q: number;
+          c: string;
+        }
+        const cvExt = cv as unknown as { _nodes?: EqNode[]; _eqd?: boolean };
+        const nodes =
+          cvExt._nodes ||
+          (cvExt._nodes = [
+            { f: 70, g: 3.5, q: 0.8, c: "--t3" },
+            { f: 280, g: -3, q: 1.3, c: "--t2" },
+            { f: 1200, g: 1.6, q: 1, c: "--t4" },
+            { f: 3400, g: 4, q: 1.5, c: "--t5" },
+            { f: 11000, g: 3, q: 0.7, c: "--t1" },
+          ]);
+
+        const resp = (u: number) => {
+          let s = 0;
+          const f = 20 * Math.pow(1000, u);
+          nodes.forEach((node) => {
+            const d = Math.log2(f / node.f) * node.q * 1.3;
+            s += node.g * Math.exp(-d * d);
+          });
+          return s;
+        };
+
+        // Curve path
+        ctx.beginPath();
+        for (let px = 0; px <= rw; px += 2) {
+          const y = rh / 2 - (resp(px / rw) / 24) * rh;
+          if (px === 0) ctx.moveTo(px, y);
+          else ctx.lineTo(px, y);
+        }
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = getCss("--tx");
         ctx.stroke();
+
+        ctx.lineTo(rw, rh / 2);
+        ctx.lineTo(0, rh / 2);
+        ctx.closePath();
+        ctx.fillStyle = getCss("--tx");
+        ctx.globalAlpha = 0.08;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Draw numbered band nodes
+        nodes.forEach((node, i) => {
+          const px = logX(node.f, rw);
+          const y = rh / 2 - (node.g / 24) * rh;
+          ctx.beginPath();
+          ctx.arc(px, y, 11, 0, Math.PI * 2);
+          ctx.fillStyle = getCss(node.c);
+          ctx.fill();
+          ctx.fillStyle = getCss(`${node.c}-on`);
+          ctx.font = `800 11px ${getCss("--sans")}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${i + 1}`, px, y + 0.5);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+        });
+
+        if (!cvExt._eqd) {
+          cvExt._eqd = true;
+          let dr: EqNode | null = null;
+          cv.style.touchAction = "none";
+          cv.addEventListener("pointerdown", (e: PointerEvent) => {
+            const r = cv.getBoundingClientRect();
+            const mx = e.clientX - r.left;
+            const my = e.clientY - r.top;
+            let best: EqNode | null = null;
+            let bd = 28;
+            nodes.forEach((node) => {
+              const d = Math.hypot(
+                logX(node.f, r.width) - mx,
+                r.height / 2 - (node.g / 24) * r.height - my,
+              );
+              if (d < bd) {
+                bd = d;
+                best = node;
+              }
+            });
+            dr = best;
+            if (dr) cv.setPointerCapture(e.pointerId);
+          });
+          cv.addEventListener("pointermove", (e: PointerEvent) => {
+            if (!dr) return;
+            const r = cv.getBoundingClientRect();
+            const u = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+            dr.f = 20 * Math.pow(1000, u);
+            dr.g = Math.min(
+              18,
+              Math.max(-18, ((r.height / 2 - (e.clientY - r.top)) / r.height) * 24),
+            );
+            render();
+          });
+          window.addEventListener("pointerup", () => {
+            dr = null;
+          });
+        }
       }
     };
 

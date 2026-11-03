@@ -21,6 +21,7 @@ import { LibraryScreen } from "./screens/LibraryScreen.js";
 import { EmptyProjectScreen } from "./screens/EmptyProjectScreen.js";
 import { EffectRackScreen } from "./screens/EffectRackScreen.js";
 import { EffectBrowserScreen } from "./screens/EffectBrowserScreen.js";
+import { EqualizerScreen } from "./screens/EqualizerScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -64,6 +65,8 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <EffectRackScreen />;
     case "fxbrowser":
       return <EffectBrowserScreen />;
+    case "fx-eq":
+      return <EqualizerScreen />;
     case "home":
     default:
       return <HomeScreen />;

@@ -955,3 +955,59 @@ def test_effect_browser_search_and_filter(browser_instance, test_server):
 
     context.close()
 
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_eq(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'fx-eq', width, height, name)
+    print(f"Equalizer [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Equalizer [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_equalizer_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Parametric EQ screen: preset switching, mode, and view toggles."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fx-eq')
+    page.wait_for_selector('.vz')
+
+    # Initial preset is Clear voice
+    clear_voice_chip = page.locator('button.chip:has-text("Clear voice")')
+    assert 'on' in (clear_voice_chip.get_attribute('class') or '')
+
+    # Click "Bass boost" preset chip
+    bass_boost_chip = page.locator('button.chip:has-text("Bass boost")')
+    bass_boost_chip.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (bass_boost_chip.get_attribute('class') or '')
+
+    # Check mode switch: Linear phase
+    lp_btn = page.locator('.sec:has-text("Mode") .seg button:has-text("Linear phase")')
+    lp_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (lp_btn.get_attribute('class') or '')
+
+    # Check view switch: 10 band
+    band10_btn = page.locator('.sec:has-text("Show") .seg button:has-text("10 band")')
+    band10_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (band10_btn.get_attribute('class') or '')
+
+    # Check bypass toggle
+    bypass_btn = page.locator('.tlbar button[data-toggle]')
+    bypass_btn.click()
+    page.wait_for_timeout(100)
+    assert bypass_btn.get_attribute('aria-pressed') == 'true'
+
+    context.close()
+
+

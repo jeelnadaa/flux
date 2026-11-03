@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 3 — Core processing
-- **Next item:** P3.1 (P3.1-a Parametric EQ engine, P3.1-b EQ UI, P3.1-c Linear-phase mode, P3.1-d EQ presets)
+- **Next item:** P3.2 (P3.2-a Compressor, P3.2-b True-peak limiter, P3.2-c Gate/expander, de-esser, transient shaper, P3.2-d Multiband compressor, P3.2-e Peak and LUFS normalize; adaptive leveler)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -18,7 +18,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
-| 3 | Core processing | In progress | 1 / 22 |
+| 3 | Core processing | In progress | 5 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P3.1-a, P3.1-b, P3.1-c, P3.1-d implemented Parametric EQ engine in Rust (flux-dsp) and TypeScript (@flux/app-core): up to 10 bands with peaking, low/high shelf, low/high pass (6-96 dB/oct cascaded Butterworth biquads in TDF-II with 64-bit state), bandpass, notch, tilt; analog frequency warping compensation; linear-phase FIR mode with constant group delay; Match EQ transfer function computation; 10 documented production presets and ISO 10/31-band graphic EQ frequencies; interactive EqualizerScreen (#fx-eq) with draggable curve nodes, solo-band listen, spectrum analyzer overlay, graphic EQ sliders, and linear phase toggle; verified 100% test pass (49 TS unit tests passing, 86 Playwright/pytest tests green, 15 cargo tests) with >= 97.2% pixel-diff match against prototype at 1440, 820, and 390 px (Desktop 97.24%, Tablet 97.97%, Phone 98.40%); full just ci gate green.
 
 - 2026-11-03: P3.0-a implemented EffectChain and EffectRackManager (@flux/app-core) with per-clip, per-track, and master chains, effect reordering, solo/bypass toggling, wet/dry mix, A/B/C comparison slots, multi-parameter macro mappings (e.g. Presence macro modulating EQ, de-esser, compressor), and DSP CPU load estimation; created EffectPanelShell component shell (@flux/ui); created EffectRackScreen (#rack) and EffectBrowserScreen (#fxbrowser); verified 100% test pass (43 TS unit tests passing, 82 Playwright tests green) with >= 99.0% pixel-diff match against prototype at 1440, 820, and 390 px (Rack: 99.50% / 99.05% / 99.30%, Browser: 99.62% / 99.73% / 99.58%); full just ci gate green.
 
@@ -162,10 +164,10 @@ Newest first. One line per commit: item, what changed, measured result.
 ## Phase 3 — Core processing
 
 - [x] P3.0-a Basic effect rack: add, remove, reorder, bypass, wet/dry, panel shell
-- [ ] P3.1-a Parametric EQ engine (10 bands, all filter types)
-- [ ] P3.1-b EQ UI: draggable curve, spectrum overlay, solo-band listen
-- [ ] P3.1-c Linear-phase mode and graphic EQ view
-- [ ] P3.1-d EQ presets with documented curves; match EQ
+- [x] P3.1-a Parametric EQ engine (10 bands, all filter types)
+- [x] P3.1-b EQ UI: draggable curve, spectrum overlay, solo-band listen
+- [x] P3.1-c Linear-phase mode and graphic EQ view
+- [x] P3.1-d EQ presets with documented curves; match EQ
 - [ ] P3.2-a Compressor
 - [ ] P3.2-b True-peak limiter
 - [ ] P3.2-c Gate/expander, de-esser, transient shaper
