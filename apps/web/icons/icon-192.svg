@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="40" fill="#181513" />
+  <rect x="24" y="24" width="144" height="144" rx="24" fill="#24201c" stroke="#38322c" stroke-width="3" />
+  <!-- Waveform lines in Cassette theme accent colors -->
+  <line x1="52" y1="96" x2="52" y2="96" stroke="#ff8533" stroke-width="8" stroke-linecap="round" />
+  <line x1="68" y1="72" x2="68" y2="120" stroke="#ff8533" stroke-width="8" stroke-linecap="round" />
+  <line x1="84" y1="52" x2="84" y2="140" stroke="#ffaa44" stroke-width="8" stroke-linecap="round" />
+  <line x1="100" y1="40" x2="100" y2="152" stroke="#ffcc00" stroke-width="8" stroke-linecap="round" />
+  <line x1="116" y1="64" x2="116" y2="128" stroke="#ff8533" stroke-width="8" stroke-linecap="round" />
+  <line x1="132" y1="84" x2="132" y2="108" stroke="#ff8533" stroke-width="8" stroke-linecap="round" />
+  <circle cx="100" cy="96" r="6" fill="#181513" />
+</svg>

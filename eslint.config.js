@@ -12,6 +12,7 @@ export default tseslint.config(
       "**/node_modules/**",
       "design/**",
       "apps/web/landing.js",
+      "apps/web/sw.js",
       "*.config.js",
     ],
   },

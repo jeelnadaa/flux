@@ -48,3 +48,4 @@ export * from "./creative/CreativeModels.js";
 export * from "./ai/AiModels.js";
 export * from "./ai/AdvancedAiModels.js";
 export * from "./workflow/index.js";
+export * from "./hardening/index.js";
