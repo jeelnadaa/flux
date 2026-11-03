@@ -38,7 +38,13 @@ jobs:
           if (Test-Path "target/release/flux.exe") {
             Copy-Item "target/release/flux.exe" -Destination "$PkgDir/Flux.exe"
           } else {
-            Get-ChildItem "target/release/*.exe" | Select-Object -First 1 | Copy-Item -Destination "$PkgDir/Flux.exe"
+            $Found = Get-ChildItem -Recurse -Filter "flux.exe" target | Select-Object -First 1
+            if ($Found) {
+              Copy-Item $Found.FullName -Destination "$PkgDir/Flux.exe"
+            } else {
+              Write-Error "Native flux.exe binary not found!"
+              exit 1
+            }
           }
 
           # Copy documents and notices
@@ -73,7 +79,9 @@ jobs:
 
       - name: Build native release binaries
         run: |
-          cargo build --release --target aarch64-apple-darwin --workspace --bins || cargo build --release --workspace --bins
+          cargo build --release --workspace --bins
+          cargo build --release --target aarch64-apple-darwin --bin flux || true
+          cargo build --release --target x86_64-apple-darwin --bin flux || true
 
       - name: Prepare macOS standalone package
         run: |
@@ -83,12 +91,52 @@ jobs:
           mkdir -p "$PKG_NAME/Flux.app/Contents/MacOS"
           mkdir -p "$PKG_NAME/Flux.app/Contents/Resources"
 
-          if [ -f target/release/flux ]; then
+          # Choose Universal or host binary
+          if [ -f target/aarch64-apple-darwin/release/flux ] && [ -f target/x86_64-apple-darwin/release/flux ]; then
+            echo "[*] Creating Universal 2 binary with lipo..."
+            lipo -create -output "$PKG_NAME/Flux.app/Contents/MacOS/Flux" \
+              target/aarch64-apple-darwin/release/flux \
+              target/x86_64-apple-darwin/release/flux
+          elif [ -f target/release/flux ]; then
             cp target/release/flux "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
+          elif [ -f target/aarch64-apple-darwin/release/flux ]; then
+            cp target/aarch64-apple-darwin/release/flux "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
           else
-            cp $(find target/release -maxdepth 1 -type f -perm +111 | head -n 1) "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
+            FOUND_BIN=$(find target -name "flux" -type f | head -n 1)
+            if [ -n "$FOUND_BIN" ] && [ -f "$FOUND_BIN" ]; then
+              cp "$FOUND_BIN" "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
+            else
+              echo "Error: Native flux binary not found in target directories."
+              exit 1
+            fi
           fi
           chmod +x "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
+
+          # Create macOS Info.plist bundle descriptor
+          cat << 'EOF' > "$PKG_NAME/Flux.app/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>Flux</string>
+              <key>CFBundleIconFile</key>
+              <string>AppIcon</string>
+              <key>CFBundleIdentifier</key>
+              <string>in.solarquack.flux</string>
+              <key>CFBundleName</key>
+              <string>Flux</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>11.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
 
           cp README.md "$PKG_NAME/README.txt"
           cp LICENSES.md "$PKG_NAME/LICENSES.txt"

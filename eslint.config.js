@@ -7,11 +7,14 @@ export default tseslint.config(
   {
     ignores: [
       "**/dist/**",
+      "**/dist-static/**",
+      "dist-static/**",
       "**/build/**",
       "**/target/**",
       "**/node_modules/**",
       "design/**",
       "apps/web/landing.js",
+      "apps/web/download.js",
       "apps/web/sw.js",
       "*.config.js",
     ],

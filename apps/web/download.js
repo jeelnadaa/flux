@@ -114,7 +114,9 @@
       g.connect(A.master);
       o.start();
       o.stop(A.ctx.currentTime + d);
-    } catch (e) {}
+    } catch {
+      // AudioContext may be suspended or blocked
+    }
   }
 
   const sb = $("#snd"),
@@ -173,7 +175,9 @@
       A.on = !A.on;
       try {
         localStorage.setItem("flux-sound", A.on ? "on" : "off");
-      } catch (e) {}
+      } catch {
+        // AudioContext may be suspended or blocked
+      }
       if (A.on) wake();
       else if (A.ctx) {
         fadeTo(0, 0.3);
