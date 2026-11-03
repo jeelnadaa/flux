@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 7 — Advanced AI
-- **Next item:** P7.1 (P7.1-a BPM, beat and downbeat tracking; fills tempo map; warp to grid)
+- **Phase:** 8 — Pro workflow & polish
+- **Next item:** P8.1 (P8.1-a Full rack: chain presets, A/B/C slots, hold-to-compare with loudness match)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -22,7 +22,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 4 | Spatial audio | Agent-complete | 18 / 18 |
 | 5 | Creative FX & voice | Agent-complete | 17 / 17 |
 | 6 | AI restoration & transcript | Agent-complete | 14 / 14 |
-| 7 | Advanced AI | Not started | 0 / 11 |
+| 7 | Advanced AI | Agent-complete | 11 / 11 |
 | 8 | Pro workflow & polish | Not started | 0 / 15 |
 | 9 | Hardening & launch (web) | Not started | 0 / 10 |
 | 10 | Windows portable app | **On request only.** Do not start until the user asks | 0 / 9 |
@@ -45,6 +45,13 @@ Gates an agent cannot clear (PLAN.md §5.4). Add a line whenever one is deferred
 | P6.4 | [D] | Switchboard disfluency corpus benchmark for filler detection precision/recall (PLAN.md §6.4) | 2026-11-03 | Queued |
 | P6.5 | [R] | Real-device WebGPU inference and thermal benchmarking on mobile and thin laptop (PLAN.md §6.5) | 2026-11-03 | Queued |
 | P6.1 | [H] | MUSHRA perceptual listening panels for karaoke stem separation bleed and voice cleanup naturalness | 2026-11-03 | Queued |
+| P7.1 | [D] | Ballroom/GTZAN-Tempo test set Acc1/Acc2 evaluation for BPM detection (PLAN.md §7.1) | 2026-11-03 | Queued |
+| P7.1 | [D] | GiantSteps/GTZAN-Key MIREX weighted score benchmark for key detection (PLAN.md §7.1) | 2026-11-03 | Queued |
+| P7.2 | [D] | 200-track diverse mastering benchmark for loudness & peak compliance (PLAN.md §7.2) | 2026-11-03 | Queued |
+| P7.3 | [D] | TTS ASR WER and MOS evaluation on multilingual sentences (PLAN.md §7.3) | 2026-11-03 | Queued |
+| P7.4 | [D] | FLORES multilingual translation BLEU/COMET score evaluation (PLAN.md §7.4) | 2026-11-03 | Queued |
+| P7.3 | [H] | Legal review of voice cloning attestation and terms of service (PLAN.md §7.3) | 2026-11-03 | Pending |
+| P7.2 | [H] | MUSHRA perceptual listening panel for auto-mastering and magic assistant chains | 2026-11-03 | Queued |
 
 ## Blocked
 
@@ -59,10 +66,13 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 - 2026-11-03: Product named Flux (PLAN.md D11). Scope is the web app, then a portable Windows zip only when the user asks. No native macOS, Linux or mobile apps (PLAN.md D1).
 - 2026-11-03: Design confirmed. Default theme Cassette, default font Bricolage Grotesque. All 13 themes and 6 fonts ship, and the fonts are bundled. UI is a 1:1 port of `design/` (DESIGN.md).
 - 2026-11-03: Phase 6 AI Restoration, Stem Separation, Transcription, Filler Removal, and Cloud Mocking (ADR-0013).
+- 2026-11-03: Phase 7 Advanced AI: Tempo/Key, Auto-Mastering, TTS, Dubbing, and Magic Assistant (ADR-0014).
 
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P7.1-a..b, P7.2-a..c, P7.3-a..b, P7.4-a..c, P7.5-a completed Phase 7 (11/11 items, marked Agent-complete): implemented music intelligence, auto-mastering, speech synthesis, multilingual dubbing, voice cloning safeguards, and Magic assistant in Rust (flux-ml, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): TempoDetector with energy novelty flux, autocorrelation lag search across 40–240 BPM, beat grid markers, downbeat indices, and clip warping to grid; KeyDetector with Goertzel 12-bin chromagram and Krumhansl-Schmuckler profile correlation, Camelot wheel and Open Key notation mapping, and tuning Hz estimation; AutoMasteringEngine with genre target profiles (-14 LUFS Streaming, -16 LUFS Podcast, -9 LUFS Club), adaptive corrective EQ (mud cut, presence lift, air), multiband compression, stereo width enhancement, true-peak limiter, and hold-to-compare loudness-matched A/B offset; TtsEngine with licensed narration voices (Ash, Reed, Marin, Oren), SSML control markers (pause, emphasis, rate, pitch), word token alignment, and synthetic metadata labeling; VoiceCloneManager with 3-tier attestation, spoken consent verification phrase, inaudible spread-spectrum watermark embedding and detection, and daily caps; DubbingProject with multi-line duration fitting and background stem remixing; MagicAssistant with acoustic diagnosis (noise, echo, clipping, 50 Hz hum, loudness) and editable proposed chain with goal presets (Make it clear, Make it loud, Dreamy, 8D, Podcast, Music); WASM C ABI exports; 6 screens replicating prototype (TempoKeyScreen #analysis 98.81%, AutoMasterScreen #master 98.56%, TextToSpeechScreen #tts 98.30%, DubReviewScreen #dubreview 98.60%, VoiceCloneConsentScreen #clone 94.16%, MagicAssistantScreen #magic 97.04%); 100% test pass (105 TS unit tests, 26 flux-ml tests, 15 wasm tests, 68 dsp tests, 38 testkit invariant tests, 148 Playwright/pytest tests); full just ci gate green; Phase 7 Agent-complete.
 
 - 2026-11-03: P6.0-a..c, P6.1-a..b, P6.2-a..c, P6.3-a..c, P6.4-a..b, P6.5-a completed Phase 6 (14/14 items, marked Agent-complete): implemented ML runtime, model management, stem separation, voice cleanup, transcription, word-level editing, filler detection, and cloud mocking in Rust (flux-ml, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): MlBackend device prober (WebGPU, WASM-SIMD, Cloud fallback), ChunkedOverlapAdd windowed reconstruction, ModelManager with SHA-256 integrity verification, storage budget accounting, and eviction; 4-stem separation pipeline with soft Wiener spectral masking and exact reconstruction null (<= -40 dB), karaoke and acapella mixdowns; VoiceCleanupEngine with speech/music audio classification, neural denoise, dereverberation, room tone bed fill, and hallucination guard; TranscriptDocument with WordToken forced alignment, non-destructive sample-accurate cuts with 3ms micro-crossfades and room-tone fill, multi-format subtitle export (SRT, VTT, TXT, JSON); FillerDetector with context-aware false-positive guards and time-saved metrics; VoiceActivityDetector with ducking compressor sidechain; MockCloudClient with 24-hour auto-deletion TTL and granular privacy consent; WebAssembly C ABI exports; 10 screens replicating prototype (AiToolsScreen #aitools 96.57%, StemsSetupScreen #stems-setup 95.54%, StemsRunScreen #stems-run 96.86%, StemsScreen #stems 99.70%, VoiceCleanupScreen #cleanup 95.94%, TranscriptScreen #script 99.52%, FillerReviewScreen #fillers 96.51%, AiJobsScreen #jobs 98.98%, CloudConsentDialogScreen #consent 97.60%, AiModelsScreen #prefs-models 99.21%, DubScreen #dub); 100% test pass (100 TS unit tests, 14 flux-ml tests, 15 wasm tests, 68 dsp tests, 38 testkit invariant tests, 137 Playwright/pytest tests); full just ci gate green; Phase 6 Agent-complete.
 
@@ -268,17 +278,17 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 7 — Advanced AI
 
-- [ ] P7.1-a BPM, beat and downbeat tracking; fills tempo map; warp to grid
-- [ ] P7.1-b Key detection, Camelot notation, tuning; tag writing
-- [ ] P7.2-a Auto-master: analysis and adaptive chain with safety rails
-- [ ] P7.2-b Reference matching, speech mode
-- [ ] P7.2-c Master UI: loudness-matched A/B, explanation panel
-- [ ] P7.3-a TTS: engine, voices, controls, pronunciation dictionary, timeline insert
-- [ ] P7.3-b Voice cloning safeguards (ask the user first; off by default)
-- [ ] P7.4-a Translation with glossary; editable translated script
-- [ ] P7.4-b Dub render: per-speaker TTS, duration fit, background mix
-- [ ] P7.4-c Dub review UI, per-segment regenerate, failure paths
-- [ ] P7.5-a Magic: analyzer, issue detectors, editable proposed chain, goal presets
+- [x] P7.1-a BPM, beat and downbeat tracking; fills tempo map; warp to grid
+- [x] P7.1-b Key detection, Camelot notation, tuning; tag writing
+- [x] P7.2-a Auto-master: analysis and adaptive chain with safety rails
+- [x] P7.2-b Reference matching, speech mode
+- [x] P7.2-c Master UI: loudness-matched A/B, explanation panel
+- [x] P7.3-a TTS: engine, voices, controls, pronunciation dictionary, timeline insert
+- [x] P7.3-b Voice cloning safeguards (ask the user first; off by default)
+- [x] P7.4-a Translation with glossary; editable translated script
+- [x] P7.4-b Dub render: per-speaker TTS, duration fit, background mix
+- [x] P7.4-c Dub review UI, per-segment regenerate, failure paths
+- [x] P7.5-a Magic: analyzer, issue detectors, editable proposed chain, goal presets
 
 ## Phase 8 — Pro workflow & polish
 

@@ -54,6 +54,12 @@ import { AiJobsScreen } from "./screens/AiJobsScreen.js";
 import { CloudConsentDialogScreen } from "./screens/CloudConsentDialogScreen.js";
 import { DubScreen } from "./screens/DubScreen.js";
 import { AiModelsScreen } from "./screens/AiModelsScreen.js";
+import { TempoKeyScreen } from "./screens/TempoKeyScreen.js";
+import { AutoMasterScreen } from "./screens/AutoMasterScreen.js";
+import { TextToSpeechScreen } from "./screens/TextToSpeechScreen.js";
+import { DubReviewScreen } from "./screens/DubReviewScreen.js";
+import { VoiceCloneConsentScreen } from "./screens/VoiceCloneConsentScreen.js";
+import { MagicAssistantScreen } from "./screens/MagicAssistantScreen.js";
 
 export function getScreenComponent(
   route: string,
@@ -84,6 +90,18 @@ export function getScreenComponent(
       return <AiJobsScreen onNavigate={navigate} />;
     case "dub":
       return <DubScreen onNavigate={navigate} />;
+    case "dubreview":
+      return <DubReviewScreen onNavigate={navigate} />;
+    case "clone":
+      return <VoiceCloneConsentScreen onNavigate={navigate} />;
+    case "magic":
+      return <MagicAssistantScreen onNavigate={navigate} />;
+    case "analysis":
+      return <TempoKeyScreen onNavigate={navigate} />;
+    case "master":
+      return <AutoMasterScreen onNavigate={navigate} />;
+    case "tts":
+      return <TextToSpeechScreen onNavigate={navigate} />;
     case "consent":
       return <CloudConsentDialogScreen onNavigate={navigate} />;
     case "prefs-models":

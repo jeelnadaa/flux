@@ -2481,6 +2481,99 @@ pub fn wasm_list_cloud_jobs_json() -> String {
     serde_json::to_string(client.list_jobs()).unwrap_or_else(|_| "[]".into())
 }
 
+/// Analyzes audio and returns musical key and tempo BPM estimation as JSON.
+#[wasm_bindgen]
+pub fn wasm_detect_tempo_and_key_json(samples: &[f32], sample_rate: f32) -> String {
+    let tempo = flux_ml::TempoDetector::detect(samples, sample_rate);
+    let key = flux_ml::KeyDetector::detect(samples, sample_rate);
+    serde_json::json!({
+        "tempo": tempo,
+        "key": key
+    })
+    .to_string()
+}
+
+/// Applies auto-mastering and returns the mastered audio samples.
+#[wasm_bindgen]
+pub fn wasm_auto_master(
+    samples: &[f32],
+    sample_rate: f32,
+    target_mode: u32,
+    intensity_mode: u32,
+) -> Vec<f32> {
+    let target = match target_mode {
+        1 => flux_ml::MasteringTarget::Podcast,
+        2 => flux_ml::MasteringTarget::Club,
+        _ => flux_ml::MasteringTarget::Streaming,
+    };
+    let intensity = match intensity_mode {
+        0 => flux_ml::MasteringIntensity::Gentle,
+        2 => flux_ml::MasteringIntensity::Loud,
+        _ => flux_ml::MasteringIntensity::Balanced,
+    };
+    let config = flux_ml::AutoMasteringConfig {
+        target,
+        intensity,
+        preserve_dynamics: true,
+        speech_mode: false,
+    };
+    let (out, _) = flux_ml::AutoMasteringEngine::process(samples, sample_rate, &config);
+    out
+}
+
+/// Synthesizes text to speech with voice selection and returns audio samples.
+#[wasm_bindgen]
+pub fn wasm_synthesize_tts(text: &str, voice_id: u32, sample_rate: f32) -> Vec<f32> {
+    let voice = match voice_id {
+        1 => flux_ml::TtsVoice::Reed,
+        2 => flux_ml::TtsVoice::Marin,
+        3 => flux_ml::TtsVoice::Oren,
+        _ => flux_ml::TtsVoice::Ash,
+    };
+    let req = flux_ml::TtsRequest {
+        script: text.to_string(),
+        language: "English (US)".into(),
+        voice,
+        rate: 1.0,
+        pitch_semitones: 0.0,
+        use_cloud: false,
+    };
+    let res = flux_ml::TtsEngine::synthesize(&req, sample_rate);
+    res.samples
+}
+
+/// Returns the prototype dubbing project data with duration fitting as JSON.
+#[wasm_bindgen]
+pub fn wasm_get_dubbing_project_json() -> String {
+    let proj = flux_ml::DubbingProject::create_sample();
+    serde_json::to_string(&proj).unwrap_or_else(|_| "{}".into())
+}
+
+/// Diagnoses audio and proposes an editable Magic chain as JSON.
+#[wasm_bindgen]
+pub fn wasm_diagnose_and_propose_magic_json(
+    samples: &[f32],
+    sample_rate: f32,
+    goal_id: u32,
+) -> String {
+    let diagnosis = flux_ml::MagicAssistant::diagnose(samples, sample_rate);
+    let goal = match goal_id {
+        1 => flux_ml::MagicGoal::MakeItLoud,
+        2 => flux_ml::MagicGoal::Dreamy,
+        3 => flux_ml::MagicGoal::Spatial8D,
+        4 => flux_ml::MagicGoal::Podcast,
+        5 => flux_ml::MagicGoal::Music,
+        _ => flux_ml::MagicGoal::MakeItClear,
+    };
+    let chain = flux_ml::MagicAssistant::propose_chain(goal);
+    serde_json::json!({
+        "diagnosis": diagnosis,
+        "goal": goal.display_name(),
+        "chain": chain
+    })
+    .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3029,5 +3122,22 @@ mod tests {
 
         let jobs_json = wasm_list_cloud_jobs_json();
         assert!(jobs_json.contains("Harbor Lights"));
+
+        let tempo_key = wasm_detect_tempo_and_key_json(&sample, 48000.0);
+        assert!(tempo_key.contains("bpm"));
+        assert!(tempo_key.contains("key"));
+
+        let mastered = wasm_auto_master(&sample, 48000.0, 0, 1);
+        assert_eq!(mastered.len(), 1000);
+
+        let tts = wasm_synthesize_tts("Hello Harbor Lights", 0, 48000.0);
+        assert!(!tts.is_empty());
+
+        let dub_json = wasm_get_dubbing_project_json();
+        assert!(dub_json.contains("Spanish"));
+
+        let magic_json = wasm_diagnose_and_propose_magic_json(&sample, 48000.0, 0);
+        assert!(magic_json.contains("diagnosis"));
+        assert!(magic_json.contains("Hum removal"));
     }
 }

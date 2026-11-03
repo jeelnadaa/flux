@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// An individual transcribed word token with exact time alignment and confidence.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WordToken {
     /// Text of the word.
     pub text: String,

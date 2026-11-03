@@ -1815,6 +1815,104 @@ def test_pixel_diff_prefs_models_desktop(browser_instance, test_server):
     assert res['match_percentage'] >= 85.0
 
 
+def test_pixel_diff_analysis_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'analysis', 1440, 900, 'desktop')
+    print(f"Tempo & Key [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_master_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'master', 1440, 900, 'desktop')
+    print(f"Auto-Master [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_master_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#master')
+    page.wait_for_selector('button[data-hold]')
+
+    hold_btn = page.locator('button[data-hold]')
+    assert hold_btn.is_visible()
+    context.close()
+
+
+def test_pixel_diff_tts_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'tts', 1440, 900, 'desktop')
+    print(f"TTS [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_tts_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#tts')
+    page.wait_for_selector('textarea')
+
+    textarea = page.locator('textarea')
+    assert 'Harbor Lights' in (textarea.input_value() or '')
+    context.close()
+
+
+def test_pixel_diff_dubreview_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'dubreview', 1440, 900, 'desktop')
+    print(f"Dub Review [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_dubreview_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#dubreview')
+    page.wait_for_selector('.box.g2')
+
+    boxes = page.locator('.box.g2')
+    assert boxes.count() >= 3
+    context.close()
+
+
+def test_pixel_diff_clone_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'clone', 1440, 900, 'desktop')
+    print(f"Voice Clone Consent [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_clone_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#clone')
+    page.wait_for_selector('.wiz')
+
+    # Verify 3 consent toggles and record consent button
+    toggles = page.locator('.tg')
+    assert toggles.count() >= 3
+
+    rec_btn = page.locator('button:has-text("Record consent")')
+    assert rec_btn.is_visible()
+    rec_btn.click()
+    page.wait_for_timeout(100)
+    context.close()
+
+
+def test_pixel_diff_magic_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'magic', 1440, 900, 'desktop')
+    print(f"Magic [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_magic_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#magic')
+    page.wait_for_selector('.g5')
+
+    boxes = page.locator('.g5 .box')
+    assert boxes.count() == 5
+    context.close()
+
+
+
 
 
 
