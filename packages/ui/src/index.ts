@@ -20,3 +20,4 @@ export * from "./components/SpectralSelectionOverlay.js";
 export * from "./components/TimelineRuler.js";
 export * from "./components/PlayheadOverlay.js";
 export * from "./components/HybridView.js";
+export * from "./kinetic.js";

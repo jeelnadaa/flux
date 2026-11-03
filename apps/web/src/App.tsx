@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { initThemeAndFont, canViewTransition } from "@flux/ui";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  initThemeAndFont,
+  canViewTransition,
+  hydrateKineticTypography,
+  observeKineticTypography,
+} from "@flux/ui";
 import { KitScreen } from "./screens/KitScreen.js";
 import { ThemesScreen } from "./screens/ThemesScreen.js";
 import { FontsScreen } from "./screens/FontsScreen.js";
@@ -98,6 +103,7 @@ export function getScreenComponent(route: string): React.ReactElement {
 }
 
 export const App: React.FC = () => {
+  const stageRef = useRef<HTMLDivElement>(null);
   const [route, setRoute] = useState(() => {
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace(/^#/, "");
@@ -109,6 +115,21 @@ export const App: React.FC = () => {
   useEffect(() => {
     initThemeAndFont();
 
+    if (stageRef.current) {
+      const cleanup = observeKineticTypography(stageRef.current);
+      return cleanup;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (stageRef.current) {
+      hydrateKineticTypography(stageRef.current);
+    }
+    const m = document.getElementById("m");
+    if (m) m.scrollTop = 0;
+  }, [route]);
+
+  useEffect(() => {
     const handleHashChange = () => {
       const nextRoute = window.location.hash.replace(/^#/, "") || "home";
       const doc = document as Document & {
@@ -133,14 +154,11 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const m = document.getElementById("m");
-    if (m) m.scrollTop = 0;
-  }, [route]);
-
   return (
     <div id="frame">
-      <div id="stage">{getScreenComponent(route)}</div>
+      <div id="stage" ref={stageRef}>
+        {getScreenComponent(route)}
+      </div>
     </div>
   );
 };

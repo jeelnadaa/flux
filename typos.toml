@@ -9,6 +9,7 @@ extend-exclude = [
 ]
 
 [default.extend-words]
+ACN = "ACN"
 fo = "fo"
 ba = "ba"
 TPE = "TPE"
