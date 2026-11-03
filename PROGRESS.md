@@ -25,7 +25,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 7 | Advanced AI | Agent-complete | 11 / 11 |
 | 8 | Pro workflow & polish | Agent-complete | 15 / 15 |
 | 9 | Hardening & launch (web) | Agent-complete | 10 / 10 |
-| 10 | Native Desktop (Win/Mac/Linux) | Planned (Awaiting confirmation) | 0 / 10 |
+| 10 | Native Desktop (Win/Mac/Linux) | Agent-complete | 10 / 10 |
 
 Statuses: Not started → In progress → Agent-complete (only human, data or device gates remain) → Released.
 
@@ -73,6 +73,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-04: P10.1-a..e implemented 100% native desktop application architecture for Windows, macOS, and Linux: integrated Tao 0.37 + Wry 0.57 native OS windowing with embedded loopback HTTP server and COOP/COEP isolation; configured #![windows_subsystem = "windows"] to eliminate terminal flashes on Windows; implemented native asset resolution across Windows, macOS Contents/Resources, and Linux /usr/share; updated release.yml to package full UI bundles into Windows x64 portable zip and macOS Universal zip; updated Makefile for Linux source builds and desktop installation.
 
 - 2026-11-03: P9.1-a, P9.2-a..c, P9.3-a..b, P9.4-a..d completed Phase 9 (10/10 items, marked Agent-complete): implemented PWA packaging, offline service worker, CSP, and runtime platform capabilities in TypeScript (@flux/app-core, @flux/web): PlatformCapabilitiesDetector probing crossOriginIsolated, SharedArrayBuffer, WebGPU, and OPFS with fallback paths; AdaptiveQualityGovernor with 4 quality tiers (Mastering, High, Balanced, PowerSave) stepping down on xruns or CPU >80% and recovering with hysteresis; ChaosSuite with 1,000 randomized fault injections (abrupt kill mid-write, disk quota exceeded, bit flips, permission revocations, concurrency races) resulting in 0 data-loss incidents and 100% recovery; SoakHarness simulating 4-hour (14,400s) continuous playback/editing with memory growth <= 5% (0 leaks); SignedModelManifest verifying SHA-256 cryptographic hashes on official models and blocking tampered weights; CloudLoadTester simulating 500 concurrent cloud jobs verifying queue latency SLO (p95 < 60s) and 24h ephemeral deletion; FeatureFlagManager with centralized kill switches and rollback rehearsal; complete PWA assets (manifest.webmanifest, icons, sw.js offline cache); STRIDE threat model (docs/STRIDE_THREAT_MODEL.md); user manual (docs/USER_GUIDE.md); developer preset format specification (docs/PRESETS_DEV_GUIDE.md); launch readiness audit against PLAN.md Appendix C (docs/LAUNCH_READINESS_REVIEW.md); 100% test pass (128 TS unit tests, 71 dsp tests, 15 wasm tests, 38 testkit invariant tests, 14 python eval tests, clean license scan with 0 violations); Phase 9 Agent-complete.
 

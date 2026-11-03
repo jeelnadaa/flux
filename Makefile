@@ -26,6 +26,10 @@ help:
 	@echo "  make clean        - Remove build artifacts and temporary binaries"
 
 build:
+	@echo "[*] Preparing Flux UI bundle..."
+	@if command -v npm >/dev/null 2>&1; then \
+		npm run build || true; \
+	fi
 	@echo "[*] Compiling native Rust DSP and Engine crates..."
 	$(CARGO) build --release --workspace --bins
 	@mkdir -p bin
@@ -51,6 +55,15 @@ install: build
 	@echo "[*] Installing Flux to $(BINDIR)..."
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 755 bin/flux $(DESTDIR)$(BINDIR)/flux
+	install -d $(DESTDIR)$(DATADIR)/flux/apps/web
+	cp -r apps/web/dist $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp -r apps/web/fonts $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp -r apps/web/icons $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp apps/web/index.html $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp apps/web/app.css $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp apps/web/themes.css $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp apps/web/fonts.css $(DESTDIR)$(DATADIR)/flux/apps/web/
+	cp apps/web/manifest.webmanifest $(DESTDIR)$(DATADIR)/flux/apps/web/
 	install -d $(DESTDIR)$(APPDIR)
 	@echo "[Desktop Entry]\nType=Application\nName=Flux\nGenericName=Audio Editor\nComment=Professional native non-destructive audio editor\nExec=flux %F\nIcon=flux\nTerminal=false\nCategories=AudioVideo;Audio;AudioVideoEditing;\nMimeType=audio/wav;audio/x-wav;audio/flac;audio/mpeg;audio/ogg;" > $(DESTDIR)$(APPDIR)/flux.desktop
 	install -d $(DESTDIR)$(ICONDIR)
@@ -62,6 +75,7 @@ install: build
 uninstall:
 	@echo "[*] Removing Flux installation..."
 	rm -f $(DESTDIR)$(BINDIR)/flux
+	rm -rf $(DESTDIR)$(DATADIR)/flux
 	rm -f $(DESTDIR)$(APPDIR)/flux.desktop
 	rm -f $(DESTDIR)$(ICONDIR)/flux.svg
 	@echo "[✓] Flux removed."

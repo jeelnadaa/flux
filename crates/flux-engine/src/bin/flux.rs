@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 //! Flux Native Audio Editor CLI & standalone executable.
 
 use flux_engine::decoder::open_decoder;
@@ -6,7 +8,7 @@ use flux_engine::flux_dsp::node::DspNode;
 use flux_engine::render::EngineHost;
 use std::env;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::time::Instant;
 
@@ -131,14 +133,208 @@ fn cmd_host() {
     println!("[✓] Engine Host active and ready.");
 }
 
+fn find_web_root() -> PathBuf {
+    if let Ok(dir) = env::var("FLUX_WEB_DIR") {
+        let p = PathBuf::from(dir);
+        if p.exists() {
+            return p;
+        }
+    }
+
+    if let Ok(exe) = env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            for rel in &[
+                "apps/web",
+                "resources/web",
+                "web",
+                "../apps/web",
+                "../../apps/web",
+                "../Resources/apps/web",
+                "../Resources/web",
+                "../Resources",
+            ] {
+                let candidate = parent.join(rel);
+                if candidate.join("index.html").exists() {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    if let Ok(cwd) = env::current_dir() {
+        for rel in &["apps/web", "resources/web", "web", "../apps/web"] {
+            let candidate = cwd.join(rel);
+            if candidate.join("index.html").exists() {
+                return candidate;
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        for sys_path in &[
+            "/usr/local/share/flux/apps/web",
+            "/usr/share/flux/apps/web",
+            "/usr/local/share/flux",
+            "/usr/share/flux",
+        ] {
+            let candidate = PathBuf::from(sys_path);
+            if candidate.join("index.html").exists() {
+                return candidate;
+            }
+        }
+    }
+
+    PathBuf::from("apps/web")
+}
+
+fn get_mime_type(path: &Path) -> &'static str {
+    match path.extension().and_then(|s| s.to_str()).unwrap_or("") {
+        "html" => "text/html; charset=utf-8",
+        "js" | "mjs" => "application/javascript; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "svg" => "image/svg+xml",
+        "woff2" => "font/woff2",
+        "woff" => "font/woff",
+        "wasm" => "application/wasm",
+        "json" | "webmanifest" => "application/json; charset=utf-8",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "ico" => "image/x-icon",
+        "wav" => "audio/wav",
+        "mp3" => "audio/mpeg",
+        "ogg" => "audio/ogg",
+        _ => "application/octet-stream",
+    }
+}
+
+fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
+    for request in server.incoming_requests() {
+        let raw_url = request.url().split('?').next().unwrap_or("/");
+        let clean_path = if raw_url == "/" {
+            "/index.html"
+        } else {
+            raw_url
+        };
+
+        let rel_path = clean_path.trim_start_matches('/');
+        let target_file = web_root.join(rel_path);
+
+        if target_file.is_file() {
+            if let Ok(data) = std::fs::read(&target_file) {
+                let mime = get_mime_type(&target_file);
+                let response = tiny_http::Response::new(
+                    tiny_http::StatusCode(200),
+                    vec![
+                        tiny_http::Header::from_bytes(&b"Content-Type"[..], mime.as_bytes())
+                            .unwrap(),
+                        tiny_http::Header::from_bytes(
+                            &b"Cross-Origin-Opener-Policy"[..],
+                            &b"same-origin"[..],
+                        )
+                        .unwrap(),
+                        tiny_http::Header::from_bytes(
+                            &b"Cross-Origin-Embedder-Policy"[..],
+                            &b"require-corp"[..],
+                        )
+                        .unwrap(),
+                        tiny_http::Header::from_bytes(&b"Cache-Control"[..], &b"no-cache"[..])
+                            .unwrap(),
+                    ],
+                    std::io::Cursor::new(data),
+                    None,
+                    None,
+                );
+                let _ = request.respond(response);
+                continue;
+            }
+        }
+
+        let not_found = tiny_http::Response::new(
+            tiny_http::StatusCode(404),
+            vec![tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/plain"[..]).unwrap()],
+            std::io::Cursor::new(b"Not Found".to_vec()),
+            None,
+            None,
+        );
+        let _ = request.respond(not_found);
+    }
+}
+
+pub fn run_gui() {
+    let web_root = find_web_root();
+    let server = tiny_http::Server::http("127.0.0.1:0").expect("Failed to start loopback server");
+    let port = server
+        .server_addr()
+        .to_ip()
+        .expect("Failed to get port")
+        .port();
+
+    let root_clone = web_root.clone();
+    std::thread::spawn(move || {
+        serve_assets(server, root_clone);
+    });
+
+    let event_loop = tao::event_loop::EventLoop::new();
+    let window = tao::window::WindowBuilder::new()
+        .with_title("Flux Audio Editor")
+        .with_inner_size(tao::dpi::LogicalSize::new(1440.0, 900.0))
+        .with_min_inner_size(tao::dpi::LogicalSize::new(800.0, 600.0))
+        .build(&event_loop)
+        .expect("Failed to create native desktop window");
+
+    let url = format!("http://127.0.0.1:{}/index.html", port);
+
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    let _webview = wry::WebViewBuilder::new()
+        .with_url(&url)
+        .build(&window)
+        .expect("Failed to initialize native webview");
+
+    #[cfg(target_os = "linux")]
+    let _webview = {
+        use tao::platform::unix::WindowExtUnix;
+        use wry::WebViewBuilderExtUnix;
+        let vbox = window.default_vbox().expect("Failed to get GTK container");
+        wry::WebViewBuilder::new()
+            .with_url(&url)
+            .build_gtk(vbox)
+            .expect("Failed to initialize native webview")
+    };
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = tao::event_loop::ControlFlow::Wait;
+        if let tao::event::Event::WindowEvent {
+            event: tao::event::WindowEvent::CloseRequested,
+            ..
+        } = event
+        {
+            *control_flow = tao::event_loop::ControlFlow::Exit;
+        }
+    });
+}
+
+fn attach_console_if_cli() {
+    #[cfg(target_os = "windows")]
+    {
+        extern "system" {
+            fn AttachConsole(dwProcessId: u32) -> i32;
+        }
+        unsafe {
+            AttachConsole(u32::MAX);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        print_usage();
-        println!("\n[i] Flux Native Audio Editor engine initialized.");
+    if args.len() < 2 || args[1] == "--gui" {
+        run_gui();
         return;
     }
+
+    attach_console_if_cli();
 
     match args[1].as_str() {
         "-h" | "--help" | "help" => {
