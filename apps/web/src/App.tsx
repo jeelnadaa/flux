@@ -14,6 +14,11 @@ import { HistoryScreen } from "./screens/HistoryScreen.js";
 import { RecoveryDialogScreen } from "./screens/RecoveryDialogScreen.js";
 import { RelinkDialogScreen } from "./screens/RelinkDialogScreen.js";
 import { QuotaDialogScreen } from "./screens/QuotaDialogScreen.js";
+import { ShortcutsDialogScreen } from "./screens/ShortcutsDialogScreen.js";
+import { CommandPaletteDialogScreen } from "./screens/CommandPaletteDialogScreen.js";
+import { KeyboardSettingsScreen } from "./screens/KeyboardSettingsScreen.js";
+import { LibraryScreen } from "./screens/LibraryScreen.js";
+import { EmptyProjectScreen } from "./screens/EmptyProjectScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -25,6 +30,8 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <FontsScreen />;
     case "prefs-general":
       return <GeneralSettingsScreen />;
+    case "prefs-keys":
+      return <KeyboardSettingsScreen />;
     case "welcome":
       return <WelcomeScreen />;
     case "edit":
@@ -43,6 +50,14 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <RelinkDialogScreen />;
     case "quota":
       return <QuotaDialogScreen />;
+    case "shortcuts":
+      return <ShortcutsDialogScreen />;
+    case "palette":
+      return <CommandPaletteDialogScreen />;
+    case "library":
+      return <LibraryScreen />;
+    case "empty":
+      return <EmptyProjectScreen />;
     case "home":
     default:
       return <HomeScreen />;

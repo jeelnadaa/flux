@@ -662,3 +662,197 @@ def test_quota_dialog_interactions(browser_instance, test_server):
     assert page.locator('.dlg .lst > div').nth(0).locator('button').inner_text().strip() == 'Done'
 
     context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_shortcuts(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'shortcuts', width, height, name)
+    print(f"\n[SHORTCUTS {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Shortcuts dialog on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_palette(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'palette', width, height, name)
+    print(f"\n[PALETTE {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Command palette on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_prefs_keys(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-keys', width, height, name)
+    print(f"\n[PREFS-KEYS {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Keyboard settings on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_library(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'library', width, height, name)
+    print(f"\n[LIBRARY {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Library screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_empty(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'empty', width, height, name)
+    print(f"\n[EMPTY {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Empty project screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+def test_shortcuts_and_command_palette_interactions(browser_instance, test_server):
+    """Verifies shortcuts dialog links and palette search filter."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    # Test shortcuts sheet
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#shortcuts')
+    page.wait_for_selector('.dlg')
+    all_btn = page.locator('.dlg .foot a:has-text("All shortcuts")')
+    assert all_btn.get_attribute('href') == '#prefs-keys'
+
+    # Test command palette
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#palette')
+    page.wait_for_selector('.dlg.cmd')
+    inp = page.locator('.dlg input.inp')
+    assert inp.input_value() == 'nor'
+    items = page.locator('.dlg .col a.it')
+    assert items.count() == 5
+
+    inp.fill('reverb')
+    page.wait_for_timeout(100)
+    assert items.count() == 1
+    assert 'Normal room' in items.first.inner_text()
+
+    context.close()
+
+
+def test_keyboard_settings_interaction(browser_instance, test_server):
+    """Verifies searching and viewing shortcuts in settings."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#prefs-keys')
+    page.wait_for_selector('.tw table')
+
+    rows = page.locator('.tw table tbody tr')
+    assert rows.count() >= 10
+
+    # Search for 'split'
+    search = page.locator('input[placeholder="Search commands"]')
+    search.fill('split')
+    page.wait_for_timeout(100)
+    assert rows.count() == 1
+    assert 'Split at playhead' in rows.first.inner_text()
+
+    context.close()
+
+
+def test_library_screen_interaction(browser_instance, test_server):
+    """Verifies searching, category filtering, and folder chips on Library screen."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#library')
+    page.wait_for_selector('.tw table')
+
+    rows = page.locator('.tw table tbody tr')
+    assert rows.count() == 5
+
+    # Filter to Podcast
+    podcast_btn = page.locator('.seg button:has-text("Podcast")')
+    podcast_btn.click()
+    page.wait_for_timeout(100)
+    assert rows.count() == 1
+    assert 'Interview ep. 12' in rows.first.inner_text()
+
+    # Reset to All
+    all_btn = page.locator('.seg button:has-text("All")')
+    all_btn.click()
+    page.wait_for_timeout(100)
+    assert rows.count() == 5
+
+    # Click chip
+    client_chip = page.locator('button.chip:has-text("Client work")')
+    client_chip.click()
+    page.wait_for_timeout(100)
+    assert 'on' in client_chip.get_attribute('class')
+
+    context.close()
+
+
+def test_edit_screen_context_menu_and_keyboard(browser_instance, test_server):
+    """Verifies right-click context menu and keyboard shortcuts (S for split, Delete) on Edit screen."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#edit')
+    page.wait_for_selector('.tl')
+
+    clips = page.locator('.trk').first.locator('.clip')
+    assert clips.count() == 3
+
+    # Press 'S' on keyboard -> splits selected clip
+    page.keyboard.press('s')
+    page.wait_for_timeout(100)
+    assert clips.count() == 4
+
+    # Right-click on timeline to open context menu
+    tl = page.locator('.tl')
+    tl.click(button='right', position={'x': 250, 'y': 80})
+    page.wait_for_timeout(100)
+
+    # Context menu popup should appear
+    menu = page.locator('.dlg:has-text("Split")')
+    assert menu.count() >= 1
+
+    # Click Delete in context menu
+    menu.locator('button:has-text("Delete")').click()
+    page.wait_for_timeout(100)
+    assert clips.count() == 3
+
+    context.close()

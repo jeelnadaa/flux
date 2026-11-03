@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ProjectLayout,
   SegmentedControl,
@@ -203,6 +203,17 @@ export const EditScreen: React.FC = () => {
   const [fadeCurveIdx, setFadeCurveIdx] = useState<number>(0);
   const [isReversed, setIsReversed] = useState<boolean>(false);
 
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [marquee, setMarquee] = useState<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+
+  const [pinchDist, setPinchDist] = useState<number | null>(null);
+
   const handleSplit = () => {
     setTracksState((prev) =>
       prev.map((trk) => {
@@ -268,6 +279,96 @@ export const EditScreen: React.FC = () => {
         ),
       })),
     );
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when focusing inputs
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "SELECT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        handleSplit();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        handleDelete();
+      } else if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        window.location.hash = "#palette";
+      } else if (e.key === "?") {
+        e.preventDefault();
+        window.location.hash = "#shortcuts";
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [ripple, isReversed]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return; // Only left-click initiates marquee
+    if ((e.target as HTMLElement).closest(".clip")) return; // Don't start marquee on clip
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMarquee({
+      active: true,
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+      currentX: e.clientX - rect.left,
+      currentY: e.clientY - rect.top,
+    });
+  };
+
+  const handleTimelineMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!marquee || !marquee.active) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMarquee((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentX: e.clientX - rect.left,
+            currentY: e.clientY - rect.top,
+          }
+        : null,
+    );
+  };
+
+  const handleTimelineMouseUp = () => {
+    if (marquee && marquee.active) {
+      setMarquee(null);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      setPinchDist(Math.hypot(dx, dy));
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchDist !== null) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      // Pinch gesture registered
+      setPinchDist(newDist);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setPinchDist(null);
   };
 
   const topBarRight = (
@@ -367,7 +468,34 @@ export const EditScreen: React.FC = () => {
           </div>
 
           {/* Timeline */}
-          <div className="tl" data-tl="">
+          <div
+            className="tl"
+            data-tl=""
+            onContextMenu={handleContextMenu}
+            onMouseDown={handleTimelineMouseDown}
+            onMouseMove={handleTimelineMouseMove}
+            onMouseUp={handleTimelineMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onClick={() => setContextMenu(null)}
+          >
+            {marquee && marquee.active && (
+              <div
+                className="marquee-overlay"
+                style={{
+                  position: "absolute",
+                  left: Math.min(marquee.startX, marquee.currentX),
+                  top: Math.min(marquee.startY, marquee.currentY),
+                  width: Math.abs(marquee.currentX - marquee.startX),
+                  height: Math.abs(marquee.currentY - marquee.startY),
+                  border: "1px dashed var(--sig)",
+                  background: "color-mix(in srgb, var(--sig) 18%, transparent)",
+                  pointerEvents: "none",
+                  zIndex: 25,
+                }}
+              />
+            )}
             <div
               className="ruler"
               onPointerDown={handleRulerPointerDown}
@@ -410,6 +538,59 @@ export const EditScreen: React.FC = () => {
             ))}
             <span className="ph" data-ph="" style={{ transform: `translateX(${playheadX}px)` }} />
           </div>
+          {contextMenu && (
+            <div
+              className="dlg"
+              style={{
+                position: "fixed",
+                left: Math.min(window.innerWidth - 200, contextMenu.x),
+                top: Math.min(window.innerHeight - 200, contextMenu.y),
+                width: "180px",
+                padding: "8px",
+                zIndex: 100,
+                gap: "4px",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="btn g"
+                style={{ width: "100%", justifyContent: "flex-start" }}
+                onClick={() => {
+                  handleSplit();
+                  setContextMenu(null);
+                }}
+              >
+                Split
+              </button>
+              <button
+                className="btn g"
+                style={{ width: "100%", justifyContent: "flex-start" }}
+                onClick={() => {
+                  toggleReverse();
+                  setContextMenu(null);
+                }}
+              >
+                Reverse
+              </button>
+              <button
+                className="btn g"
+                style={{ width: "100%", justifyContent: "flex-start" }}
+                onClick={() => {
+                  handleDelete();
+                  setContextMenu(null);
+                }}
+              >
+                Delete
+              </button>
+              <button
+                className="btn g"
+                style={{ width: "100%", justifyContent: "flex-start" }}
+                onClick={() => setContextMenu(null)}
+              >
+                Close
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Clip inspector */}

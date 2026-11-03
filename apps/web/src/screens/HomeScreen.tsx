@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { PageLayout, Icon, EffectCard, CanvasViz } from "@flux/ui";
 
 const RECENT_PROJECTS = [
@@ -76,9 +76,53 @@ const TASKS = [
 ] as const;
 
 export const HomeScreen: React.FC = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (e.clipboardData && e.clipboardData.files.length > 0) {
+        window.location.hash = "#import";
+      }
+    };
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length > 0) {
+      window.location.hash = "#import";
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleChooseFile = (e: React.MouseEvent) => {
+    e.preventDefault();
+    fileInputRef.current?.click();
+  };
+
   return (
     <PageLayout currentTab="home" title="What are we doing to it?">
-      <a className="drop" href="#import" data-go="import">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*,video/*"
+        style={{ display: "none" }}
+        onChange={() => {
+          window.location.hash = "#import";
+        }}
+      />
+      <a
+        className="drop"
+        href="#import"
+        data-go="import"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onClick={handleChooseFile}
+      >
         <span className="act">
           <Icon name="imp" size={30} />
         </span>

@@ -35,3 +35,4 @@ export * from "./project/Command.js";
 export * from "./project/ProjectJournal.js";
 export * from "./project/FluxPackage.js";
 export * from "./project/StorageDurability.js";
+export * from "./input/ShortcutManager.js";
