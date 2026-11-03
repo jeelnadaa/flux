@@ -31,3 +31,7 @@ export * from "./timeline/TimelineModel.js";
 export * from "./timeline/SnappingEngine.js";
 export * from "./editing/FadeCurves.js";
 export * from "./editing/EditingModel.js";
+export * from "./project/Command.js";
+export * from "./project/ProjectJournal.js";
+export * from "./project/FluxPackage.js";
+export * from "./project/StorageDurability.js";

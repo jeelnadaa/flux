@@ -302,6 +302,53 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
           ctx.fillRect(px, py, 1.5, 1.5);
         }
         ctx.globalAlpha = 1;
+      } else if (type === "history") {
+        ctx.clearRect(0, 0, rw, rh);
+        ctx.lineCap = "round";
+        const ys = [rh * 0.5, rh * 0.22, rh * 0.78];
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        ctx.strokeStyle = getCss("--ln2");
+        ctx.lineWidth = 2;
+        const stepsN = 15;
+        const st = rw / (stepsN + 0.6);
+        ctx.beginPath();
+        ctx.moveTo(st * 0.5, ys[0]);
+        ctx.lineTo(st * (stepsN - 2), ys[0]);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(st * 4.5, ys[0]);
+        ctx.bezierCurveTo(st * 5, ys[0], st * 5, ys[1], st * 5.6, ys[1]);
+        ctx.lineTo(st * 9.5, ys[1]);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(st * 8.5, ys[0]);
+        ctx.bezierCurveTo(st * 9, ys[0], st * 9, ys[2], st * 9.6, ys[2]);
+        ctx.lineTo(st * 12.5, ys[2]);
+        ctx.stroke();
+
+        for (let i = 0; i < stepsN - 2; i++) {
+          ctx.beginPath();
+          ctx.arc(st * (i + 0.5), ys[0], i === 11 ? 8 : 5, 0, 7);
+          ctx.fillStyle = i === 11 ? getCss("--sig") : getCss("--tx2");
+          ctx.fill();
+        }
+        for (let i = 5; i < 10; i++) {
+          ctx.beginPath();
+          ctx.arc(st * (i + 0.6), ys[1], 4.5, 0, 7);
+          ctx.fillStyle = getCss("--t1");
+          ctx.fill();
+        }
+        for (let i = 9; i < 13; i++) {
+          ctx.beginPath();
+          ctx.arc(st * (i + 0.6), ys[2], 4.5, 0, 7);
+          ctx.fillStyle = getCss("--t3");
+          ctx.fill();
+        }
       } else if (type === "eq") {
         // Draw simplified interactive EQ curve
         ctx.clearRect(0, 0, rw, rh);

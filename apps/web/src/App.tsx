@@ -10,6 +10,10 @@ import { EditScreen } from "./screens/EditScreen.js";
 import { SpectralScreen } from "./screens/SpectralScreen.js";
 import { AutomationScreen } from "./screens/AutomationScreen.js";
 import { MixScreen } from "./screens/MixScreen.js";
+import { HistoryScreen } from "./screens/HistoryScreen.js";
+import { RecoveryDialogScreen } from "./screens/RecoveryDialogScreen.js";
+import { RelinkDialogScreen } from "./screens/RelinkDialogScreen.js";
+import { QuotaDialogScreen } from "./screens/QuotaDialogScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -31,6 +35,14 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <AutomationScreen />;
     case "mix":
       return <MixScreen />;
+    case "history":
+      return <HistoryScreen />;
+    case "recovery":
+      return <RecoveryDialogScreen />;
+    case "relink":
+      return <RelinkDialogScreen />;
+    case "quota":
+      return <QuotaDialogScreen />;
     case "home":
     default:
       return <HomeScreen />;

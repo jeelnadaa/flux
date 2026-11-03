@@ -492,3 +492,173 @@ def test_edit_screen_clip_and_track_interactions(browser_instance, test_server):
     assert 'on' in (mute_btn.get_attribute('class') or '')
 
     context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_history(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'history', width, height, name)
+    print(f"\n[HISTORY {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"History screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_recovery(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'recovery', width, height, name)
+    print(f"\n[RECOVERY {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Recovery dialog on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_relink(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'relink', width, height, name)
+    print(f"\n[RELINK {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Relink dialog on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_quota(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'quota', width, height, name)
+    print(f"\n[QUOTA {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Quota dialog on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+def test_history_screen_interactions(browser_instance, test_server):
+    """Verifies creating snapshots and navigating history timeline."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#history')
+    page.wait_for_selector('#stage > *')
+
+    # Initial history items count
+    items = page.locator('.lst.box > div')
+    initial_count = items.count()
+    assert initial_count >= 6
+
+    # Verify first item is Current
+    first_btn = items.first.locator('button')
+    assert first_btn.inner_text().strip() == 'Current'
+
+    # Click 'Save a snapshot'
+    snap_btn = page.locator('button:has-text("Save a snapshot")')
+    snap_btn.click()
+    page.wait_for_timeout(100)
+
+    # A new snapshot should have been added
+    assert items.count() == initial_count + 1
+    assert 'Snapshot:' in items.first.locator('.ti b').inner_text()
+    assert items.first.locator('button').inner_text().strip() == 'Current'
+
+    # Click 'Go here' on second item
+    second_btn = items.nth(1).locator('button')
+    second_btn.click()
+    page.wait_for_timeout(100)
+    assert second_btn.inner_text().strip() == 'Current'
+
+    context.close()
+
+
+def test_recovery_dialog_interactions(browser_instance, test_server):
+    """Verifies crash recovery dialog buttons and resume action."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#recovery')
+    page.wait_for_selector('.dlg')
+
+    # Resume interrupted export
+    resume_btn = page.locator('.dlg button:has-text("Resume")')
+    assert resume_btn.count() == 1
+    resume_btn.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.dlg button:has-text("Resumed")').count() == 1
+
+    # Check footer link targets
+    snap_link = page.locator('.dlg .foot a:has-text("Open earlier snapshot")')
+    assert snap_link.get_attribute('href') == '#history'
+
+    reopen_link = page.locator('.dlg .foot a:has-text("Reopen project")')
+    assert reopen_link.get_attribute('href') == '#edit'
+
+    context.close()
+
+
+def test_relink_dialog_interactions(browser_instance, test_server):
+    """Verifies missing media locate buttons and folder toggle."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#relink')
+    page.wait_for_selector('.dlg')
+
+    # Locate missing drums
+    locate_btn = page.locator('.dlg .lst > div').first.locator('button:has-text("Locate")')
+    locate_btn.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.dlg .lst > div').first.locator('.pill').inner_text().strip() == 'Relinked'
+
+    # Toggle 'Look in the same folder'
+    tg = page.locator('.dlg button.tg')
+    assert tg.get_attribute('aria-pressed') == 'true'
+    tg.click()
+    page.wait_for_timeout(100)
+    assert tg.get_attribute('aria-pressed') == 'false'
+
+    context.close()
+
+
+def test_quota_dialog_interactions(browser_instance, test_server):
+    """Verifies storage quota cleanup actions."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#quota')
+    page.wait_for_selector('.dlg')
+
+    # Verify 98% progress bar
+    prog = page.locator('.dlg .prog')
+    assert prog.get_attribute('aria-valuenow') == '98'
+
+    # Click 'Clear' on waveform caches
+    clear_btn = page.locator('.dlg .lst > div').nth(0).locator('button:has-text("Clear")')
+    clear_btn.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.dlg .lst > div').nth(0).locator('button').inner_text().strip() == 'Done'
+
+    context.close()

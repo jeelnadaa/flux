@@ -17,7 +17,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
-| 2 | Editor UI & timeline | In progress | 11 / 17 |
+| 2 | Editor UI & timeline | In progress | 16 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P2.3-a, P2.3-b, P2.3-c, P2.3-d, P2.3-e implemented Command system (@flux/app-core) with unlimited undo/redo, coalescing, canonical project hashing, and property tests (all undone yields bit-exact initial hash); visual history timeline with branching graph and snapshot saving (HistoryScreen #history, CanvasViz type="history"); crash-safe append-only ProjectJournal with IEEE 802.3 CRC32 verification and 100 trials chaos kill-mid-write recovery (RecoveryDialogScreen #recovery); FluxPackage serialization, v1->v2 schema migrations, and missing media detection/relink engine (RelinkDialogScreen #relink); StorageDurability persistence checks, quota warning evaluation at 90%/95%/98%, and cache eviction tools (QuotaDialogScreen #quota); 34 TS unit tests passing, 55 browser/Playwright tests green with >= 98.9% pixel-diff match against prototype at 1440, 820, and 390 px; just ci green.
 
 - 2026-11-03: P2.2-a, P2.2-b, P2.2-c, P2.2-d, P2.2-e implemented sample-accurate EditingModel & FadeCurves (@flux/app-core), full non-destructive editing operations (split, cut, copy, paste, delete, ripple-delete, move, nudge, slip-edit, non-destructive reverse, clip gain, 5 fade curve types, equal-power auto crossfades, automatic 3ms micro-fades), multitrack mixing (track gain, pan, mute, solo, arm, buses), automation lanes (linear, smooth Hermite spline, hold), dynamic EditScreen with interactive tools/inspector, AutomationScreen (#automation) with multi-mode lane management, MixScreen (#mix) with 8 channel strips and master goniometer; 18 TS unit tests passing, 29 pixel-diff & UI interaction tests green across desktop, tablet, and phone (automation 98.4%+, mix 98.2%+); just ci green.
 
@@ -144,11 +146,11 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P2.2-c Fades with curve types; auto crossfades; automatic micro-fades
 - [x] P2.2-d Multitrack: track gain, pan, mute, solo, color, groups, buses
 - [x] P2.2-e Automation lanes with interpolation modes
-- [ ] P2.3-a Command system: unlimited undo/redo, coalescing
-- [ ] P2.3-b Visual history timeline
-- [ ] P2.3-c Working project directory and journal; crash recovery dialog
-- [ ] P2.3-d `.flux` package save/open, migrations, relink media, snapshots
-- [ ] P2.3-e Storage durability: `persist()`, quota warnings, File System Access, fault tests
+- [x] P2.3-a Command system: unlimited undo/redo, coalescing
+- [x] P2.3-b Visual history timeline
+- [x] P2.3-c Working project directory and journal; crash recovery dialog
+- [x] P2.3-d `.flux` package save/open, migrations, relink media, snapshots
+- [x] P2.3-e Storage durability: `persist()`, quota warnings, File System Access, fault tests
 - [ ] P2.4-a Rebindable shortcuts, full keyboard operation, context menus, marquee
 - [ ] P2.4-b Touch gestures and responsive layouts (desktop, tablet, phone)
 - [ ] P2.4-c Home screen: drag-and-drop, paste, file picker, recent projects
