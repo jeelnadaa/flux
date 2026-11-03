@@ -1,6 +1,7 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 npm_cmd := if os() == "windows" { "npm.cmd" } else { "npm" }
+python_cmd := if os() == "windows" { "python" } else { "python3" }
 
 # Default recipe: list available recipes
 default:
@@ -43,7 +44,7 @@ test-rust:
 
 # Run Python evaluation harness unit tests
 test-python:
-    python -m pytest tools/eval/tests
+    {{python_cmd}} -m pytest tools/eval/tests
 
 # Run TypeScript unit tests (Timeline, Snapping, Math)
 test-ts:
@@ -51,11 +52,11 @@ test-ts:
 
 # Run headless browser smoke tests (Spikes, Recording, Engine, Export, Analysis, Pixel-Diff)
 test-browser:
-    python -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py tests/spikes/spike_c/test_spike_c.py tests/spikes/spike_d/test_spike_d.py tests/spikes/spike_f/test_spike_f.py tests/spikes/spike_g/test_spike_g.py tests/recording/test_recording.py tests/engine/test_engine.py tests/export/test_export.py tests/analysis/test_analysis.py tests/pixel_diff/test_pixel_diff.py
+    {{python_cmd}} -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py tests/spikes/spike_c/test_spike_c.py tests/spikes/spike_d/test_spike_d.py tests/spikes/spike_f/test_spike_f.py tests/spikes/spike_g/test_spike_g.py tests/recording/test_recording.py tests/engine/test_engine.py tests/export/test_export.py tests/analysis/test_analysis.py tests/pixel_diff/test_pixel_diff.py
 
 # Run full Python evaluation benchmark suite and update dashboards
 eval:
-    python tools/eval/run_eval.py
+    {{python_cmd}} tools/eval/run_eval.py
 
 # Build WebAssembly crate
 build-wasm:

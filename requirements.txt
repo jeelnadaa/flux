@@ -1,0 +1,7 @@
+# Flux Python Test & Evaluation Dependencies
+pytest>=8.0.0
+numpy>=1.26.0
+Pillow>=10.0.0
+playwright>=1.40.0
+soundfile>=0.12.1
+PyYAML>=6.0.1
