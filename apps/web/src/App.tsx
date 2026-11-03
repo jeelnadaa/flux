@@ -23,6 +23,7 @@ import { EffectRackScreen } from "./screens/EffectRackScreen.js";
 import { EffectBrowserScreen } from "./screens/EffectBrowserScreen.js";
 import { EqualizerScreen } from "./screens/EqualizerScreen.js";
 import { DynamicsScreen } from "./screens/DynamicsScreen.js";
+import { SpeedPitchScreen } from "./screens/SpeedPitchScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -70,6 +71,8 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <EqualizerScreen />;
     case "fx-comp":
       return <DynamicsScreen />;
+    case "fx-time":
+      return <SpeedPitchScreen />;
     case "home":
     default:
       return <HomeScreen />;

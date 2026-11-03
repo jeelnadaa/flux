@@ -1090,4 +1090,74 @@ def test_dynamics_interactive(browser_instance, test_server):
     context.close()
 
 
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1180, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_speed_pitch(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'fx-time', width, height, name)
+    print(f"SpeedPitch [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"SpeedPitch [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_speed_pitch_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Speed and Pitch screen: chip selection, slider interaction, mode switching, tap tempo."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fx-time')
+    page.wait_for_selector('.h3')
+
+    # Verify initial stats
+    speed_stat = page.locator('.box .stat').first
+    assert '0.85' in speed_stat.inner_text()
+    pitch_stat = page.locator('.box .stat').nth(1)
+    assert '2.0' in pitch_stat.inner_text()
+
+    # Click speed chip '1.5×'
+    chip_15 = page.locator('.box button.chip:has-text("1.5×")')
+    chip_15.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (chip_15.get_attribute('class') or '')
+    assert '1.50' in speed_stat.inner_text()
+
+    # Click pitch chip '+2'
+    chip_p2 = page.locator('.box button.chip:has-text("+2")')
+    chip_p2.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (chip_p2.get_attribute('class') or '')
+    assert '+2.0' in pitch_stat.inner_text()
+
+    # Switch mode to Varispeed
+    varispeed_btn = page.locator('.sec .seg button:has-text("Varispeed")')
+    varispeed_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (varispeed_btn.get_attribute('class') or '')
+
+    # Test tap tempo
+    tap_btn = page.locator('button[data-toggle]:has-text("Tap")')
+    tap_btn.click()
+    page.wait_for_timeout(500)
+    tap_btn.click()
+    page.wait_for_timeout(100)
+    tempo_inp = page.locator('input.inp').first
+    assert float(tempo_inp.input_value()) > 0
+
+    # Toggle 'Keep pitch when changing speed'
+    keep_pitch_tg = page.locator('.box.row button.tg')
+    init_pressed = keep_pitch_tg.get_attribute('aria-pressed')
+    keep_pitch_tg.click()
+    page.wait_for_timeout(100)
+    assert keep_pitch_tg.get_attribute('aria-pressed') != init_pressed
+
+    context.close()
+
+
+
 

@@ -9,6 +9,18 @@ use crate::node::DspNode;
 const BUFFER_SAMPLES: usize = 4096;
 const MAX_STRETCH_CHANNELS: usize = 2;
 
+/// Processing mode for time-stretch and pitch-shift engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StretchMode {
+    /// Music mode: transient-preserving, phase-locked for sharp rhythm and drums.
+    #[default]
+    Music,
+    /// Voice mode: formant-preserving, phase-coherent for natural speech.
+    Voice,
+    /// Varispeed mode: tempo and pitch linked together like a turntable.
+    Varispeed,
+}
+
 /// Time-stretch and pitch-shift DSP node.
 #[derive(Debug, Clone)]
 pub struct StretchNode {
@@ -21,6 +33,7 @@ pub struct StretchNode {
     pitch_shift_semitones: f32, // Target semitones (-24.0 to +24.0)
     current_pitch: f32, // Smoothed semitones
     formant_preserve: bool,
+    mode: StretchMode,
 
     // Circular input buffer
     in_buffer: Vec<Vec<f32>>,
@@ -47,6 +60,7 @@ impl StretchNode {
             pitch_shift_semitones: 0.0,
             current_pitch: 0.0,
             formant_preserve: true,
+            mode: StretchMode::Music,
             in_buffer: vec![vec![0.0; BUFFER_SAMPLES]; MAX_STRETCH_CHANNELS],
             in_write_pos: 0,
             read_phase: 0.0,
@@ -56,6 +70,9 @@ impl StretchNode {
     /// Sets the time-stretch playback rate (0.25 to 4.0, where 1.0 is original speed).
     pub fn set_stretch_ratio(&mut self, ratio: f32) {
         self.time_stretch = ratio.clamp(0.25, 4.0);
+        if self.mode == StretchMode::Varispeed {
+            self.pitch_shift_semitones = 12.0 * self.time_stretch.log2();
+        }
     }
 
     /// Sets the pitch shift in semitones (-24.0 to +24.0).
@@ -66,6 +83,36 @@ impl StretchNode {
     /// Enables or disables formant preservation during pitch shifting.
     pub fn set_formant_preservation(&mut self, preserve: bool) {
         self.formant_preserve = preserve;
+    }
+
+    /// Sets the processing mode (Music, Voice, or Varispeed).
+    pub fn set_mode(&mut self, mode: StretchMode) {
+        self.mode = mode;
+        if self.mode == StretchMode::Varispeed {
+            self.pitch_shift_semitones = 12.0 * self.time_stretch.log2();
+        } else if self.mode == StretchMode::Voice {
+            self.formant_preserve = true;
+        }
+    }
+
+    /// Returns the current processing mode.
+    pub fn mode(&self) -> StretchMode {
+        self.mode
+    }
+
+    /// Returns the target time-stretch ratio.
+    pub fn stretch_ratio(&self) -> f32 {
+        self.time_stretch
+    }
+
+    /// Returns the target pitch shift in semitones.
+    pub fn pitch_shift(&self) -> f32 {
+        self.pitch_shift_semitones
+    }
+
+    /// Returns whether formant preservation is enabled.
+    pub fn is_formant_preserved(&self) -> bool {
+        self.formant_preserve
     }
 
     /// Pitch factor: 2^(semitones / 12)
@@ -174,6 +221,16 @@ impl DspNode for StretchNode {
             0 => self.set_stretch_ratio(value),
             1 => self.set_pitch_shift(value),
             2 => self.set_formant_preservation(value > 0.5),
+            3 => {
+                let m = if value < 0.5 {
+                    StretchMode::Music
+                } else if value < 1.5 {
+                    StretchMode::Voice
+                } else {
+                    StretchMode::Varispeed
+                };
+                self.set_mode(m);
+            }
             _ => {}
         }
     }
@@ -184,12 +241,17 @@ impl DspNode for StretchNode {
             1 => self.pitch_shift_semitones,
             2 if self.formant_preserve => 1.0,
             2 => 0.0,
+            3 => match self.mode {
+                StretchMode::Music => 0.0,
+                StretchMode::Voice => 1.0,
+                StretchMode::Varispeed => 2.0,
+            },
             _ => 0.0,
         }
     }
 
     fn parameter_count(&self) -> usize {
-        3
+        4
     }
 
     fn set_bypass(&mut self, bypassed: bool) {
@@ -233,5 +295,29 @@ mod tests {
         stretch.set_pitch_shift(-12.0); // Octave down
         stretch.current_pitch = -12.0;
         assert!((stretch.pitch_factor() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_stretch_varispeed_mode() {
+        let mut stretch = StretchNode::new();
+        stretch.set_mode(StretchMode::Varispeed);
+
+        // Double speed -> octave up (+12 semitones)
+        stretch.set_stretch_ratio(2.0);
+        assert!((stretch.pitch_shift() - 12.0).abs() < 0.01);
+
+        // Half speed -> octave down (-12 semitones)
+        stretch.set_stretch_ratio(0.5);
+        assert!((stretch.pitch_shift() - -12.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_stretch_ratios_within_bounds() {
+        let mut stretch = StretchNode::new();
+        let ratios = [0.25, 0.5, 0.75, 1.25, 1.5, 2.0, 4.0];
+        for &r in &ratios {
+            stretch.set_stretch_ratio(r);
+            assert!((stretch.stretch_ratio() - r).abs() < 1e-5);
+        }
     }
 }

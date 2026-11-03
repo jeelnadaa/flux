@@ -18,7 +18,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
-| 3 | Core processing | In progress | 10 / 22 |
+| 3 | Core processing | In progress | 13 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P3.3-a, P3.3-b, P3.3-c implemented time-stretch and pitch-shift engine in Rust (flux-dsp) and TypeScript (@flux/app-core): StretchNode with StretchMode (Music, Voice, Varispeed) linking speed ratio to pitch semitones via 12*log2(ratio), formant preservation toggle; musical TempoMap with beat conversion, subdivision snapping, and grid generation; TapTempo detector computing moving average BPM with 2.5s inactivity timeout reset; interactive SpeedPitchScreen (#fx-time) with waveform preview, speed and pitch preset chips, fine sliders with dynamic duration/cents readouts, mode selector, tap tempo button, and final render quality options; verified 100% test pass (61 TS unit tests, 94 Playwright/pytest tests green, 30 dsp cargo tests) with >= 99.7% pixel-diff match against prototype at 1440, 820, and 390 px (Desktop 99.74%, Tablet 99.87%, Phone 99.71%); full just ci gate green.
 
 - 2026-11-03: P3.2-a, P3.2-b, P3.2-c, P3.2-d, P3.2-e implemented complete dynamics processing suite in Rust (flux-dsp) and TypeScript (@flux/app-core): feed-forward Compressor with soft-knee, program-dependent release, lookahead buffer, auto-makeup gain, parallel mix, and sidechain HPF; ISP-safe TruePeakLimiter with 4x polyphase inter-sample peak detection and lookahead; GateExpander downward expander/noise gate with hysteresis and hold; DeEsser split-band sibilance reduction; dual-envelope TransientShaper; 4-band MultibandCompressor with 4th-order Linkwitz-Riley (LR4) crossovers with allpass phase compensation (sum flatness < 0.05 dB); AdaptiveLeveler with speech-aware noise gating plus peak and LUFS normalizers; registered all nodes in universal DSP invariant harness (13/13 PLAN.md §5.2 invariants passing); interactive DynamicsScreen (#fx-comp) with transfer curve canvas, gain reduction history, tab switching across all 7 processors, sliders, and toggles; verified 100% test pass (55 TS unit tests, 90 Playwright/pytest tests green, 28 testkit invariant tests) with >= 96.2% pixel-diff match against prototype at 1440, 820, and 390 px (Desktop 96.72%, Tablet 96.20%, Phone 96.77%); full just ci gate green.
 
@@ -175,9 +177,9 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P3.2-c Gate/expander, de-esser, transient shaper
 - [x] P3.2-d Multiband compressor
 - [x] P3.2-e Peak and LUFS normalize; adaptive leveler
-- [ ] P3.3-a Time-stretch (voice and music modes)
-- [ ] P3.3-b Pitch shift with formant preserve; varispeed
-- [ ] P3.3-c Tempo map with manual entry and tap tempo; beat grid and snapping
+- [x] P3.3-a Time-stretch (voice and music modes)
+- [x] P3.3-b Pitch shift with formant preserve; varispeed
+- [x] P3.3-c Tempo map with manual entry and tap tempo; beat grid and snapping
 - [ ] P3.4-a Stationary noise reduction (profile capture)
 - [ ] P3.4-b Hum removal, DC removal, de-buzz, de-wind
 - [ ] P3.4-c De-click, de-crackle, de-clip

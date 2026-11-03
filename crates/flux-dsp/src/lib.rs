@@ -16,6 +16,7 @@ pub mod sample;
 pub mod spatial_analysis;
 pub mod spectrogram;
 pub mod stretch;
+pub mod tempo;
 
 pub use binaural::BinauralNode;
 pub use biquad::{BiquadChain, BiquadCoeffs, BiquadState, BiquadType};
@@ -41,7 +42,8 @@ pub use spatial_analysis::{GoniometerPoint, StereoAnalysisResult, StereoAnalyzer
 pub use spectrogram::{
     ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTile, SpectrogramTileGenerator,
 };
-pub use stretch::StretchNode;
+pub use stretch::{StretchMode, StretchNode};
+pub use tempo::{TapTempo, TempoMap, TempoPoint};
 
 #[cfg(test)]
 mod tests {
