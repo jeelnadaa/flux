@@ -38,3 +38,4 @@ export * from "./project/StorageDurability.js";
 export * from "./input/ShortcutManager.js";
 export * from "./effects/EffectRack.js";
 export * from "./effects/ParametricEq.js";
+export * from "./effects/Dynamics.js";

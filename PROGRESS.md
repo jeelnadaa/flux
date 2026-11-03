@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 3 — Core processing
-- **Next item:** P3.2 (P3.2-a Compressor, P3.2-b True-peak limiter, P3.2-c Gate/expander, de-esser, transient shaper, P3.2-d Multiband compressor, P3.2-e Peak and LUFS normalize; adaptive leveler)
+- **Next item:** P3.3 (P3.3-a Time-stretch, P3.3-b Pitch shift with formant preserve; varispeed, P3.3-c Tempo map with manual entry and tap tempo; beat grid and snapping)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -18,7 +18,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
-| 3 | Core processing | In progress | 5 / 22 |
+| 3 | Core processing | In progress | 10 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P3.2-a, P3.2-b, P3.2-c, P3.2-d, P3.2-e implemented complete dynamics processing suite in Rust (flux-dsp) and TypeScript (@flux/app-core): feed-forward Compressor with soft-knee, program-dependent release, lookahead buffer, auto-makeup gain, parallel mix, and sidechain HPF; ISP-safe TruePeakLimiter with 4x polyphase inter-sample peak detection and lookahead; GateExpander downward expander/noise gate with hysteresis and hold; DeEsser split-band sibilance reduction; dual-envelope TransientShaper; 4-band MultibandCompressor with 4th-order Linkwitz-Riley (LR4) crossovers with allpass phase compensation (sum flatness < 0.05 dB); AdaptiveLeveler with speech-aware noise gating plus peak and LUFS normalizers; registered all nodes in universal DSP invariant harness (13/13 PLAN.md §5.2 invariants passing); interactive DynamicsScreen (#fx-comp) with transfer curve canvas, gain reduction history, tab switching across all 7 processors, sliders, and toggles; verified 100% test pass (55 TS unit tests, 90 Playwright/pytest tests green, 28 testkit invariant tests) with >= 96.2% pixel-diff match against prototype at 1440, 820, and 390 px (Desktop 96.72%, Tablet 96.20%, Phone 96.77%); full just ci gate green.
 
 - 2026-11-03: P3.1-a, P3.1-b, P3.1-c, P3.1-d implemented Parametric EQ engine in Rust (flux-dsp) and TypeScript (@flux/app-core): up to 10 bands with peaking, low/high shelf, low/high pass (6-96 dB/oct cascaded Butterworth biquads in TDF-II with 64-bit state), bandpass, notch, tilt; analog frequency warping compensation; linear-phase FIR mode with constant group delay; Match EQ transfer function computation; 10 documented production presets and ISO 10/31-band graphic EQ frequencies; interactive EqualizerScreen (#fx-eq) with draggable curve nodes, solo-band listen, spectrum analyzer overlay, graphic EQ sliders, and linear phase toggle; verified 100% test pass (49 TS unit tests passing, 86 Playwright/pytest tests green, 15 cargo tests) with >= 97.2% pixel-diff match against prototype at 1440, 820, and 390 px (Desktop 97.24%, Tablet 97.97%, Phone 98.40%); full just ci gate green.
 
@@ -168,11 +170,11 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P3.1-b EQ UI: draggable curve, spectrum overlay, solo-band listen
 - [x] P3.1-c Linear-phase mode and graphic EQ view
 - [x] P3.1-d EQ presets with documented curves; match EQ
-- [ ] P3.2-a Compressor
-- [ ] P3.2-b True-peak limiter
-- [ ] P3.2-c Gate/expander, de-esser, transient shaper
-- [ ] P3.2-d Multiband compressor
-- [ ] P3.2-e Peak and LUFS normalize; adaptive leveler
+- [x] P3.2-a Compressor
+- [x] P3.2-b True-peak limiter
+- [x] P3.2-c Gate/expander, de-esser, transient shaper
+- [x] P3.2-d Multiband compressor
+- [x] P3.2-e Peak and LUFS normalize; adaptive leveler
 - [ ] P3.3-a Time-stretch (voice and music modes)
 - [ ] P3.3-b Pitch shift with formant preserve; varispeed
 - [ ] P3.3-c Tempo map with manual entry and tap tempo; beat grid and snapping

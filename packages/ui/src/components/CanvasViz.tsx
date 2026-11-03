@@ -1,7 +1,19 @@
 import React, { useEffect, useRef } from "react";
 
 export interface CanvasVizProps {
-  type: "wave" | "spec" | "ruler" | "eq" | "meter" | "stage" | "rooms" | "slice" | "tape" | string;
+  type:
+    | "wave"
+    | "spec"
+    | "ruler"
+    | "eq"
+    | "meter"
+    | "stage"
+    | "rooms"
+    | "slice"
+    | "tape"
+    | "transfer"
+    | "gr"
+    | string;
   seed?: number;
   stereo?: boolean | string;
   step?: number;
@@ -13,6 +25,8 @@ export interface CanvasVizProps {
   height?: number;
   roleLabel?: string;
   on?: boolean;
+  th?: number;
+  ratio?: number;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -231,6 +245,8 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
   height,
   roleLabel,
   on = false,
+  th,
+  ratio,
   className = "",
   style,
 }) => {
@@ -505,6 +521,79 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
             dr = null;
           });
         }
+      } else if (type === "transfer") {
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        ctx.clearRect(0, 0, rw, rh);
+        ctx.strokeStyle = getCss("--ln");
+        for (let i = 1; i < 6; i++) {
+          ctx.beginPath();
+          ctx.moveTo((i * rw) / 6, 0);
+          ctx.lineTo((i * rw) / 6, rh);
+          ctx.moveTo(0, (i * rh) / 6);
+          ctx.lineTo(rw, (i * rh) / 6);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = getCss("--tx3");
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, rh);
+        ctx.lineTo(rw, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const thVal = th ?? 0.62;
+        const raVal = ratio ?? 3.2;
+        ctx.beginPath();
+        for (let i = 0; i <= 100; i++) {
+          const u = i / 100;
+          const k = 0.09;
+          const v =
+            u < thVal - k
+              ? u
+              : u > thVal + k
+                ? thVal + (u - thVal) / raVal
+                : u + ((1 / raVal - 1) * Math.pow(u - thVal + k, 2)) / (4 * k);
+          const px = u * rw;
+          const py = rh - v * rh;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = getCss("--tx");
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(thVal * rw, rh - thVal * rh, 6, 0, Math.PI * 2);
+        ctx.fillStyle = getCss("--sig");
+        ctx.fill();
+        ctx.fillStyle = getCss("--tx3");
+        ctx.font = '500 10.5px "Geist Mono",monospace';
+        ctx.fillText("Input", rw - 38, rh - 6);
+        ctx.fillText("Output", 5, 13);
+      } else if (type === "gr") {
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        ctx.clearRect(0, 0, rw, rh);
+        const n = Math.floor(rw / 3);
+        const e = getEnvelope(4, 800, "mix");
+        const t = (cv as unknown as { _t?: number })._t || 0;
+        for (let i = 0; i < n; i++) {
+          const idx = Math.floor(i + t * 26) % 800;
+          const v = e[idx];
+          const gr = Math.min(1, Math.max(0, (v - 0.4) * 1.5));
+          ctx.fillStyle = getCss("--tx2");
+          ctx.globalAlpha = 0.55;
+          const h = v * rh * 0.8;
+          ctx.fillRect(i * 3, rh - h, 2, h);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = getCss("--sig");
+          ctx.fillRect(i * 3, 0, 2, gr * rh * 0.34);
+        }
       }
     };
 
@@ -523,7 +612,7 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         ro.disconnect();
       }
     };
-  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height, on]);
+  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height, on, th, ratio]);
 
   const canvasEl = (
     <canvas
@@ -537,6 +626,8 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
       data-gain={gain}
       data-until={until}
       data-ceil={ceil}
+      data-th={th}
+      data-ratio={ratio}
       aria-hidden={!roleLabel}
       style={{ width: "100%", height: height ? `${height}px` : "100%", ...style }}
     />

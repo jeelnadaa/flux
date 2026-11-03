@@ -91,6 +91,83 @@ mod tests {
     }
 
     #[test]
+    fn test_parametric_eq_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::ParametricEq::new()), &config);
+        assert!(
+            result.all_passed(),
+            "Parametric EQ failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_compressor_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::Compressor::new()), &config);
+        assert!(
+            result.all_passed(),
+            "Compressor failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_true_peak_limiter_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::TruePeakLimiter::new()), &config);
+        assert!(
+            result.all_passed(),
+            "TruePeakLimiter failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_gate_expander_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::GateExpander::new()), &config);
+        assert!(
+            result.all_passed(),
+            "GateExpander failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_deesser_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::DeEsser::new()), &config);
+        assert!(
+            result.all_passed(),
+            "DeEsser failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_transient_shaper_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::TransientShaper::new()), &config);
+        assert!(
+            result.all_passed(),
+            "TransientShaper failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_adaptive_leveler_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::AdaptiveLeveler::new()), &config);
+        assert!(
+            result.all_passed(),
+            "AdaptiveLeveler failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_sine_generator_and_spectrum() {
         let sample_rate = 48000.0;
         let freq = 1000.0;

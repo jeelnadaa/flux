@@ -22,6 +22,7 @@ import { EmptyProjectScreen } from "./screens/EmptyProjectScreen.js";
 import { EffectRackScreen } from "./screens/EffectRackScreen.js";
 import { EffectBrowserScreen } from "./screens/EffectBrowserScreen.js";
 import { EqualizerScreen } from "./screens/EqualizerScreen.js";
+import { DynamicsScreen } from "./screens/DynamicsScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -67,6 +68,8 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <EffectBrowserScreen />;
     case "fx-eq":
       return <EqualizerScreen />;
+    case "fx-comp":
+      return <DynamicsScreen />;
     case "home":
     default:
       return <HomeScreen />;

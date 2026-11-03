@@ -1011,3 +1011,83 @@ def test_equalizer_interactive(browser_instance, test_server):
     context.close()
 
 
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_dynamics(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'fx-comp', width, height, name)
+    print(f"Dynamics [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Dynamics [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_dynamics_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Dynamics screen: tab switching across all 7 processors, sliders, toggles."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fx-comp')
+    page.wait_for_selector('.tabs')
+
+    # Initial tab is Compressor
+    comp_btn = page.locator('.tabs button:has-text("Compressor")')
+    assert 'on' in (comp_btn.get_attribute('class') or '')
+
+    # Switch to Limiter tab
+    limiter_btn = page.locator('.tabs button:has-text("Limiter")')
+    limiter_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (limiter_btn.get_attribute('class') or '')
+    assert page.locator('.ctl-grid .sl label:has-text("Ceiling")').count() == 1
+
+    # Switch to Multiband tab
+    mb_btn = page.locator('.tabs button:has-text("Multiband")')
+    mb_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (mb_btn.get_attribute('class') or '')
+
+    # Switch to Gate tab
+    gate_btn = page.locator('.tabs button:has-text("Gate")')
+    gate_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (gate_btn.get_attribute('class') or '')
+
+    # Switch to De-esser tab
+    deess_btn = page.locator('.tabs button:has-text("De-esser")')
+    deess_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (deess_btn.get_attribute('class') or '')
+
+    # Switch to Transient tab
+    trans_btn = page.locator('.tabs button:has-text("Transient")')
+    trans_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (trans_btn.get_attribute('class') or '')
+
+    # Switch to Leveler tab
+    leveler_btn = page.locator('.tabs button:has-text("Leveler")')
+    leveler_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (leveler_btn.get_attribute('class') or '')
+
+    # Switch back to Compressor
+    comp_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (comp_btn.get_attribute('class') or '')
+
+    # Toggle bypass
+    bypass_btn = page.locator('.tlbar button[data-toggle]')
+    bypass_btn.click()
+    page.wait_for_timeout(100)
+    assert bypass_btn.get_attribute('aria-pressed') == 'true'
+
+    context.close()
+
+
+
