@@ -22,6 +22,7 @@ use flux_dsp::spectrogram::{
     ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTileGenerator,
 };
 use flux_dsp::stretch::StretchNode;
+use flux_dsp::utility::{HearingProtectionConfig, HearingProtectionNode};
 use flux_dsp::voice::{VoiceChangerNode, VoiceCharacter};
 use flux_engine::capture::{ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
@@ -2574,6 +2575,62 @@ pub fn wasm_diagnose_and_propose_magic_json(
     .to_string()
 }
 
+/// WebAssembly wrapper for hearing protection (soft-start playback ramp and safety limiter).
+#[wasm_bindgen]
+pub struct HearingProtectionWasm {
+    inner: HearingProtectionNode,
+}
+
+#[wasm_bindgen]
+impl HearingProtectionWasm {
+    /// Creates a new hearing protection node.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        soft_start_enabled: bool,
+        ramp_duration_ms: f32,
+        limiter_enabled: bool,
+        ceiling_db: f32,
+    ) -> Self {
+        let config = HearingProtectionConfig {
+            soft_start_enabled,
+            ramp_duration_ms: ramp_duration_ms.max(10.0),
+            limiter_enabled,
+            ceiling_db: ceiling_db.min(0.0),
+            loud_warning_threshold_db: 0.0,
+        };
+        let mut inner = HearingProtectionNode::new(config);
+        inner.prepare(48000.0, 2);
+        Self { inner }
+    }
+
+    /// Triggers playback start or unpause, starting a smooth soft ramp.
+    #[wasm_bindgen]
+    pub fn trigger_playback_start(&mut self) {
+        self.inner.trigger_playback_start();
+    }
+
+    /// Processes left and right audio channels with hearing protection in place.
+    #[wasm_bindgen]
+    pub fn process(&mut self, left: &mut [f32], right: &mut [f32]) {
+        let left_copy = left.to_vec();
+        let right_copy = right.to_vec();
+        self.inner
+            .process(&[&left_copy[..], &right_copy[..]], &mut [left, right]);
+    }
+
+    /// Returns whether any loud signal was flagged during playback.
+    #[wasm_bindgen]
+    pub fn is_loud_warning_flagged(&self) -> bool {
+        self.inner.is_loud_warning_flagged()
+    }
+
+    /// Clears the loud warning flag.
+    #[wasm_bindgen]
+    pub fn clear_loud_warning(&mut self) {
+        self.inner.clear_loud_warning();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3139,5 +3196,17 @@ mod tests {
         let magic_json = wasm_diagnose_and_propose_magic_json(&sample, 48000.0, 0);
         assert!(magic_json.contains("diagnosis"));
         assert!(magic_json.contains("Hum removal"));
+
+        // Hearing Protection WASM
+        let mut hp = HearingProtectionWasm::new(true, 15.0, true, -0.1);
+        hp.trigger_playback_start();
+        let mut l = vec![2.0f32; 1000];
+        let mut r = vec![2.0f32; 1000];
+        hp.process(&mut l, &mut r);
+        assert!(l[0] < 0.001); // soft start ramp active
+        assert!(l[999] <= 1.0); // limited below ceiling
+        assert!(hp.is_loud_warning_flagged());
+        hp.clear_loud_warning();
+        assert!(!hp.is_loud_warning_flagged());
     }
 }

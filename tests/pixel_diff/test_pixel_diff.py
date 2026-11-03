@@ -1912,6 +1912,149 @@ def test_magic_interactive(browser_instance, test_server):
     context.close()
 
 
+# ==============================================================================
+# Phase 8 — Pro workflow & polish (desktop pixel-diff & interactive)
+# ==============================================================================
+
+def test_pixel_diff_batch_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'batch', 1440, 900, 'desktop')
+    print(f"Batch [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_ringtone_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'ringtone', 1440, 900, 'desktop')
+    print(f"Ringtone [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_macros_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'macros', 1440, 900, 'desktop')
+    print(f"Macros [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_task_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'task', 1440, 900, 'desktop')
+    print(f"Task 8D [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_task_slowed_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'task-slowed', 1440, 900, 'desktop')
+    print(f"Task Slowed [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_new_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'new', 1440, 900, 'desktop')
+    print(f"New templates [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_convert_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'convert', 1440, 900, 'desktop')
+    print(f"Format Converter [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_audio_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-audio', 1440, 900, 'desktop')
+    print(f"Audio Settings [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_privacy_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-privacy', 1440, 900, 'desktop')
+    print(f"Privacy Settings [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_storage_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-storage', 1440, 900, 'desktop')
+    print(f"Storage Settings [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_access_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-access', 1440, 900, 'desktop')
+    print(f"Accessibility Settings [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_account_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-account', 1440, 900, 'desktop')
+    print(f"Account Settings [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_about_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-about', 1440, 900, 'desktop')
+    print(f"About Settings [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_help_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'help', 1440, 900, 'desktop')
+    print(f"Help [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_trouble_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'trouble', 1440, 900, 'desktop')
+    print(f"Troubleshooting [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_diag_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'diag', 1440, 900, 'desktop')
+    print(f"Diagnostic Dialog [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_legal_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'legal', 1440, 900, 'desktop')
+    print(f"Legal Privacy [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_legal_terms_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'legal-terms', 1440, 900, 'desktop')
+    print(f"Legal Terms [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_legal_credits_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'legal-credits', 1440, 900, 'desktop')
+    print(f"Legal Credits [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_export_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'export', 1440, 900, 'desktop')
+    print(f"Export Dialog [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_record_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'record', 1440, 900, 'desktop')
+    print(f"Record Screen [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_boot_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'boot', 1440, 900, 'desktop')
+    print(f"Boot Screen [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_storage_ask_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'storage-ask', 1440, 900, 'desktop')
+    print(f"Storage Ask Screen [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+
 
 
 

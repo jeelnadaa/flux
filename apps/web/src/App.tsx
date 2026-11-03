@@ -60,6 +60,28 @@ import { TextToSpeechScreen } from "./screens/TextToSpeechScreen.js";
 import { DubReviewScreen } from "./screens/DubReviewScreen.js";
 import { VoiceCloneConsentScreen } from "./screens/VoiceCloneConsentScreen.js";
 import { MagicAssistantScreen } from "./screens/MagicAssistantScreen.js";
+import { TaskViewScreen } from "./screens/TaskViewScreen.js";
+import { NewProjectScreen } from "./screens/NewProjectScreen.js";
+import { FormatConverterScreen } from "./screens/FormatConverterScreen.js";
+import { BatchScreen } from "./screens/BatchScreen.js";
+import { RingtoneScreen } from "./screens/RingtoneScreen.js";
+import { MacrosScreen } from "./screens/MacrosScreen.js";
+import { AudioSettingsScreen } from "./screens/AudioSettingsScreen.js";
+import { PrivacySettingsScreen } from "./screens/PrivacySettingsScreen.js";
+import { StorageSettingsScreen } from "./screens/StorageSettingsScreen.js";
+import { AccessibilitySettingsScreen } from "./screens/AccessibilitySettingsScreen.js";
+import { AccountSettingsScreen } from "./screens/AccountSettingsScreen.js";
+import { AboutSettingsScreen } from "./screens/AboutSettingsScreen.js";
+import { HelpScreen } from "./screens/HelpScreen.js";
+import { TroubleshootingScreen } from "./screens/TroubleshootingScreen.js";
+import { DiagnosticDialogScreen } from "./screens/DiagnosticDialogScreen.js";
+import { LegalPrivacyScreen } from "./screens/LegalPrivacyScreen.js";
+import { LegalTermsScreen } from "./screens/LegalTermsScreen.js";
+import { LegalCreditsScreen } from "./screens/LegalCreditsScreen.js";
+import { ExportDialogScreen } from "./screens/ExportDialogScreen.js";
+import { RecordScreen } from "./screens/RecordScreen.js";
+import { BootScreen } from "./screens/BootScreen.js";
+import { StorageAskScreen } from "./screens/StorageAskScreen.js";
 
 export function getScreenComponent(
   route: string,
@@ -116,6 +138,58 @@ export function getScreenComponent(
       return <GeneralSettingsScreen />;
     case "prefs-keys":
       return <KeyboardSettingsScreen />;
+    case "prefs-audio":
+      return <AudioSettingsScreen onNavigate={navigate} />;
+    case "prefs-privacy":
+      return <PrivacySettingsScreen />;
+    case "prefs-storage":
+      return <StorageSettingsScreen />;
+    case "prefs-access":
+      return <AccessibilitySettingsScreen onNavigate={navigate} />;
+    case "prefs-account":
+      return <AccountSettingsScreen />;
+    case "prefs-about":
+      return <AboutSettingsScreen onNavigate={navigate} />;
+    case "task":
+      return <TaskViewScreen mode="8d" onNavigate={navigate} />;
+    case "task-slowed":
+      return <TaskViewScreen mode="slowed" onNavigate={navigate} />;
+    case "new":
+      return <NewProjectScreen onNavigate={navigate} />;
+    case "convert":
+      return <FormatConverterScreen />;
+    case "batch":
+      return <BatchScreen onNavigate={navigate} />;
+    case "ringtone":
+      return <RingtoneScreen onNavigate={navigate} />;
+    case "macros":
+      return <MacrosScreen />;
+    case "help":
+      return <HelpScreen onNavigate={navigate} />;
+    case "trouble":
+      return <TroubleshootingScreen onNavigate={navigate} />;
+    case "diag":
+      return <DiagnosticDialogScreen onNavigate={navigate} />;
+    case "legal":
+      return <LegalPrivacyScreen onNavigate={navigate} />;
+    case "legal-terms":
+      return <LegalTermsScreen onNavigate={navigate} />;
+    case "legal-credits":
+      return <LegalCreditsScreen onNavigate={navigate} />;
+    case "export":
+      return <ExportDialogScreen mode="export" onNavigate={navigate} />;
+    case "exporting":
+      return <ExportDialogScreen mode="exporting" onNavigate={navigate} />;
+    case "exported":
+      return <ExportDialogScreen mode="exported" onNavigate={navigate} />;
+    case "export-sub":
+      return <ExportDialogScreen mode="export-sub" onNavigate={navigate} />;
+    case "record":
+      return <RecordScreen onNavigate={navigate} />;
+    case "boot":
+      return <BootScreen onNavigate={navigate} />;
+    case "storage-ask":
+      return <StorageAskScreen onNavigate={navigate} />;
     case "welcome":
       return <WelcomeScreen />;
     case "edit":

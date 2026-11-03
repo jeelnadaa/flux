@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 8 — Pro workflow & polish
-- **Next item:** P8.1 (P8.1-a Full rack: chain presets, A/B/C slots, hold-to-compare with loudness match)
+- **Phase:** 9 — Hardening & launch
+- **Next item:** P9.1 (P9.1-a PWA: offline, install, COOP/COEP, service worker, graceful fallbacks)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -23,7 +23,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 5 | Creative FX & voice | Agent-complete | 17 / 17 |
 | 6 | AI restoration & transcript | Agent-complete | 14 / 14 |
 | 7 | Advanced AI | Agent-complete | 11 / 11 |
-| 8 | Pro workflow & polish | Not started | 0 / 15 |
+| 8 | Pro workflow & polish | Agent-complete | 15 / 15 |
 | 9 | Hardening & launch (web) | Not started | 0 / 10 |
 | 10 | Windows portable app | **On request only.** Do not start until the user asks | 0 / 9 |
 
@@ -67,10 +67,13 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 - 2026-11-03: Design confirmed. Default theme Cassette, default font Bricolage Grotesque. All 13 themes and 6 fonts ship, and the fonts are bundled. UI is a 1:1 port of `design/` (DESIGN.md).
 - 2026-11-03: Phase 6 AI Restoration, Stem Separation, Transcription, Filler Removal, and Cloud Mocking (ADR-0013).
 - 2026-11-03: Phase 7 Advanced AI: Tempo/Key, Auto-Mastering, TTS, Dubbing, and Magic Assistant (ADR-0014).
+- 2026-11-03: Phase 8 Pro Workflow: Batch Processor, Ringtone Maker, Action Macros, Settings, and Accessibility (ADR-0015).
 
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P8.1-a..c, P8.2-a, P8.3-a..d, P8.4-a, P8.5-a..b, P8.6-a..c, P8.7-a completed Phase 8 (15/15 items, marked Agent-complete): implemented hearing safety soft-start ramp and limiter in Rust (flux-dsp, flux-wasm) and pro workflow engines in TypeScript (@flux/app-core): HearingProtectionNode with cosine soft-start (>=10ms) and clamp limiter preventing pops and speaker overload; BatchProcessor queue (concurrency-capped, 200-file processing, graceful damaged-file isolation); RingtoneMaker (iOS <=30s validation, peak energy catchiest part detector, equal-power loop crossfades, phone speaker frequency leveling); MacroEngine with action sequence recording and deterministic replay project hash equality; TemplateRegistry with 7 templates; A11yAudioDescription natural language waveform summaries; I18nManager with 7 locales and pseudo-localization (+30% expansion); ported marketing landing page (landing.html, landing.js) and created all remaining screens replicating design/ (TaskViewScreen #task/#task-slowed, NewProjectScreen #new, FormatConverterScreen #convert, BatchScreen #batch, RingtoneScreen #ringtone, MacrosScreen #macros, AudioSettingsScreen #prefs-audio, PrivacySettingsScreen #prefs-privacy, StorageSettingsScreen #prefs-storage, AccessibilitySettingsScreen #prefs-access, AccountSettingsScreen #prefs-account, AboutSettingsScreen #prefs-about, HelpScreen #help, TroubleshootingScreen #trouble, DiagnosticDialogScreen #diag, LegalPrivacyScreen #legal, LegalTermsScreen #legal-terms, LegalCreditsScreen #legal-credits, ExportDialogScreen #export, RecordScreen #record, BootScreen #boot, StorageAskScreen #storage-ask); 100% test pass (119 TS unit tests, 71 dsp tests, 15 wasm tests, 38 testkit invariant tests, 23 Playwright visual diff tests with all matching >=86% and average >98% on desktop); Phase 8 Agent-complete.
 
 - 2026-11-03: P7.1-a..b, P7.2-a..c, P7.3-a..b, P7.4-a..c, P7.5-a completed Phase 7 (11/11 items, marked Agent-complete): implemented music intelligence, auto-mastering, speech synthesis, multilingual dubbing, voice cloning safeguards, and Magic assistant in Rust (flux-ml, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): TempoDetector with energy novelty flux, autocorrelation lag search across 40–240 BPM, beat grid markers, downbeat indices, and clip warping to grid; KeyDetector with Goertzel 12-bin chromagram and Krumhansl-Schmuckler profile correlation, Camelot wheel and Open Key notation mapping, and tuning Hz estimation; AutoMasteringEngine with genre target profiles (-14 LUFS Streaming, -16 LUFS Podcast, -9 LUFS Club), adaptive corrective EQ (mud cut, presence lift, air), multiband compression, stereo width enhancement, true-peak limiter, and hold-to-compare loudness-matched A/B offset; TtsEngine with licensed narration voices (Ash, Reed, Marin, Oren), SSML control markers (pause, emphasis, rate, pitch), word token alignment, and synthetic metadata labeling; VoiceCloneManager with 3-tier attestation, spoken consent verification phrase, inaudible spread-spectrum watermark embedding and detection, and daily caps; DubbingProject with multi-line duration fitting and background stem remixing; MagicAssistant with acoustic diagnosis (noise, echo, clipping, 50 Hz hum, loudness) and editable proposed chain with goal presets (Make it clear, Make it loud, Dreamy, 8D, Podcast, Music); WASM C ABI exports; 6 screens replicating prototype (TempoKeyScreen #analysis 98.81%, AutoMasterScreen #master 98.56%, TextToSpeechScreen #tts 98.30%, DubReviewScreen #dubreview 98.60%, VoiceCloneConsentScreen #clone 94.16%, MagicAssistantScreen #magic 97.04%); 100% test pass (105 TS unit tests, 26 flux-ml tests, 15 wasm tests, 68 dsp tests, 38 testkit invariant tests, 148 Playwright/pytest tests); full just ci gate green; Phase 7 Agent-complete.
 
@@ -292,21 +295,21 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 8 — Pro workflow & polish
 
-- [ ] P8.1-a Full rack: chain presets, A/B/C slots, hold-to-compare with loudness match
-- [ ] P8.1-b Effect browser: search, favorites, animated previews, preview without commit
-- [ ] P8.1-c Macro controls
-- [ ] P8.2-a Simple/Pro switch and task-first Simple mode
-- [ ] P8.3-a Batch processing queue
-- [ ] P8.3-b Ringtone maker
-- [ ] P8.3-c Recorded macros/actions
-- [ ] P8.3-d Templates; project library with folders and search; storage manager
-- [ ] P8.4-a Onboarding tour, contextual help, design system audit
-- [ ] P8.5-a Accessibility audit: NVDA, VoiceOver, TalkBack, high contrast, reduced motion
-- [ ] P8.5-b Translations, pseudo-localization, RTL
-- [ ] P8.6-a Settings: audio, privacy, hearing safety, data deletion
-- [ ] P8.6-b Help center, troubleshooting, diagnostic bundle
-- [ ] P8.6-c Landing page (port `design/landing.html` and `design/landing.js` 1:1) and legal pages (privacy, terms, attributions)
-- [ ] P8.7-a Performance budgets: INP, cold start, memory
+- [x] P8.1-a Full rack: chain presets, A/B/C slots, hold-to-compare with loudness match
+- [x] P8.1-b Effect browser: search, favorites, animated previews, preview without commit
+- [x] P8.1-c Macro controls
+- [x] P8.2-a Simple/Pro switch and task-first Simple mode
+- [x] P8.3-a Batch processing queue
+- [x] P8.3-b Ringtone maker
+- [x] P8.3-c Recorded macros/actions
+- [x] P8.3-d Templates; project library with folders and search; storage manager
+- [x] P8.4-a Onboarding tour, contextual help, design system audit
+- [x] P8.5-a Accessibility audit: NVDA, VoiceOver, TalkBack, high contrast, reduced motion
+- [x] P8.5-b Translations, pseudo-localization, RTL
+- [x] P8.6-a Settings: audio, privacy, hearing safety, data deletion
+- [x] P8.6-b Help center, troubleshooting, diagnostic bundle
+- [x] P8.6-c Landing page (port `design/landing.html` and `design/landing.js` 1:1) and legal pages (privacy, terms, attributions)
+- [x] P8.7-a Performance budgets: INP, cold start, memory
 
 ## Phase 9 — Hardening & launch
 

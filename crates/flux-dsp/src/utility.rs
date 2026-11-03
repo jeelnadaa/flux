@@ -689,6 +689,218 @@ impl DspNode for SpectrumAnalyzerNode {
 // Tests
 // ============================================================================
 
+// ============================================================================
+// 6. Hearing Safety & Protection Processor (PLAN.md §8.6)
+// ============================================================================
+
+/// Configuration for hearing safety protection.
+#[derive(Debug, Clone)]
+pub struct HearingProtectionConfig {
+    /// Whether the soft-start ramp on playback start is enabled.
+    pub soft_start_enabled: bool,
+    /// Duration of the soft-start ramp in milliseconds (must be >= 10.0 ms per PLAN.md).
+    pub ramp_duration_ms: f32,
+    /// Whether the safety brickwall output limiter is enabled.
+    pub limiter_enabled: bool,
+    /// Output ceiling in dBFS (default -0.1 dBFS).
+    pub ceiling_db: f32,
+    /// Threshold in dBFS to flag loud playback or export warning.
+    pub loud_warning_threshold_db: f32,
+}
+
+impl Default for HearingProtectionConfig {
+    fn default() -> Self {
+        Self {
+            soft_start_enabled: true,
+            ramp_duration_ms: 15.0, // >= 10 ms
+            limiter_enabled: true,
+            ceiling_db: -0.1,
+            loud_warning_threshold_db: 0.0,
+        }
+    }
+}
+
+/// Hearing safety node implementing soft-start playback ramps and safety peak limiting.
+pub struct HearingProtectionNode {
+    bypassed: bool,
+    sample_rate: f32,
+    channels: usize,
+    config: HearingProtectionConfig,
+    ramp_sample_count: usize,
+    current_ramp_sample: usize,
+    ceiling_linear: f32,
+    loud_warning_flagged: bool,
+}
+
+impl HearingProtectionNode {
+    /// Creates a new hearing protection node with configuration.
+    pub fn new(config: HearingProtectionConfig) -> Self {
+        let ceiling_linear = 10.0f32.powf(config.ceiling_db / 20.0);
+        let ramp_ms = config.ramp_duration_ms.max(10.0);
+        let ramp_sample_count = ((ramp_ms * 0.001) * 44100.0).round() as usize;
+        Self {
+            bypassed: false,
+            sample_rate: 44100.0,
+            channels: 2,
+            config,
+            ramp_sample_count,
+            current_ramp_sample: 0,
+            ceiling_linear,
+            loud_warning_flagged: false,
+        }
+    }
+
+    /// Triggers a playback start or restart, resetting the soft-start ramp to 0.
+    pub fn trigger_playback_start(&mut self) {
+        self.current_ramp_sample = 0;
+        self.loud_warning_flagged = false;
+    }
+
+    /// Returns whether a loud level was flagged during processing.
+    pub fn is_loud_warning_flagged(&self) -> bool {
+        self.loud_warning_flagged
+    }
+
+    /// Clears the loud warning flag.
+    pub fn clear_loud_warning(&mut self) {
+        self.loud_warning_flagged = false;
+    }
+
+    /// Returns the configured ceiling in linear amplitude.
+    pub fn ceiling_linear(&self) -> f32 {
+        self.ceiling_linear
+    }
+}
+
+impl Default for HearingProtectionNode {
+    fn default() -> Self {
+        Self::new(HearingProtectionConfig::default())
+    }
+}
+
+impl DspNode for HearingProtectionNode {
+    fn name(&self) -> &str {
+        "HearingProtectionNode"
+    }
+
+    fn prepare(&mut self, sample_rate: f32, channels: usize) {
+        self.sample_rate = sample_rate;
+        self.channels = channels;
+        let ramp_ms = self.config.ramp_duration_ms.max(10.0);
+        self.ramp_sample_count = ((ramp_ms * 0.001) * sample_rate).round().max(1.0) as usize;
+        self.ceiling_linear = 10.0f32.powf(self.config.ceiling_db / 20.0);
+        self.current_ramp_sample = 0;
+        self.loud_warning_flagged = false;
+    }
+
+    fn reset(&mut self) {
+        self.current_ramp_sample = 0;
+        self.loud_warning_flagged = false;
+    }
+
+    fn set_parameter(&mut self, index: usize, value: f32) {
+        match index {
+            0 => self.config.soft_start_enabled = value > 0.5,
+            1 => {
+                self.config.ramp_duration_ms = value.max(10.0);
+                self.ramp_sample_count = ((self.config.ramp_duration_ms * 0.001) * self.sample_rate)
+                    .round()
+                    .max(1.0) as usize;
+            }
+            2 => self.config.limiter_enabled = value > 0.5,
+            3 => {
+                self.config.ceiling_db = value.min(0.0);
+                self.ceiling_linear = 10.0f32.powf(self.config.ceiling_db / 20.0);
+            }
+            _ => {}
+        }
+    }
+
+    fn get_parameter(&self, index: usize) -> f32 {
+        match index {
+            0 => {
+                if self.config.soft_start_enabled {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            1 => self.config.ramp_duration_ms,
+            2 => {
+                if self.config.limiter_enabled {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            3 => self.config.ceiling_db,
+            _ => 0.0,
+        }
+    }
+
+    fn process(&mut self, inputs: &[&[f32]], outputs: &mut [&mut [f32]]) {
+        if self.bypassed || inputs.is_empty() || outputs.is_empty() {
+            for (in_ch, out_ch) in inputs.iter().zip(outputs.iter_mut()) {
+                out_ch[..in_ch.len()].copy_from_slice(in_ch);
+            }
+            return;
+        }
+
+        let num_samples = inputs[0].len().min(outputs[0].len());
+        let num_channels = inputs.len().min(outputs.len());
+
+        let loud_threshold_linear = 10.0f32.powf(self.config.loud_warning_threshold_db / 20.0);
+
+        for i in 0..num_samples {
+            // Calculate soft-start ramp gain
+            let ramp_gain = if !self.config.soft_start_enabled
+                || self.current_ramp_sample >= self.ramp_sample_count
+            {
+                1.0
+            } else {
+                let t = self.current_ramp_sample as f32 / self.ramp_sample_count as f32;
+                // Raised cosine ramp for zero initial derivative and smooth transition
+                0.5 * (1.0 - (PI * t).cos())
+            };
+
+            if self.config.soft_start_enabled && self.current_ramp_sample < self.ramp_sample_count {
+                self.current_ramp_sample += 1;
+            }
+
+            for ch in 0..num_channels {
+                let sample = inputs[ch][i] * ramp_gain;
+
+                if sample.abs() > loud_threshold_linear {
+                    self.loud_warning_flagged = true;
+                }
+
+                // Safety output limiter
+                let limited_sample = if self.config.limiter_enabled {
+                    if sample > self.ceiling_linear {
+                        self.ceiling_linear
+                    } else if sample < -self.ceiling_linear {
+                        -self.ceiling_linear
+                    } else {
+                        sample
+                    }
+                } else {
+                    sample
+                };
+
+                outputs[ch][i] = limited_sample;
+            }
+        }
+    }
+
+    fn is_bypassed(&self) -> bool {
+        self.bypassed
+    }
+
+    fn set_bypass(&mut self, bypassed: bool) {
+        self.bypassed = bypassed;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -785,5 +997,103 @@ mod tests {
             "Peak magnitude should be near 0 dBFS, got {}",
             peak_db
         );
+    }
+
+    #[test]
+    fn test_hearing_protection_soft_start_ramp() {
+        let config = HearingProtectionConfig {
+            soft_start_enabled: true,
+            ramp_duration_ms: 15.0,
+            limiter_enabled: true,
+            ceiling_db: -0.1,
+            loud_warning_threshold_db: 0.0,
+        };
+        let mut node = HearingProtectionNode::new(config);
+        node.prepare(48000.0, 1);
+
+        // 15 ms at 48 kHz is 720 samples
+        let total_samples = 1000;
+        let input = vec![1.0f32; total_samples];
+        let mut output = vec![0.0f32; total_samples];
+
+        node.process(&[&input[..]], &mut [&mut output[..]]);
+
+        // First sample should be very close to 0 (initial step < -60 dBFS = 0.001)
+        assert!(
+            output[0] < 0.0001,
+            "First sample of soft start ramp must be near zero: got {}",
+            output[0]
+        );
+
+        // Maximum consecutive step should be smooth (no jump above -60 dBFS relative to target)
+        let max_allowed_step = 0.005; // 0.5% max derivative
+        for i in 1..720 {
+            let step = (output[i] - output[i - 1]).abs();
+            assert!(
+                step < max_allowed_step,
+                "Step at sample {} exceeds smoothness threshold: {}",
+                i,
+                step
+            );
+        }
+
+        // After ramp completion (720 samples), signal is at full volume (or clamped to ceiling)
+        assert!(
+            (output[750] - node.ceiling_linear()).abs() < 0.001,
+            "After ramp completion, signal should reach ceiling: {}",
+            output[750]
+        );
+    }
+
+    #[test]
+    fn test_hearing_protection_limiter_clamps_hot_peaks() {
+        let config = HearingProtectionConfig {
+            soft_start_enabled: false,
+            ramp_duration_ms: 10.0,
+            limiter_enabled: true,
+            ceiling_db: -0.5, // ~0.944 linear
+            loud_warning_threshold_db: 0.0,
+        };
+        let mut node = HearingProtectionNode::new(config);
+        node.prepare(48000.0, 1);
+
+        // Extreme hot input (+18 dBFS = ~8.0 linear)
+        let input = vec![8.0f32; 128];
+        let mut output = vec![0.0f32; 128];
+
+        node.process(&[&input[..]], &mut [&mut output[..]]);
+
+        let max_val = output.iter().cloned().fold(0.0f32, f32::max);
+        let ceiling = node.ceiling_linear();
+
+        assert!(
+            (max_val - ceiling).abs() < 1e-6,
+            "Limiter must clamp hot signal to ceiling: got {}, ceiling {}",
+            max_val,
+            ceiling
+        );
+        assert!(
+            node.is_loud_warning_flagged(),
+            "Loud warning flag must be set on extreme input"
+        );
+    }
+
+    #[test]
+    fn test_hearing_protection_reset_and_restart() {
+        let mut node = HearingProtectionNode::default();
+        node.prepare(44100.0, 1);
+
+        let input = vec![1.0f32; 1000];
+        let mut output1 = vec![0.0f32; 1000];
+        node.process(&[&input[..]], &mut [&mut output1[..]]);
+        assert!((output1[999] - node.ceiling_linear()).abs() < 0.01);
+
+        // Retrigger playback start
+        node.trigger_playback_start();
+        let mut output2 = vec![0.0f32; 1000];
+        node.process(&[&input[..]], &mut [&mut output2[..]]);
+
+        // Should start from zero again
+        assert!(output2[0] < 0.0001);
     }
 }

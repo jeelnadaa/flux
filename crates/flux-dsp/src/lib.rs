@@ -65,8 +65,8 @@ pub use spectrogram::{
 pub use stretch::{StretchMode, StretchNode};
 pub use tempo::{TapTempo, TempoMap, TempoPoint};
 pub use utility::{
-    FadeCurveType, FadeProcessor, NoiseGenerator, NoiseType, SilenceGenerator,
-    SpectrumAnalyzerNode, ToneGenerator, WaveformType,
+    FadeCurveType, FadeProcessor, HearingProtectionConfig, HearingProtectionNode, NoiseGenerator,
+    NoiseType, SilenceGenerator, SpectrumAnalyzerNode, ToneGenerator, WaveformType,
 };
 
 #[cfg(test)]

@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/target/**",
       "**/node_modules/**",
       "design/**",
+      "apps/web/landing.js",
       "*.config.js",
     ],
   },
