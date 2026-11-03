@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 4 — Spatial audio
-- **Next item:** P4.1 (P4.1-a HRTF pipeline, P4.1-b Renderer A direct HRTF, P4.1-c Partitioned FFT convolution, P4.1-d Renderer B ambisonic, P4.1-e Distance cues, Doppler & level stability, P4.1-f Head-width control and HRTF test)
+- **Next item:** P4.2 (P4.2-a Stereo inputs: virtual speakers, mid/side, mono bass)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -19,7 +19,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
 | 3 | Core processing | Agent-complete | 22 / 22 |
-| 4 | Spatial audio | Not started | 0 / 18 |
+| 4 | Spatial audio | In progress | 6 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
 | 7 | Advanced AI | Not started | 0 / 11 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P4.1-a, P4.1-b, P4.1-c, P4.1-d, P4.1-e, P4.1-f implemented binaural spatial rendering core: HrtfDataset with 6 profiles (A through F) decomposed into minimum-phase IRs and Woodworth fractional ITDs (600-700 µs at 90° azimuth); PartitionedConvolver with zero latency and cosine crossfading; DirectHrtfRenderer (Renderer A); AmbisonicRenderer (Renderer B) with 3rd-order Higher-Order Ambisonics (16 channels) spherical harmonic encoding and MagLS binaural decoding; DistanceCues with 1/r law, air absorption filtering, near-field ILD boost, and Doppler; MonoBassFilter 120 Hz crossover; Headphone Check screen (#hpcheck) and HRTF Profile screen (#hrtf); verified 100% test pass (77 TS unit tests, 116 Playwright/pytest tests green, 45 dsp cargo tests, 37 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green.
 
 - 2026-11-03: P3.5-a, P3.5-b, P3.5-c implemented utility suite, comprehensive metering panel, signal generators, fade processor, and versioned preset system: ToneGenerator (sine, triangle, square, saw with click-free smoothing), NoiseGenerator (seeded white, 1/f pink), SilenceGenerator, FadeProcessor (Linear, EqualPower, SCurve, Exp, Log), SpectrumAnalyzerNode (STFT with Hann window, coherent gain normalization 4/N, peak hold decay 12 dB/s); target configurations (-14, -16, -23 LUFS); .fluxpreset v1 schema with JSON import/export, hostile-input validation, 8 factory presets, and ComparisonSlotManager; MetersScreen (#meters) and PresetsScreen (#presets); verified 100% test pass (71 TS unit tests, 106 Playwright/pytest tests green, 39 dsp cargo tests, 35 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green; Phase 3 Agent-complete.
 - 2026-11-03: P3.4-a, P3.4-b, P3.4-c, P3.4-d, P3.4-e, P3.4-f implemented classical audio restoration suite in Rust (flux-dsp) and TypeScript (@flux/app-core): StationaryNoiseReduction with spectral gating, decision-directed a-priori SNR, noise profile capture, kurtosis-controlled musical noise suppression, and difference audition; HumRemover dual cascaded 2nd-order notch filters at fundamental (50/60 Hz) and up to 8 harmonics with Q=30 (>= 40 dB suppression, off-frequency delta < 0.1 dB); DcOffsetFilter 10 Hz Butterworth HPF; DeWindFilter 4th-order steep low-cut; DeClicker innovation thresholding with cubic interpolation (>= 30 dB synthetic click attenuation); DeClipper peak crest reconstruction exceeding ceiling; SpectralRepair bounding box inpainting; SilenceRemover RMS pause detector with shorten-to-duration and crossfaded joins; StereoTools Mid/Side width (0-200%), pan, swap channels, phase invert, and phase correlation coefficient; CleanUpScreen (#fx-clean) and SilenceRemoverScreen (#fx-silence); verified 100% test pass (65 TS unit tests, 98 Playwright/pytest tests green, 35 dsp cargo tests, 34 testkit invariant tests) with >= 95.6% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green.
@@ -195,12 +197,12 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 4 — Spatial audio
 
-- [ ] P4.1-a HRTF pipeline: SOFA conversion, minimum-phase + ITD
-- [ ] P4.1-b Renderer A: direct HRTF with interpolation, crossfaded convolvers
-- [ ] P4.1-c Partitioned FFT convolution engine
-- [ ] P4.1-d Renderer B: ambisonic encode, rotate, MagLS decode
-- [ ] P4.1-e Distance cues, Doppler, level stability, headphone compensation
-- [ ] P4.1-f Head-width control and "pick your HRTF" test
+- [x] P4.1-a HRTF pipeline: SOFA conversion, minimum-phase + ITD
+- [x] P4.1-b Renderer A: direct HRTF with interpolation, crossfaded convolvers
+- [x] P4.1-c Partitioned FFT convolution engine
+- [x] P4.1-d Renderer B: ambisonic encode, rotate, MagLS decode
+- [x] P4.1-e Distance cues, Doppler, level stability, headphone compensation
+- [x] P4.1-f Head-width control and "pick your HRTF" test
 - [ ] P4.2-a Stereo inputs (virtual speakers, mid/side), mono bass
 - [ ] P4.3-a 3D static placement and presets
 - [ ] P4.3-b 8D auto-orbit with all controls, tempo sync

@@ -28,6 +28,8 @@ import { CleanUpScreen } from "./screens/CleanUpScreen.js";
 import { SilenceRemoverScreen } from "./screens/SilenceRemoverScreen.js";
 import { MetersScreen } from "./screens/MetersScreen.js";
 import { PresetsScreen } from "./screens/PresetsScreen.js";
+import { HrtfScreen } from "./screens/HrtfScreen.js";
+import { HpCheckScreen } from "./screens/HpCheckScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -85,6 +87,10 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <MetersScreen />;
     case "presets":
       return <PresetsScreen />;
+    case "hrtf":
+      return <HrtfScreen />;
+    case "hpcheck":
+      return <HpCheckScreen />;
     case "home":
     default:
       return <HomeScreen />;

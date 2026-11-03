@@ -43,3 +43,4 @@ export * from "./tempo/TempoMap.js";
 export * from "./restoration/Restoration.js";
 export * from "./utility/Metering.js";
 export * from "./utility/PresetSystem.js";
+export * from "./spatial/SpatialModels.js";

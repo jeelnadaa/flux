@@ -248,6 +248,28 @@ mod tests {
     }
 
     #[test]
+    fn test_direct_hrtf_renderer_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::DirectHrtfRenderer::new()), &config);
+        assert!(
+            result.all_passed(),
+            "DirectHrtfRenderer failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_ambisonic_renderer_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(|| Box::new(flux_dsp::AmbisonicRenderer::new()), &config);
+        assert!(
+            result.all_passed(),
+            "AmbisonicRenderer failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_sine_generator_and_spectrum() {
         let sample_rate = 48000.0;
         let freq = 1000.0;

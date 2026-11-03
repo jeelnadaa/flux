@@ -14,6 +14,7 @@ pub mod pyramid;
 pub mod resampler;
 pub mod restoration;
 pub mod sample;
+pub mod spatial;
 pub mod spatial_analysis;
 pub mod spectrogram;
 pub mod stretch;
@@ -44,6 +45,11 @@ pub use restoration::{
     SilenceRemover, SpectralRepair, StationaryNoiseReduction, StereoTools,
 };
 pub use sample::Sample;
+pub use spatial::{
+    compute_spherical_harmonics, AmbisonicRenderer, DirectHrtfRenderer, DistanceCues,
+    FractionalDelay, HrtfDataset, HrtfPair, HrtfProfile, MonoBassFilter, PartitionedConvolver,
+    AMBISONIC_CHANNELS, AMBISONIC_ORDER, DEFAULT_HEAD_RADIUS, HRTF_IR_LENGTH, SPEED_OF_SOUND,
+};
 pub use spatial_analysis::{GoniometerPoint, StereoAnalysisResult, StereoAnalyzer};
 pub use spectrogram::{
     ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTile, SpectrogramTileGenerator,

@@ -1403,6 +1403,94 @@ def test_presets_interactive(browser_instance, test_server):
     context.close()
 
 
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_hrtf(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'hrtf', width, height, name)
+    print(f"HRTF [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"HRTF [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_hrtf_interactive(browser_instance, test_server):
+    """Verifies interactivity on the HRTF screen: profile selection and head width slider."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#hrtf')
+    page.wait_for_selector('.g3')
+
+    # Verify initial 6 profile tiles
+    tiles = page.locator('.g3 button.tile')
+    assert tiles.count() == 6
+
+    # Verify initial selected profile is Profile C (index 2)
+    assert 'on' in (tiles.nth(2).get_attribute('class') or '')
+    assert page.locator('a.btn.p:has-text("Use Profile C")').count() == 1
+
+    # Select Profile A (index 0)
+    tiles.nth(0).click()
+    page.wait_for_timeout(100)
+    assert 'on' in (tiles.nth(0).get_attribute('class') or '')
+    assert page.locator('a.btn.p:has-text("Use Profile A")').count() == 1
+
+    # Verify slider exists and has initial 17.5 cm
+    assert page.locator('.sl .sv:has-text("17.5 cm")').count() == 1
+
+    context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_hpcheck(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'hpcheck', width, height, name)
+    print(f"HpCheck [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"HpCheck [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_hpcheck_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Headphone Check screen: left/right buttons, chips."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#hpcheck')
+    page.wait_for_selector('.g2')
+
+    # Verify left and right headphone check buttons
+    assert page.locator('button.tile:has-text("Play left")').count() == 1
+    assert page.locator('button.tile:has-text("Play right")').count() == 1
+
+    # Verify moving sound button
+    assert page.locator('button:has-text("Play the moving sound")').count() == 1
+
+    # Verify feedback chips
+    chips = page.locator('.row button.chip')
+    assert chips.count() == 4
+    assert 'on' in (chips.nth(0).get_attribute('class') or '')
+
+    # Click second chip ("Left and right are swapped")
+    chips.nth(1).click()
+    page.wait_for_timeout(100)
+    assert 'on' in (chips.nth(1).get_attribute('class') or '')
+
+    context.close()
+
+
 
 
 
