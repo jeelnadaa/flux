@@ -3,7 +3,7 @@ import React, { useEffect, useRef } from "react";
 export interface CanvasVizProps {
   type: "wave" | "spec" | "ruler" | "eq" | "meter" | "stage" | "rooms" | "slice" | "tape" | string;
   seed?: number;
-  stereo?: boolean;
+  stereo?: boolean | string;
   step?: number;
   kind?: string;
   color?: string;
@@ -12,6 +12,7 @@ export interface CanvasVizProps {
   ceil?: number;
   height?: number;
   roleLabel?: string;
+  on?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -77,6 +78,7 @@ export function drawWaveform(
     until?: number;
     color?: string;
     ceil?: number;
+    on?: boolean;
   },
 ): void {
   const docStyle =
@@ -85,7 +87,9 @@ export function drawWaveform(
 
   const n = Math.min(1600, Math.max(30, Math.floor(width / (opts.step || 2.5))));
   const e = getEnvelope(opts.seed || 1, n, opts.kind || "mix");
-  const col = opts.color ? getCss(opts.color) || opts.color : getCss("--tx");
+  const col = opts.color
+    ? getCss(opts.on ? `${opts.color}-on` : opts.color) || opts.color
+    : getCss("--tx");
 
   ctx.clearRect(0, 0, width, height);
   const stereo = Boolean(opts.stereo);
@@ -124,6 +128,96 @@ export function drawWaveform(
   }
 }
 
+const specCache: Record<string, HTMLCanvasElement> = {};
+const rgb = (h: string) => [
+  parseInt(h.slice(1, 3), 16),
+  parseInt(h.slice(3, 5), 16),
+  parseInt(h.slice(5, 7), 16),
+];
+const heat = (v: number, A: number[], B: number[], C: number[]) => {
+  v = Math.min(1, Math.max(0, v * 1.5));
+  const [p, q, k] = v < 0.55 ? [A, B, v / 0.55] : [B, C, (v - 0.55) / 0.45];
+  return [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k, p[2] + (q[2] - p[2]) * k];
+};
+
+export function drawSpectrogram(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  seed = 1,
+): void {
+  const docStyle =
+    typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+  const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+  const g = getCss("--ground") || "#f3ecdc";
+  const k = getCss("--ink") || "#221c15";
+  const dark = rgb(k).reduce((a, b) => a + b) < rgb(g).reduce((a, b) => a + b);
+  const ramp = [dark ? k : g, getCss("--sig-i") || "#8f2203", dark ? g : k];
+  const key = `sp${seed}_${Math.round(width / 3)}_${Math.round(height / 3)}${ramp.join("")}`;
+
+  let c = specCache[key];
+  if (!c) {
+    const w = Math.max(40, Math.round(width / 3));
+    const h = Math.max(20, Math.round(height / 3));
+    c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const q = c.getContext("2d");
+    if (q) {
+      const im = q.createImageData(w, h);
+      const r = prng(seed * 91);
+      const e1 = getEnvelope(seed, w, "voice");
+      const e2 = getEnvelope(seed + 1, w, "drums");
+      const e3 = getEnvelope(seed + 2, w, "bass");
+
+      for (let xi = 0; xi < w; xi++) {
+        for (let y = 0; y < h; y++) {
+          const f = 1 - y / h;
+          const t = xi / w;
+          const v =
+            e3[xi] * Math.exp(-f * 13) +
+            e2[xi] * Math.exp(-f * 3.4) * 0.8 +
+            e1[xi] *
+              Math.pow(Math.max(0, Math.sin(f * 62 + Math.sin(t * 90) * 2.6)), 8) *
+              Math.exp(-f * 1.7) +
+            r() * 0.03 +
+            0.1 * Math.exp(-f * 2.2);
+
+          const [cr, cg, cb] = heat(v, rgb(ramp[0]), rgb(ramp[1]), rgb(ramp[2]));
+          const idx = (y * w + xi) * 4;
+          im.data[idx] = cr;
+          im.data[idx + 1] = cg;
+          im.data[idx + 2] = cb;
+          im.data[idx + 3] = 255;
+        }
+      }
+      q.putImageData(im, 0, 0);
+      specCache[key] = c;
+    }
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(c, 0, 0, width, height);
+}
+
+export function drawSpectrum(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  const docStyle =
+    typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+  const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+  ctx.clearRect(0, 0, width, height);
+  const n = Math.floor(width / 5);
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    const v = Math.min(
+      1,
+      Math.max(0, 0.82 - u * 0.62 + Math.sin(u * 19) * 0.1 + Math.sin(u * 53) * 0.07),
+    );
+    ctx.fillStyle = getCss("--ac-t") || "#c33";
+    const h = v * height;
+    ctx.fillRect(i * 5, height - h, 4, h);
+  }
+}
+
 export const CanvasViz: React.FC<CanvasVizProps> = ({
   type,
   seed = 1,
@@ -136,6 +230,7 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
   ceil,
   height,
   roleLabel,
+  on = false,
   className = "",
   style,
 }) => {
@@ -145,35 +240,76 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const render = () => {
+      const cv = canvasRef.current;
+      if (!cv) return;
+      const ctx = cv.getContext("2d");
+      if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const w = Math.max(30, Math.round(rect.width));
-    const h = Math.max(20, Math.round(rect.height || height || 80));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = cv.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) return;
 
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    ctx.scale(dpr, dpr);
+      const w = Math.round(rect.width * dpr);
+      const h = Math.round(rect.height * dpr);
 
-    if (type === "wave") {
-      drawWaveform(ctx, w, h, { seed, stereo, step, kind, color, gain, until, ceil });
-    } else if (type === "eq") {
-      // Draw simplified interactive EQ curve
-      ctx.clearRect(0, 0, w, h);
-      ctx.strokeStyle = "#B8350A";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let x = 0; x < w; x++) {
-        const normX = x / w;
-        const y = h / 2 - Math.sin(normX * Math.PI * 2) * (h * 0.25);
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      if (cv.width !== w || cv.height !== h) {
+        cv.width = w;
+        cv.height = h;
       }
-      ctx.stroke();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const rw = rect.width;
+      const rh = rect.height;
+
+      if (type === "wave") {
+        drawWaveform(ctx, rw, rh, {
+          seed,
+          stereo: Boolean(stereo),
+          step,
+          kind,
+          color,
+          gain,
+          until,
+          ceil,
+          on,
+        });
+      } else if (type === "spec") {
+        drawSpectrogram(ctx, rw, rh, seed);
+      } else if (type === "spectrum") {
+        drawSpectrum(ctx, rw, rh);
+      } else if (type === "eq") {
+        // Draw simplified interactive EQ curve
+        ctx.clearRect(0, 0, rw, rh);
+        ctx.strokeStyle = "#B8350A";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let x = 0; x < rw; x++) {
+          const normX = x / rw;
+          const y = rh / 2 - Math.sin(normX * Math.PI * 2) * (rh * 0.25);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    };
+
+    render();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        render();
+      });
+      ro.observe(canvas);
     }
-  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height]);
+
+    return () => {
+      if (ro) {
+        ro.disconnect();
+      }
+    };
+  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height, on]);
 
   const canvasEl = (
     <canvas

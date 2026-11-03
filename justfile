@@ -7,7 +7,7 @@ default:
     @just --list
 
 # The local CI gate: format, lint, typos, licenses, unit, property, golden, null, integration, E2E, WASM build, Python eval, browser smoke test
-ci: fmt-check lint typos license-scan check-rust test-rust test-python test-browser build-wasm check-ts
+ci: fmt-check lint typos license-scan check-rust test-rust test-python test-ts test-browser build-wasm check-ts
 
 # Format check across Rust and TypeScript
 fmt-check:
@@ -44,6 +44,10 @@ test-rust:
 # Run Python evaluation harness unit tests
 test-python:
     python -m pytest tools/eval/tests
+
+# Run TypeScript unit tests (Timeline, Snapping, Math)
+test-ts:
+    {{npm_cmd}} run test:unit
 
 # Run headless browser smoke tests (Spikes, Recording, Engine, Export, Analysis, Pixel-Diff)
 test-browser:

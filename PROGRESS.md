@@ -17,7 +17,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
-| 2 | Editor UI & timeline | In progress | 3 / 17 |
+| 2 | Editor UI & timeline | In progress | 6 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P2.1-a, P2.1-b, P2.1-c implemented TimelineModel & SnappingEngine (@flux/app-core), interactive WaveformCanvas (sample-level zoom, dB/linear scales, clipping indicator, mono/stereo/mid-side), SpectrogramCanvas (linear/log/mel scales, 4 colormaps, zoom, frequency grid), SpectralSelectionOverlay, HybridView (30% waveform + 70% spectrogram with view mode toggle), TimelineRuler (time division ticks, loop region, marker flags, shaded regions, scrub seek), PlayheadOverlay with playhead translation, zero-crossing and clip snapping, SpectralScreen (#spectral), and CanvasViz procedural renderers with ResizeObserver; automated Playwright tests verify >= 95% pixel-diff match at Desktop (Spectral 98.6%, Edit 98.5%), Tablet (Spectral 98.8%, Edit 98.8%), and Phone (Spectral 98.7%, Edit 98.6%); 9 timeline unit tests and 20 pixel-diff/interaction tests green; just ci green.
 
 - 2026-11-03: P2.0-a, P2.0-b, P2.0-c implemented design tokens and complete UI component library (@flux/ui), app shell with hash routing and View Transitions, 13 themes (Cassette default), 6 bundled fonts (Bricolage Grotesque default) with 950ms circular reveal animation, and automated pixel-diff visual regression harness (tests/pixel_diff) verifying >= 95% match against design/ prototype at 1440px (Kit 98.56%, Themes 98.56%, Fonts 99.29%), 820px (Kit 99.07%, Themes 98.70%, Fonts 98.26%), and 390px (Kit 98.64%, Themes 98.70%, Fonts 98.85%); 12 pixel-diff tests passing, just ci green.
 
@@ -132,9 +134,9 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P2.0-a Design tokens and component library per DESIGN.md (port `design/` CSS as is); app shell and routing
 - [x] P2.0-b Pixel-diff harness against the `design/` prototype at 1440, 820 and 390 px
 - [x] P2.0-c Themes and Fonts settings: 13 themes (default Cassette), 6 bundled fonts (default Bricolage Grotesque), circular reveal
-- [ ] P2.1-a Waveform view: zoom whole-file to sample level, scales, clipping
-- [ ] P2.1-b Spectrogram and hybrid view; spectral selection
-- [ ] P2.1-c Playhead, scrub, loop region, markers, snapping
+- [x] P2.1-a Waveform view: zoom whole-file to sample level, scales, clipping
+- [x] P2.1-b Spectrogram and hybrid view; spectral selection
+- [x] P2.1-c Playhead, scrub, loop region, markers, snapping
 - [ ] P2.2-a Select, cut, copy, paste, delete, ripple, split, move, nudge
 - [ ] P2.2-b Slip, reverse, clip gain and envelope
 - [ ] P2.2-c Fades with curve types; auto crossfades; automatic micro-fades

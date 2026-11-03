@@ -8,8 +8,13 @@
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@flux/app-core": ["../app-core/src/index.ts"]
+    },
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [{ "path": "../app-core" }]
 }

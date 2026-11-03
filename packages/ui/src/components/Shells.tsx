@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon, type IconName } from "../icons.js";
 import { Button } from "./Button.js";
+import { SegmentedControl } from "./SegmentedControl.js";
 
 export const PROJ_NAV_ITEMS: readonly [string, IconName, string][] = [
   ["edit", "wave", "Edit"],
@@ -233,12 +234,29 @@ export interface ProjectLayoutProps {
   className?: string;
 }
 
+const defaultProjectRightActions = (
+  <>
+    <SegmentedControl items={["Simple", "Pro"]} selectedIndex={1} className="hide-s" dataMode />
+    <button className="tbtn" type="button" aria-label="Undo">
+      <Icon name="undo" />
+    </button>
+    <button className="tbtn hide-s" type="button" aria-label="Redo">
+      <Icon name="redo" />
+    </button>
+    <a className="btn g lbl-s hide-s" href="#history" data-go="history" aria-label="History">
+      <Icon name="hist" />
+    </a>
+    <Button variant="magic" className="lbl-s" icon="mag" label="Magic" dataGo="magic" />
+    <Button variant="primary" className="lbl-s" icon="exp" label="Export" dataGo="export" />
+  </>
+);
+
 export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
   currentTab = "edit",
   projectName = "Harbor Lights",
   projectStatus = "Saved 12 seconds ago",
   children,
-  rightActions,
+  rightActions = defaultProjectRightActions,
   transportExtra,
   onNavigate,
   className = "",

@@ -7,5 +7,5 @@
     "skipLibCheck": true
   },
   "files": [],
-  "references": [{ "path": "packages/ui" }, { "path": "packages/app-core" }, { "path": "apps/web" }]
+  "references": [{ "path": "packages/app-core" }, { "path": "packages/ui" }, { "path": "apps/web" }]
 }

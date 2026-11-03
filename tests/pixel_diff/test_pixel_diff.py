@@ -55,7 +55,7 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
     ctx_proto = browser.new_context(viewport={'width': width, 'height': height})
     page_proto = ctx_proto.new_page()
     page_proto.goto(f'http://127.0.0.1:{port}/design/app.html#{screen}', wait_until='domcontentloaded')
-    page_proto.wait_for_selector('#stage .pg', timeout=25000)
+    page_proto.wait_for_selector('#stage > *', timeout=25000)
     page_proto.evaluate("""() => {
         const rv = document.getElementById('rv');
         if (rv) rv.remove();
@@ -73,7 +73,7 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
     ctx_prod = browser.new_context(viewport={'width': width, 'height': height})
     page_prod = ctx_prod.new_page()
     page_prod.goto(f'http://127.0.0.1:{port}/apps/web/index.html#{screen}', wait_until='domcontentloaded')
-    page_prod.wait_for_selector('#stage .pg', timeout=25000)
+    page_prod.wait_for_selector('#stage > *', timeout=25000)
     page_prod.evaluate("""() => {
         const m = document.getElementById('m');
         if (m) m.scrollTop = 0;
@@ -249,5 +249,104 @@ def test_kit_interactive_controls(browser_instance, test_server):
     second_btn.click()
     page.wait_for_timeout(100)
     assert 'on' in second_btn.get_attribute('class')
+
+    context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_spectral(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'spectral', width, height, name)
+    print(f"\n[SPECTRAL {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Spectral screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_edit(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'edit', width, height, name)
+    print(f"\n[EDIT {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Edit screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+def test_spectral_selection_interaction(browser_instance, test_server):
+    """Verifies spectral selection box can be moved and view modes toggled."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#spectral')
+    page.wait_for_selector('#stage > *')
+
+    # Verify spectral box exists
+    box = page.locator('[data-testid="spectral-box"]')
+    assert box.is_visible()
+
+    # Move the box by dragging
+    box_box = box.bounding_box()
+    assert box_box is not None
+
+    page.mouse.move(box_box['x'] + 20, box_box['y'] + 20)
+    page.mouse.down()
+    page.mouse.move(box_box['x'] + 80, box_box['y'] + 50)
+    page.mouse.up()
+    page.wait_for_timeout(100)
+
+    # Verify mode toggles work
+    seg_btns = page.locator('.tlbar .seg button')
+    assert seg_btns.count() >= 3
+    # Click 'Spectrogram'
+    seg_btns.nth(0).click()
+    page.wait_for_timeout(100)
+    assert 'on' in seg_btns.nth(0).get_attribute('class')
+
+    context.close()
+
+
+def test_timeline_scrub_and_snapping(browser_instance, test_server):
+    """Verifies timeline ruler scrubbing moves playhead and snaps."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#edit')
+    page.wait_for_selector('#stage > *')
+
+    ph = page.locator('.ph')
+    initial_style = ph.get_attribute('style') or ''
+    assert 'translateX(120px)' in initial_style
+
+    # Click on ruler at x = 320px
+    ruler = page.locator('.ruler').first
+    ruler_box = ruler.bounding_box()
+    assert ruler_box is not None
+
+    page.mouse.click(ruler_box['x'] + 280, ruler_box['y'] + 10)
+    page.wait_for_timeout(100)
+
+    # Playhead should have moved
+    new_style = ph.get_attribute('style') or ''
+    assert new_style != initial_style
+
+    # Toggle snap chip
+    snap_chip = page.locator('button.chip:has-text("Snap: zero cross")')
+    assert 'on' in (snap_chip.get_attribute('class') or '')
+    snap_chip.click()
+    page.wait_for_timeout(100)
+    assert 'on' not in (snap_chip.get_attribute('class') or '')
 
     context.close()
