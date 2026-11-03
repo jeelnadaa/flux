@@ -24,11 +24,10 @@ function copyDirRecursive(src, dest) {
 function buildStaticSite() {
   console.log("[*] Assembling static site in dist-static/ for Cloudflare Pages...");
 
-  // Clean output directory
-  if (fs.existsSync(OUT_DIR)) {
-    fs.rmSync(OUT_DIR, { recursive: true, force: true });
+  // Ensure output directory exists
+  if (!fs.existsSync(OUT_DIR)) {
+    fs.mkdirSync(OUT_DIR, { recursive: true });
   }
-  fs.mkdirSync(OUT_DIR, { recursive: true });
 
   // 1. Copy landing.html as index.html so root domain opens the showcase
   const landingHtml = fs.readFileSync(path.join(WEB_DIR, "landing.html"), "utf8");

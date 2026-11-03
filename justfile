@@ -8,7 +8,7 @@ default:
     @just --list
 
 # The local CI gate: format, lint, typos, licenses, unit, property, golden, null, integration, E2E, WASM build, Python eval, browser smoke test
-ci: fmt-check lint typos license-scan check-rust test-rust test-python test-ts test-browser build-wasm check-ts
+ci: fmt-check lint typos license-scan check-rust test-rust test-python build-wasm build-web test-ts test-browser check-ts
 
 # Format check across Rust and TypeScript
 fmt-check:
@@ -50,9 +50,13 @@ test-python:
 test-ts:
     {{npm_cmd}} run test:unit
 
-# Run headless browser smoke tests (Spikes, Recording, Engine, Export, Analysis, Pixel-Diff)
+# Run headless browser smoke tests (Spikes A-G, Recording, Engine, Export, Analysis)
 test-browser:
-    {{python_cmd}} -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py tests/spikes/spike_c/test_spike_c.py tests/spikes/spike_d/test_spike_d.py tests/spikes/spike_f/test_spike_f.py tests/spikes/spike_g/test_spike_g.py tests/recording/test_recording.py tests/engine/test_engine.py tests/export/test_export.py tests/analysis/test_analysis.py tests/pixel_diff/test_pixel_diff.py
+    {{python_cmd}} -m pytest tests/spikes/spike_a/test_spike_a.py tests/spikes/spike_b/test_spike_b.py tests/spikes/spike_c/test_spike_c.py tests/spikes/spike_d/test_spike_d.py tests/spikes/spike_f/test_spike_f.py tests/spikes/spike_g/test_spike_g.py tests/recording/test_recording.py tests/engine/test_engine.py tests/export/test_export.py tests/analysis/test_analysis.py
+
+# Run visual pixel-diff tests for desktop screens
+test-pixel-diff:
+    {{python_cmd}} -m pytest tests/pixel_diff/test_pixel_diff.py -k "desktop"
 
 # Run full Python evaluation benchmark suite and update dashboards
 eval:
@@ -61,6 +65,10 @@ eval:
 # Build WebAssembly crate
 build-wasm:
     cargo build -p flux-wasm --target wasm32-unknown-unknown
+
+# Build TypeScript and web bundle
+build-web:
+    {{npm_cmd}} run build
 
 # Typecheck TypeScript packages and apps
 check-ts:
