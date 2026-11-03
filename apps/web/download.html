@@ -402,6 +402,18 @@
         height: 6px;
         border-radius: 50%;
         background: currentColor;
+        box-shadow: 0 0 6px currentColor;
+        animation: dotPulse 2.2s ease-in-out infinite alternate;
+      }
+      @keyframes dotPulse {
+        from {
+          transform: scale(0.85);
+          opacity: 0.55;
+        }
+        to {
+          transform: scale(1.3);
+          opacity: 1;
+        }
       }
 
       /* Download action row: Centered */
@@ -414,14 +426,38 @@
         margin: 0 auto 32px;
       }
       .dl-hero-btn {
+        position: relative;
+        overflow: hidden;
         height: 64px;
         padding: 0 36px;
         font-size: 19px;
         border-radius: 99px;
         gap: 14px;
+        will-change: transform;
+      }
+      .dl-hero-btn::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          115deg,
+          transparent 35%,
+          rgba(255, 255, 255, 0.22) 50%,
+          transparent 65%
+        );
+        transform: translateX(-120%);
+        transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+      }
+      .dl-hero-btn:hover::after {
+        transform: translateX(120%);
       }
       .dl-hero-btn svg {
         flex-shrink: 0;
+        transition: transform 0.35s var(--spring);
+      }
+      .dl-hero-btn:hover svg {
+        transform: translateY(3px) scale(1.15);
       }
       .dl-size {
         opacity: 0.75;
@@ -618,7 +654,7 @@
           <span id="sndl">sound off</span>
         </button>
         <a class="btn" href="landing.html#scenes">Tour</a>
-        <a class="btn" href="https://github.com/flux-audio/flux" target="_blank" rel="noopener"
+        <a class="btn" href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener"
           >GitHub</a
         >
         <a class="btn solid" href="#dl-win">Get Flux</a>
@@ -676,7 +712,7 @@
           <div class="action-row">
             <a
               class="btn solid dl-hero-btn"
-              href="https://github.com/flux-audio/flux/releases/latest/download/flux-windows-x64.zip"
+              href="https://github.com/jeelnadaa/flux/releases/latest/download/Flux-1.0.0-win-x64.zip"
               download
             >
               <svg
@@ -732,7 +768,7 @@
           <div class="action-row">
             <a
               class="btn solid dl-hero-btn"
-              href="https://github.com/flux-audio/flux/releases/latest/download/flux-macos-universal.zip"
+              href="https://github.com/jeelnadaa/flux/releases/latest/download/Flux-v1.0.0-macos-universal.zip"
               download
             >
               <svg
@@ -749,7 +785,7 @@
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span>Download flux-macos-universal.zip</span>
+              <span>Download Flux-macos-universal.zip</span>
               <span class="mono dl-size">52 MB</span>
             </a>
           </div>
@@ -785,7 +821,7 @@
           <div class="action-row">
             <a
               class="btn solid dl-hero-btn"
-              href="https://github.com/flux-audio/flux"
+              href="https://github.com/jeelnadaa/flux"
               target="_blank"
               rel="noopener"
             >
@@ -810,13 +846,13 @@
 
           <div class="terminal-card">
             <div class="terminal-code">
-              <span class="prompt">$</span> git clone https://github.com/flux-audio/flux.git<br />
-              <span class="prompt">$</span> cd flux && make && ./flux
+              <span class="prompt">$</span> git clone https://github.com/jeelnadaa/flux.git<br />
+              <span class="prompt">$</span> cd flux && make && ./bin/flux
             </div>
             <button
               class="btn-copy"
               type="button"
-              data-copy="git clone https://github.com/flux-audio/flux.git && cd flux && make && ./flux"
+              data-copy="git clone https://github.com/jeelnadaa/flux.git && cd flux && make && ./bin/flux"
             >
               Copy Commands
             </button>
@@ -905,8 +941,8 @@
           <span>FLUX NATIVE AUDIO EDITOR · V1.0.0</span>
           <nav aria-label="Footer">
             <a href="landing.html">Landing</a>
-            <a href="https://github.com/flux-audio/flux" target="_blank" rel="noopener">GitHub</a>
-            <a href="https://github.com/flux-audio/flux/releases" target="_blank" rel="noopener"
+            <a href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://github.com/jeelnadaa/flux/releases" target="_blank" rel="noopener"
               >Releases</a
             >
           </nav>

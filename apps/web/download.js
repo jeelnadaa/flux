@@ -309,15 +309,16 @@ void main(){
     { passive: true },
   );
 
-  /* -------- Lenis Smooth Scroll & Ground Color Shift -------- */
-  if (hasG) {
-    if (window.Lenis && !calm) {
-      const lenis = new Lenis({ lerp: 0.09, smoothWheel: true, wheelMultiplier: 0.95 });
+  /* -------- Lenis Smooth Scroll & GSAP ScrollTrigger Animations -------- */
+  if (hasG && !calm) {
+    if (window.Lenis) {
+      const lenis = new Lenis({ lerp: 0.08, smoothWheel: true, wheelMultiplier: 0.95 });
       lenis.on("scroll", ScrollTrigger.update);
       gsap.ticker.add((t) => lenis.raf(t * 1000));
       gsap.ticker.lagSmoothing(0);
     }
 
+    // Ground color transitions
     const secs = $$("[data-g]");
     const ground = (s) =>
       gsap.to(document.body, {
@@ -338,22 +339,231 @@ void main(){
       }),
     );
 
-    // Hero entrance animations
-    gsap.from(".hero .c", {
-      y: 60,
+    // 1. Hero Entrance Animation
+    gsap.from(".hero .ln.up .c", {
+      y: 80,
       opacity: 0,
       stagger: 0.03,
-      duration: 1,
+      duration: 1.1,
       ease: "power4.out",
+      delay: 0.1,
     });
-    gsap.from("#seam", { scaleX: 0, duration: 1.2, ease: "expo.inOut" });
-    gsap.from(".herofoot > *", {
-      y: 30,
+    gsap.from(".hero .ln.dn .c", {
+      y: -60,
       opacity: 0,
-      duration: 0.9,
+      stagger: 0.035,
+      duration: 1.1,
+      ease: "power4.out",
+      delay: 0.2,
+    });
+    gsap.from("#seam", { scaleX: 0, duration: 1.3, ease: "expo.inOut", delay: 0.15 });
+    gsap.from(".herofoot > *", {
+      y: 35,
+      opacity: 0,
+      duration: 1,
       ease: "expo.out",
-      stagger: 0.1,
-      delay: 0.3,
+      stagger: 0.12,
+      delay: 0.45,
+    });
+
+    // 2. Hero Scroll Parallax Split
+    const heroEl = $("#hero");
+    if (heroEl) {
+      gsap.to(".hero .ln.up", {
+        yPercent: -40,
+        ease: "none",
+        scrollTrigger: { trigger: heroEl, start: "top top", end: "bottom top", scrub: true },
+      });
+      gsap.to(".hero .ln.dn", {
+        yPercent: 40,
+        ease: "none",
+        scrollTrigger: { trigger: heroEl, start: "top top", end: "bottom top", scrub: true },
+      });
+      gsap.to(heroState, {
+        s: 1,
+        ease: "none",
+        scrollTrigger: { trigger: heroEl, start: "top top", end: "bottom top", scrub: true },
+      });
+      gsap.to("#seam", {
+        scaleX: 0.15,
+        opacity: 0,
+        ease: "none",
+        scrollTrigger: { trigger: heroEl, start: "top top", end: "65% top", scrub: true },
+      });
+      gsap.to(".herofoot", {
+        y: -70,
+        opacity: 0,
+        ease: "none",
+        scrollTrigger: { trigger: heroEl, start: "top top", end: "55% top", scrub: true },
+      });
+    }
+
+    // 3. Platform Chapter Watermarks (Deep Parallax Drift) & Staggered Reveal
+    $$(".chapter").forEach((ch) => {
+      const wm = $(".watermark", ch);
+      if (wm) {
+        gsap.fromTo(
+          wm,
+          { yPercent: 25, scale: 0.92 },
+          {
+            yPercent: -25,
+            scale: 1.08,
+            ease: "none",
+            scrollTrigger: {
+              trigger: ch,
+              start: "top bottom",
+              end: "bottom top",
+              scrub: true,
+            },
+          },
+        );
+      }
+
+      const eyebrow = $(".eyebrow", ch);
+      const title = $(".big", ch);
+      const pitch = $(".chapter-pitch", ch);
+      const pills = $$(".spec-pill", ch);
+      const action = $(".action-row", ch);
+      const terminal = $(".terminal-card", ch);
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: ch,
+          start: "top 72%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      if (eyebrow) tl.from(eyebrow, { y: -20, opacity: 0, duration: 0.6, ease: "power3.out" }, 0);
+      if (title) tl.from(title, { y: 45, opacity: 0, duration: 0.85, ease: "power4.out" }, 0.08);
+      if (pitch) tl.from(pitch, { y: 30, opacity: 0, duration: 0.8, ease: "power3.out" }, 0.18);
+      if (pills.length) {
+        tl.from(
+          pills,
+          {
+            scale: 0.75,
+            y: 18,
+            opacity: 0,
+            duration: 0.6,
+            stagger: 0.05,
+            ease: "back.out(1.8)",
+          },
+          0.26,
+        );
+      }
+      if (action)
+        tl.from(
+          action,
+          { scale: 0.92, y: 25, opacity: 0, duration: 0.7, ease: "back.out(1.4)" },
+          0.36,
+        );
+      if (terminal)
+        tl.from(terminal, { y: 35, opacity: 0, duration: 0.75, ease: "power2.out" }, 0.44);
+    });
+
+    // 4. Engineering Specs Section (#spec)
+    const specEl = $("#spec");
+    if (specEl) {
+      gsap.from("#spec .huge", {
+        scaleY: 0.6,
+        letterSpacing: "-0.08em",
+        opacity: 0.25,
+        ease: "none",
+        scrollTrigger: {
+          trigger: specEl,
+          start: "top 88%",
+          end: "top 30%",
+          scrub: true,
+        },
+      });
+      gsap.from(".spec", {
+        y: 50,
+        opacity: 0,
+        stagger: 0.08,
+        duration: 0.9,
+        ease: "expo.out",
+        scrollTrigger: {
+          trigger: ".specs",
+          start: "top 82%",
+          toggleActions: "play none none reverse",
+        },
+      });
+    }
+
+    // 5. Bigmark Footer Reveal
+    const bigmark = $("#bigmark");
+    if (bigmark) {
+      gsap.from(".say", {
+        y: 40,
+        opacity: 0,
+        duration: 0.9,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: ".end",
+          start: "top 75%",
+          toggleActions: "play none none reverse",
+        },
+      });
+      gsap.from("#bigmark .c", {
+        scaleX: 0.5,
+        opacity: 0,
+        stagger: 0.05,
+        duration: 1,
+        ease: "back.out(1.6)",
+        scrollTrigger: {
+          trigger: bigmark,
+          start: "top 90%",
+          toggleActions: "play none none reverse",
+        },
+      });
+      gsap.from("#bigmark .bar", {
+        scaleY: 0,
+        duration: 0.9,
+        ease: "expo.out",
+        scrollTrigger: {
+          trigger: bigmark,
+          start: "top 90%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      // Interactive Bigmark letter tilt on mouse move
+      bigmark.addEventListener("mousemove", (e) => {
+        const rect = bigmark.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) / rect.width - 0.5;
+        $$("#bigmark .c").forEach((c, idx) => {
+          const factor = (idx - 1.5) * 12;
+          c.style.transform = `rotate(${mx * factor}deg) translateY(${Math.abs(mx) * -6}px)`;
+        });
+      });
+      bigmark.addEventListener("mouseleave", () => {
+        $$("#bigmark .c").forEach((c) => {
+          c.style.transform = "";
+        });
+      });
+    }
+
+    // 6. Magnetic Mouse Tracking on Hero Download Buttons
+    $$(".dl-hero-btn").forEach((btn) => {
+      btn.addEventListener("mousemove", (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - (rect.left + rect.width / 2);
+        const y = e.clientY - (rect.top + rect.height / 2);
+        gsap.to(btn, {
+          x: x * 0.25,
+          y: y * 0.25,
+          duration: 0.35,
+          ease: "power2.out",
+        });
+      });
+      btn.addEventListener("mouseleave", () => {
+        gsap.to(btn, {
+          x: 0,
+          y: 0,
+          duration: 0.7,
+          ease: "elastic.out(1, 0.35)",
+        });
+      });
     });
   }
 

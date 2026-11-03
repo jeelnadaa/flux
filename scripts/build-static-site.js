@@ -78,10 +78,20 @@ function buildStaticSite() {
 `;
   fs.writeFileSync(path.join(OUT_DIR, "_headers"), headersContent);
 
+  // 6. Add Cloudflare _redirects file for clean URL handling
+  const redirectsContent = `/download     /download.html    200
+/downloads    /download.html    200
+/tour         /landing.html     200
+/get          /download.html    302
+`;
+  fs.writeFileSync(path.join(OUT_DIR, "_redirects"), redirectsContent);
+
   console.log("[✓] Static site built successfully in dist-static/");
   console.log(`    - index.html (Showcase Landing)`);
   console.log(`    - download.html (Windows / macOS / Linux downloads)`);
-  console.log(`    - Styles, Fonts, Icons, and _headers (Zero web editor assets included)`);
+  console.log(
+    `    - Styles, Fonts, Icons, _headers, and _redirects (Zero web editor assets included)`,
+  );
 }
 
 buildStaticSite();
