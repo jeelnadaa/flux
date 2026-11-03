@@ -9,6 +9,8 @@ extend-exclude = [
 ]
 
 [default.extend-words]
+ANE = "ANE"
+ane = "ane"
 sstem = "sstem"
 nd = "nd"
 ACN = "ACN"

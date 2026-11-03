@@ -1022,61 +1022,85 @@ These apply from the first UI commit (axe-core runs in E2E from Phase 2, strings
 
 ---
 
-## Phase 10 — Windows Portable App (on request only)
+## Phase 10 — Native Desktop Ecosystem (Windows, macOS & Linux)
 
-> **Do not start this phase until the user explicitly asks,** after Phase 9. Until then, do not create `apps/desktop`, add Tauri, or spend time on Windows packaging. The only preparation allowed earlier is keeping the Rust engine compiling natively and keeping `EngineHost` clean.
+> **Updated per User Direction (2026-11-03):** Transition Flux to a **100% native desktop application suite** across Windows, macOS, and Linux. The web version of the editor is retired; the web domain (`flux.solarquack.in`) serves strictly as the product showcase landing page and download portal. The editor runs natively with zero web-view/browser-wrapper overhead, utilizing operating system audio APIs and hardware acceleration directly.
+>
+> **Pending User Confirmation:** This phase will begin execution once the user reviews and confirms this updated specification.
 
-**Goal:** One zip. Unpack it anywhere, double-click `Flux.exe`, and it works on a clean Windows machine with nothing else installed.
+**Goal:** Standalone, self-contained native desktop applications. For Windows and macOS: unpack a single zip and run the app with all dependencies, codecs, and runtimes bundled. For Linux: compile natively from source code via a single `make` command.
 
-### 10.1 The package
+### 10.1 The Desktop Packages
 
+#### Windows Portable Package
 ```
 Flux-<version>-win-x64.zip
 └── Flux/
-    ├── Flux.exe               (Tauri app, C runtime statically linked)
-    ├── *.dll                  (every required DLL, e.g. ONNX Runtime, DirectML, LGPL codec libraries)
-    ├── tools/ffmpeg.exe       (LGPL build; any other helper executables go here too)
-    ├── webview2/              (WebView2 fixed-version runtime)
-    ├── data/                  (models and assets shipped with the app)
-    ├── licenses/              (notices and LGPL source offers for everything above)
+    ├── Flux.exe               (Native OS application, static C runtime)
+    ├── *.dll                  (DirectML, ONNX Runtime, native audio codecs)
+    ├── tools/ffmpeg.exe       (LGPL build bundled locally)
+    ├── data/                  (bundled models and assets)
+    ├── licenses/              (notices and source offers)
+    ├── portable.flag          (portable mode indicator)
     └── README.txt
 ```
 
-Rules:
+#### macOS Universal Package
+```
+Flux-<version>-macos-universal.zip
+└── Flux.app/
+    ├── Contents/
+    │   ├── MacOS/Flux         (Universal Mach-O binary: arm64 + x86_64)
+    │   ├── Frameworks/        (Native dylibs & Metal shaders)
+    │   ├── Resources/         (Icons, fonts, audio assets)
+    │   └── Info.plist
+    ├── licenses/
+    └── README.txt
+```
 
-- **Nothing to install.** No installer, administrator rights, Visual C++ redistributable, .NET, separately installed WebView2, or FFmpeg on `PATH`. If `Flux.exe` needs a file, that file is in the zip.
-- **Self-contained paths.** Find DLLs and tools relative to `Flux.exe`, never through `PATH` or the registry. Search only the app's own folder for DLLs, to prevent DLL hijacking.
-- **Portable behavior.** No registry writes, and no system file associations (the user can open files by dragging them onto the window or the exe). Projects go where the user saves them. Settings and caches go in `%LOCALAPPDATA%\Flux`, or next to the exe when a `portable.flag` file is present.
-- **Offline first.** Everything except AI model downloads and opt-in cloud features works with no internet. Keep the base zip small and offer to download models on first use; ask the user before shipping a large "all models" zip.
-- **Licences.** LGPL libraries stay as separate replaceable DLLs or executables. Check every bundled component against §4, including the ASIO SDK terms.
-- **Updates.** A new version is a new zip. No auto-updater unless the user asks.
-- **Signing.** An unsigned exe triggers a Windows SmartScreen warning. Certificates cost money, so ask the user first and document the warning if unsigned.
+#### Linux Native Source Build (Makefile)
+```bash
+git clone https://github.com/solarquack/flux.git
+cd flux
+make
+./bin/flux
+sudo make install # Optional: installs to /usr/local/bin with desktop entry
+```
 
-### 10.2 Features
+### 10.2 Engineering Rules & Native Capabilities
 
-- Native engine through `EngineHost` with `cpal`: WASAPI by default, optional ASIO; device selection, buffer size, hot-plug.
-- Native file access: projects as real folders, no browser storage limits, large file streaming.
-- Native ONNX Runtime with DirectML and CUDA, falling back to CPU.
-- Bundled encoders and FFmpeg for the formats browsers cannot handle; Media Foundation for AAC.
-- Identical UI to the web app, from the same code.
+- **Zero Web Packaging Overhead:** The application is native to the host operating system, binding directly to native windowing, input events, and hardware audio subsystems rather than a browser sandbox.
+- **Self-Contained Zips (Windows & macOS):** No external installer, no administrator rights, no system dependencies on `PATH`. Everything needed to run is located relative to the application binary.
+- **Native Audio Subsystems:**
+  - **Windows:** WASAPI exclusive & shared mode via `cpal`, optional low-latency ASIO driver support; device hot-plug.
+  - **macOS:** CoreAudio low-latency HAL stream integration; automatic aggregation and Bluetooth/AirPlay routing.
+  - **Linux:** Native PipeWire, JACK, and ALSA drivers with real-time thread scheduling (`SCHED_FIFO`).
+- **Native Hardware ML Acceleration:**
+  - **Windows:** DirectML GPU acceleration and CUDA support with CPU fallback.
+  - **macOS:** Apple Neural Engine (ANE) and Metal Performance Shaders (MPS).
+  - **Linux:** OpenVINO and AVX-512 / AVX2 SIMD CPU kernels.
+- **Native File Access & Durability:** Real operating system folders, file descriptor streaming, no browser storage quotas, zero cloud data transfer.
+- **GitHub Releases Automation:** `.github/workflows/release.yml` automatically compiles, packages, and publishes the Windows and macOS ZIPs to GitHub Releases on tag push.
 
 ### Tests (Phase 10)
 
 **Automated**
-- Native engine passes every §5.2 invariant, and native vs WASM output nulls within the documented tolerance on the golden set.
-- Build script produces the zip from one command (`just package-windows`); dependency audit fails the build if any non-system DLL imported by any bundled binary is missing from the zip.
-- E2E suite passes against the packaged app, launched from the unpacked zip.
-- Launch test with `PATH` emptied: FFmpeg and all DLLs are still found.
-- Chaos and project compatibility: projects open identically in the web app and the Windows app.
+- Native DSP engine passes every §5.2 universal invariant on host operating systems.
+- Build scripts produce standalone ZIPs (`just package-windows`, `just package-macos`, `make`).
+- Dependency audit verifies that zero unbundled dynamic libraries are required.
+- Launch test with sanitized empty `PATH`: all tools and codecs are located relative to the executable.
 
-**Real device [R]**
-- **Clean-machine test:** on a fresh Windows 10 and Windows 11 VM or Windows Sandbox (no Visual C++ redistributable, no developer tools, no separately installed WebView2): unzip, run, import, edit, play, export to every format, with no missing-DLL errors.
-- Works from a path with spaces and non-ASCII characters, a USB drive, and a standard (non-admin) user account.
-- No registry changes and no files written outside the documented locations, verified by comparing before and after snapshots.
-- Latency ≤ 40 ms on reference devices.
+**Real Device [R]**
+- **Clean-machine test (Windows):** Fresh Windows 10 & 11 VM (no VC++ redistributable): unzip, double-click `Flux.exe`, verify edit and export.
+- **Clean-machine test (macOS):** Fresh macOS 13–15 machine: unzip, double-click `Flux.app`, verify CoreAudio and Metal rendering.
+- **Clean-machine test (Linux):** Fresh Ubuntu/Arch/Fedora install: run `make`, verify binary runs and binds to PipeWire/ALSA.
 
-### Exit criteria
-- The zip passes the clean-machine test, the dependency audit is green, every bundled licence is documented, and the user has approved the release.
+### Exit Criteria
+- Windows portable zip verified on clean Windows VM.
+- macOS universal zip verified on Apple Silicon and Intel machines.
+- Linux `make` compiles cleanly from fresh git checkout.
+- GitHub Actions release pipeline verified.
+- User confirmation received.
 
 ---
 

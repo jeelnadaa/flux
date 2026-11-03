@@ -1,6 +1,8 @@
 # Build outputs
 target/
 dist/
+dist-static/
+brag-output*/
 build/
 coverage/
 .vite/

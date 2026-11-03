@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --build && node scripts/bundle.js",
+    "build:static": "node scripts/build-static-site.js",
     "typecheck": "tsc --build",
     "test:unit": "node --test packages/app-core/dist/timeline/__tests__/*.test.js packages/app-core/dist/editing/__tests__/*.test.js packages/app-core/dist/project/__tests__/*.test.js packages/app-core/dist/input/__tests__/*.test.js packages/app-core/dist/effects/__tests__/*.test.js packages/app-core/dist/tempo/__tests__/*.test.js packages/app-core/dist/restoration/__tests__/*.test.js packages/app-core/dist/utility/__tests__/*.test.js packages/app-core/dist/spatial/__tests__/*.test.js packages/app-core/dist/creative/__tests__/*.test.js packages/app-core/dist/ai/__tests__/*.test.js packages/app-core/dist/workflow/__tests__/*.test.js packages/app-core/dist/hardening/__tests__/*.test.js packages/ui/dist/__tests__/*.test.js",
     "lint": "eslint .",

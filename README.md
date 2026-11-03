@@ -67,13 +67,50 @@ The full list, with quality targets for each feature, is in [PLAN.md](PLAN.md).
 - **Simple or deep.** Each tool has a one-slider surface and a full parameter panel.
 - **Measured quality.** Each feature has objective targets enforced by automated tests.
 
-## Platforms
+## Platforms & Installation
 
-Flux is a **web app**, installable as a PWA and usable offline, in any modern browser. A **portable Windows app** is planned for later: one zip containing `Flux.exe` and every DLL and tool it needs, with nothing to install.
+Flux is a **native desktop application** for Windows, macOS, and Linux. The web site (`flux.solarquack.in`) serves as the product showcase and download portal.
+
+### 1. Windows (x64 Portable)
+1. Download `Flux-v<version>-win-x64.zip` from [GitHub Releases](https://github.com/solarquack/flux/releases) or the [Download Page](https://flux.solarquack.in/download.html).
+2. Unpack the ZIP archive to any directory (e.g. `C:\Flux` or a USB drive).
+3. Double-click **`Flux.exe`**.
+- **No installer required:** Every dependency, DLL, DirectML ONNX Runtime, and FFmpeg binary is bundled inside.
+- **Portable mode:** Settings and project scratch buffers remain inside the app folder when `portable.flag` is present.
+
+### 2. macOS (Apple Silicon & Intel Universal)
+1. Download `Flux-v<version>-macos-universal.zip` from [GitHub Releases](https://github.com/solarquack/flux/releases) or the [Download Page](https://flux.solarquack.in/download.html).
+2. Unpack the ZIP to reveal **`Flux.app`**.
+3. Drag `Flux.app` to your `/Applications` folder (or run directly).
+4. *First run note:* If macOS displays a Gatekeeper prompt for unsigned developer builds, right-click `Flux.app` and select **Open**, or run:
+   ```bash
+   xattr -cr /Applications/Flux.app
+   ```
+
+### 3. Linux (Build from Source via Makefile)
+Flux provides a single-command `Makefile` for compiling natively on any modern Linux distribution (Ubuntu, Debian, Fedora, Arch, etc.):
+
+```bash
+# 1. Clone repository
+git clone https://github.com/solarquack/flux.git
+cd flux
+
+# 2. Build native release executable
+make
+
+# 3. Launch Flux
+./bin/flux
+
+# 4. (Optional) Install system-wide to /usr/local/bin with desktop entry
+sudo make install
+```
+- **Requirements:** Standard Rust toolchain (`cargo`, `rustc`), `make`, and standard audio development headers (`libasound2-dev` for ALSA, `libpipewire-0.3-dev` for PipeWire, or `libjack-jackd2-dev` for JACK).
+
+---
 
 ## Tech
 
-Rust DSP engine compiled to WebAssembly, React + TypeScript UI, ONNX Runtime for on-device AI.
+Native Rust DSP engine (`flux-dsp`, `flux-engine`), DirectML/Metal/OpenVINO hardware acceleration (`flux-ml`), and low-latency native audio drivers (WASAPI, CoreAudio, PipeWire, ALSA, JACK).
 
 ## Running Flux
 

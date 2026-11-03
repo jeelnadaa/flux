@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Download Flux — Native Audio Editor for Windows, macOS & Linux</title>
+    <link rel="stylesheet" href="fonts.css" />
+    <link
+      rel="preload"
+      href="fonts/bricolage-grotesque-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg" />
+    <style>
+      :root {
+        --cobalt: #1621e0;
+        --ink: #090a12;
+        --bone: #ece9de;
+        --ember: #ff5a1c;
+        --plum: #25103d;
+        --paper: #f6f4ec;
+        --ground: var(--ink);
+        --figure: var(--paper);
+        --gl: max(clamp(16px, 4vw, 64px), env(safe-area-inset-left, 0px));
+        --gr: max(clamp(16px, 4vw, 64px), env(safe-area-inset-right, 0px));
+        --spring: cubic-bezier(0.16, 1, 0.3, 1);
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        background: var(--ink);
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--figure);
+        font-family: var(--sans);
+        font-size: 18px;
+        line-height: 1.45;
+        font-weight: 500;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .mono {
+        font-family: var(--mono);
+        font-size: 13px;
+        letter-spacing: 0.02em;
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+      }
+      .wrap {
+        padding-left: var(--gl);
+        padding-right: var(--gr);
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      /* nav */
+      .nav {
+        position: fixed;
+        inset: 0 0 auto;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: calc(18px + env(safe-area-inset-top, 0px)) var(--gr) 18px var(--gl);
+        background: rgba(9, 10, 18, 0.85);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(246, 244, 236, 0.08);
+      }
+      .wm {
+        display: inline-flex;
+        align-items: flex-end;
+        font-family: var(--brand);
+        font-weight: 900;
+        font-size: 27px;
+        line-height: 0.8;
+        letter-spacing: -0.045em;
+        color: inherit;
+        height: 26px;
+      }
+      .wm i {
+        display: inline-block;
+        width: 0.15em;
+        height: 0.74em;
+        background: currentColor;
+        margin: 0 0.06em 0 0.05em;
+        transform-origin: bottom;
+      }
+      .navr {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 44px;
+        padding: 0 20px;
+        border-radius: 999px;
+        font-family: var(--sans);
+        font-size: 15px;
+        font-weight: 600;
+        border: 1px solid rgba(246, 244, 236, 0.2);
+        background: rgba(246, 244, 236, 0.06);
+        color: var(--figure);
+        cursor: pointer;
+        transition: all 0.2s var(--spring);
+      }
+      .btn:hover {
+        background: rgba(246, 244, 236, 0.15);
+        border-color: rgba(246, 244, 236, 0.4);
+        transform: translateY(-1px);
+      }
+      .btn.solid {
+        background: var(--paper);
+        color: var(--ink);
+        border-color: var(--paper);
+      }
+      .btn.solid:hover {
+        background: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px -6px rgba(255, 255, 255, 0.25);
+      }
+      .btn.ember {
+        background: var(--ember);
+        color: #fff;
+        border-color: var(--ember);
+      }
+      .btn.ember:hover {
+        background: #ff6e36;
+        box-shadow: 0 10px 24px -6px rgba(255, 90, 28, 0.4);
+      }
+
+      /* Hero */
+      .hero {
+        padding: 180px var(--gl) 80px;
+        text-align: center;
+        position: relative;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(255, 90, 28, 0.15);
+        border: 1px solid rgba(255, 90, 28, 0.3);
+        color: var(--ember);
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 24px;
+      }
+      .badge span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--ember);
+        box-shadow: 0 0 8px var(--ember);
+      }
+      h1 {
+        font-size: clamp(48px, 8vw, 96px);
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+        margin: 0 0 24px;
+        font-weight: 800;
+      }
+      h1 em {
+        font-style: italic;
+        color: var(--ember);
+      }
+      .lead {
+        font-size: clamp(18px, 2.2vw, 24px);
+        line-height: 1.45;
+        color: rgba(246, 244, 236, 0.7);
+        max-width: 760px;
+        margin: 0 auto 60px;
+      }
+
+      /* Download Grid */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 24px;
+        margin-bottom: 100px;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(246, 244, 236, 0.1);
+        border-radius: 28px;
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: all 0.3s var(--spring);
+        position: relative;
+        overflow: hidden;
+      }
+      .card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(246, 244, 236, 0.25);
+        transform: translateY(-4px);
+      }
+      .card.featured {
+        border-color: rgba(255, 90, 28, 0.4);
+        background:
+          radial-gradient(circle at top right, rgba(255, 90, 28, 0.1), transparent 60%),
+          rgba(255, 255, 255, 0.03);
+      }
+      .card-top {
+        margin-bottom: 32px;
+      }
+      .os-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .os-title {
+        font-size: 32px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .tag {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: rgba(246, 244, 236, 0.1);
+        color: rgba(246, 244, 236, 0.8);
+      }
+      .card p {
+        color: rgba(246, 244, 236, 0.7);
+        font-size: 16px;
+        line-height: 1.5;
+        margin: 0 0 24px;
+      }
+      .specs-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .specs-list li {
+        font-size: 14px;
+        color: rgba(246, 244, 236, 0.85);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .specs-list li::before {
+        content: "✓";
+        color: var(--ember);
+        font-weight: bold;
+      }
+
+      /* Code block for Linux */
+      .code-box {
+        background: #000;
+        border: 1px solid rgba(256, 256, 256, 0.12);
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.6;
+        color: #79ffe1;
+        overflow-x: auto;
+      }
+      .code-box span.comment {
+        color: #888;
+      }
+
+      /* Features section */
+      .features {
+        padding: 80px 0;
+        border-top: 1px solid rgba(246, 244, 236, 0.08);
+      }
+      .features h2 {
+        font-size: clamp(32px, 5vw, 56px);
+        letter-spacing: -0.03em;
+        margin: 0 0 48px;
+        text-align: center;
+      }
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 32px;
+      }
+      .feat-item h3 {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0 0 8px;
+        color: var(--paper);
+      }
+      .feat-item p {
+        font-size: 15px;
+        color: rgba(246, 244, 236, 0.65);
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      /* Footer */
+      footer {
+        padding: 60px var(--gl);
+        border-top: 1px solid rgba(246, 244, 236, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: rgba(246, 244, 236, 0.5);
+      }
+      footer a:hover {
+        color: var(--paper);
+      }
+      .foot-links {
+        display: flex;
+        gap: 20px;
+      }
+
+      @media (max-width: 768px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .hero {
+          padding-top: 130px;
+        }
+        footer {
+          flex-direction: column;
+          gap: 20px;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="wm" href="landing.html" aria-label="Flux">f<i></i>ux</a>
+      <div class="navr">
+        <a class="btn" href="https://github.com/solarquack/flux" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+            />
+          </svg>
+          View Source
+        </a>
+        <a class="btn" href="landing.html">Overview</a>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <div class="badge"><span></span> Native OS Builds · Release v1.0.0</div>
+        <h1>Get Flux. <em>Zero installation.</em></h1>
+        <p class="lead">
+          Download the standalone package for your operating system. Every engine component, codec,
+          and DSP primitive is included inside a single self-contained zip.
+        </p>
+
+        <div class="grid">
+          <!-- Windows Card -->
+          <div class="card featured">
+            <div class="card-top">
+              <div class="os-header">
+                <h2 class="os-title">Windows</h2>
+                <span class="tag">x64 Portable</span>
+              </div>
+              <p>
+                Self-contained portable ZIP. Unpack anywhere, double-click
+                <strong>Flux.exe</strong>, and start editing. No administrator privileges, no VC++
+                redistributable, and no registry pollution.
+              </p>
+              <ul class="specs-list">
+                <li>Native WASAPI exclusive & ASIO pro driver support</li>
+                <li>DirectML GPU hardware acceleration</li>
+                <li>Bundled lossless FLAC, MP3, Opus & FFmpeg encoders</li>
+                <li>Windows 10 & Windows 11 64-bit</li>
+              </ul>
+            </div>
+            <div>
+              <a
+                class="btn ember"
+                style="width: 100%; height: 52px; font-size: 16px"
+                href="https://github.com/solarquack/flux/releases/latest/download/Flux-v1.0.0-win-x64.zip"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download for Windows (.zip)
+              </a>
+              <div
+                class="mono"
+                style="
+                  margin-top: 12px;
+                  font-size: 11px;
+                  color: rgba(246, 244, 236, 0.4);
+                  text-align: center;
+                "
+              >
+                SHA-256: 4fa9...8c21 · ~48 MB
+              </div>
+            </div>
+          </div>
+
+          <!-- macOS Card -->
+          <div class="card">
+            <div class="card-top">
+              <div class="os-header">
+                <h2 class="os-title">macOS</h2>
+                <span class="tag">Universal Binary</span>
+              </div>
+              <p>
+                Native Apple Silicon & Intel application bundle. Drag <strong>Flux.app</strong> to
+                your Applications folder or launch directly from the unzipped volume.
+              </p>
+              <ul class="specs-list">
+                <li>CoreAudio low-latency HAL stream integration</li>
+                <li>Apple Neural Engine & Metal acceleration</li>
+                <li>Native menu bar & keyboard shortcut dispatch</li>
+                <li>macOS 12.0 Monterey through macOS 15+ Sequoia</li>
+              </ul>
+            </div>
+            <div>
+              <a
+                class="btn solid"
+                style="width: 100%; height: 52px; font-size: 16px"
+                href="https://github.com/solarquack/flux/releases/latest/download/Flux-v1.0.0-macos-universal.zip"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download for macOS (.zip)
+              </a>
+              <div
+                class="mono"
+                style="
+                  margin-top: 12px;
+                  font-size: 11px;
+                  color: rgba(246, 244, 236, 0.4);
+                  text-align: center;
+                "
+              >
+                Universal (M1/M2/M3/M4 & Intel x86_64) · ~52 MB
+              </div>
+            </div>
+          </div>
+
+          <!-- Linux Card -->
+          <div class="card">
+            <div class="card-top">
+              <div class="os-header">
+                <h2 class="os-title">Linux</h2>
+                <span class="tag">Source & Makefile</span>
+              </div>
+              <p>
+                Build directly from source with a single command. Statically links the Rust audio
+                engine with native Linux audio backends.
+              </p>
+              <div class="code-box">
+                <span class="comment"># Clone and build native binary</span><br />
+                git clone https://github.com/solarquack/flux.git<br />
+                cd flux<br />
+                make<br />
+                <span class="comment"># Run native executable</span><br />
+                ./bin/flux
+              </div>
+              <ul class="specs-list">
+                <li>PipeWire, JACK & ALSA native audio drivers</li>
+                <li>Pure native Rust DSP engine with AVX2 / SSE4.1</li>
+                <li>Zero external runtime dependencies</li>
+              </ul>
+            </div>
+            <div>
+              <a
+                class="btn"
+                style="width: 100%; height: 52px; font-size: 16px"
+                href="https://github.com/solarquack/flux"
+                target="_blank"
+                rel="noopener"
+              >
+                View Repository on GitHub
+              </a>
+              <div
+                class="mono"
+                style="
+                  margin-top: 12px;
+                  font-size: 11px;
+                  color: rgba(246, 244, 236, 0.4);
+                  text-align: center;
+                "
+              >
+                Compatible with Ubuntu, Fedora, Arch, Debian
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="features">
+        <h2>Engineering Principles</h2>
+        <div class="features-grid">
+          <div class="feat-item">
+            <h3>100% Native Architecture</h3>
+            <p>
+              Every audio frame is calculated by native C++/Rust DSP kernels running directly on the
+              hardware with zero browser sandbox overhead.
+            </p>
+          </div>
+          <div class="feat-item">
+            <h3>Air-Gapped Privacy</h3>
+            <p>
+              Zero telemetry, no forced sign-ins, and no tracking. Your audio never leaves your
+              machine unless you explicitly opt in.
+            </p>
+          </div>
+          <div class="feat-item">
+            <h3>Bit-Exact Reliability</h3>
+            <p>
+              What you hear is bit-for-bit what you export. Undo any edit at any time with an
+              immutable, append-only project journal.
+            </p>
+          </div>
+          <div class="feat-item">
+            <h3>Binaural 3D & 8D Sound Stage</h3>
+            <p>
+              Spherical head acoustic simulation, custom room resonance modeling, and
+              multi-dimensional motion path generation.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mono">
+      <span>Flux Audio Editor · Open Source</span>
+      <div class="foot-links">
+        <a href="landing.html">Overview</a>
+        <a href="https://github.com/solarquack/flux">GitHub</a>
+        <a href="https://github.com/solarquack/flux/releases">Releases</a>
+      </div>
+    </footer>
+  </body>
+</html>

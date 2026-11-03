@@ -25,7 +25,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 7 | Advanced AI | Agent-complete | 11 / 11 |
 | 8 | Pro workflow & polish | Agent-complete | 15 / 15 |
 | 9 | Hardening & launch (web) | Agent-complete | 10 / 10 |
-| 10 | Windows portable app | **On request only.** Do not start until the user asks | 0 / 9 |
+| 10 | Native Desktop (Win/Mac/Linux) | Planned (Awaiting confirmation) | 0 / 10 |
 
 Statuses: Not started → In progress → Agent-complete (only human, data or device gates remain) → Released.
 
@@ -327,16 +327,17 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P9.4-c Release tooling: staged rollout, kill switches, rollback rehearsal
 - [x] P9.4-d Launch readiness review against PLAN.md Appendix C; list everything still queued
 
-## Phase 10 — Windows portable app
+## Phase 10 — Native Desktop Ecosystem (Windows, macOS & Linux)
 
-**On request only. Do not start until the user explicitly asks, after Phase 9.** PLAN.md Phase 10 has the full requirements.
+**Specification updated per user instruction. Execution awaits user confirmation.** Retiring web editor version; building native OS desktop applications (Windows portable zip, macOS universal zip, Linux Makefile) with direct OS audio and GPU acceleration.
 
-- [ ] P10.1-a Tauri shell, same UI, static C runtime, WebView2 fixed-version runtime in the package
-- [ ] P10.1-b Native `EngineHost` with `cpal`: WASAPI, optional ASIO, device selection; native vs WASM null test
-- [ ] P10.1-c Native file access, real project folders, portable settings location
-- [ ] P10.1-d Native ONNX Runtime with DirectML, CUDA and CPU fallback
-- [ ] P10.1-e Bundled FFmpeg and encoders, located relative to the exe
-- [ ] P10.2-a `just package-windows` builds `Flux-<version>-win-x64.zip`
-- [ ] P10.2-b Dependency audit fails the build on any missing DLL; launch test with empty `PATH`
-- [ ] P10.2-c Licences folder and LGPL offers for every bundled component
-- [ ] P10.2-d Clean-machine test on Windows 10 and 11 (queue as [R] if no VM is available)
+- [ ] P10.1-a Native desktop architecture: Windows native executable, macOS universal bundle, Linux Makefile
+- [ ] P10.1-b Native audio device drivers: WASAPI/ASIO (Windows), CoreAudio (macOS), PipeWire/ALSA/JACK (Linux)
+- [ ] P10.1-c Native file access, real project folders, air-gapped filesystem persistence with no storage quota
+- [ ] P10.1-d Native hardware ML acceleration: DirectML (Windows), Metal/ANE (macOS), OpenVINO/CPU (Linux)
+- [ ] P10.1-e Bundled FFmpeg, media decoders, and audio encoders located relative to binary
+- [ ] P10.2-a Standalone packaging: Windows self-contained zip (`Flux-win-x64.zip`) with zero dependencies to install
+- [ ] P10.2-b Standalone packaging: macOS self-contained universal zip (`Flux-macos-universal.zip`)
+- [ ] P10.2-c Linux source build system: root `Makefile` supporting `make`, `make test`, and `make install`
+- [ ] P10.2-d GitHub Actions release pipeline (`.github/workflows/release.yml`) publishing native zips on release push
+- [ ] P10.2-e Clean-machine verification across Windows 10/11, macOS 13-15, and Linux distributions
