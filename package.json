@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc --build && node scripts/bundle.js",
     "typecheck": "tsc --build",
-    "test:unit": "node --test packages/app-core/dist/timeline/__tests__/*.test.js packages/app-core/dist/editing/__tests__/*.test.js packages/app-core/dist/project/__tests__/*.test.js packages/app-core/dist/input/__tests__/*.test.js packages/app-core/dist/effects/__tests__/*.test.js packages/app-core/dist/tempo/__tests__/*.test.js packages/app-core/dist/restoration/__tests__/*.test.js",
+    "test:unit": "node --test packages/app-core/dist/timeline/__tests__/*.test.js packages/app-core/dist/editing/__tests__/*.test.js packages/app-core/dist/project/__tests__/*.test.js packages/app-core/dist/input/__tests__/*.test.js packages/app-core/dist/effects/__tests__/*.test.js packages/app-core/dist/tempo/__tests__/*.test.js packages/app-core/dist/restoration/__tests__/*.test.js packages/app-core/dist/utility/__tests__/*.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format:check": "prettier --check .",

@@ -41,3 +41,5 @@ export * from "./effects/ParametricEq.js";
 export * from "./effects/Dynamics.js";
 export * from "./tempo/TempoMap.js";
 export * from "./restoration/Restoration.js";
+export * from "./utility/Metering.js";
+export * from "./utility/PresetSystem.js";

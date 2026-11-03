@@ -1302,6 +1302,107 @@ def test_silence_remover_interactive(browser_instance, test_server):
     context.close()
 
 
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_meters(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'meters', width, height, name)
+    print(f"Meters [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Meters [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_meters_interactive(browser_instance, test_server):
+    """Verifies interactivity and content on the Meters screen: stat inspection, reset toggle, phase correlation."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#meters')
+    page.wait_for_selector('.g4')
+
+    # Verify initial stats
+    assert page.locator('.stat:has-text("14.2")').count() == 1
+    assert page.locator('.stat:has-text("1.1")').count() == 1
+    assert page.locator('.stat:has-text("6.4")').count() == 1
+    assert page.locator('text=Phase correlation').count() == 1
+    assert page.locator('text=Mono check').count() == 1
+
+    # Click first stat box (Integrated LUFS) to trigger reset
+    first_stat = page.locator('.g4 .box.inv').first
+    first_stat.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.stat:has-text("−inf")').count() >= 1
+
+    # Click again to restore
+    first_stat.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.stat:has-text("14.2")').count() == 1
+
+    context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_presets(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'presets', width, height, name)
+    print(f"Presets [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Presets [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_presets_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Presets screen: category filtering, search input, import/export."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#presets')
+    page.wait_for_selector('.g4')
+
+    # Verify initial 8 tiles
+    tiles = page.locator('.g4 a.tile')
+    assert tiles.count() == 8
+
+    # Filter by search input
+    search_inp = page.locator('input.inp')
+    search_inp.fill('drums')
+    page.wait_for_timeout(100)
+    assert page.locator('.g4 a.tile:has-text("Tight drums")').count() == 1
+    assert page.locator('.g4 a.tile').count() == 1
+
+    # Clear search
+    search_inp.fill('')
+    page.wait_for_timeout(100)
+    assert page.locator('.g4 a.tile').count() == 8
+
+    # Switch category to Chains
+    chains_btn = page.locator('.seg button:has-text("Chains")')
+    chains_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (chains_btn.get_attribute('class') or '')
+    assert page.locator('.g4 a.tile:has-text("Late night radio")').count() == 1
+
+    # Click Import button
+    import_btn = page.locator('button:has-text("Import .fluxpreset")')
+    import_btn.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.pill:has-text("Imported")').count() == 1
+
+    context.close()
+
+
 
 
 

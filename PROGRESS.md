@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 3 — Core processing
-- **Next item:** P3.5 (P3.5-a Metering panel, P3.5-b Tone and silence generators, gain and fade tools, P3.5-c Preset system: versioned files, import/export, A/B slots)
+- **Phase:** 4 — Spatial audio
+- **Next item:** P4.1 (P4.1-a HRTF pipeline, P4.1-b Renderer A direct HRTF, P4.1-c Partitioned FFT convolution, P4.1-d Renderer B ambisonic, P4.1-e Distance cues, Doppler & level stability, P4.1-f Head-width control and HRTF test)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -18,7 +18,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
-| 3 | Core processing | In progress | 19 / 22 |
+| 3 | Core processing | Agent-complete | 22 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P3.5-a, P3.5-b, P3.5-c implemented utility suite, comprehensive metering panel, signal generators, fade processor, and versioned preset system: ToneGenerator (sine, triangle, square, saw with click-free smoothing), NoiseGenerator (seeded white, 1/f pink), SilenceGenerator, FadeProcessor (Linear, EqualPower, SCurve, Exp, Log), SpectrumAnalyzerNode (STFT with Hann window, coherent gain normalization 4/N, peak hold decay 12 dB/s); target configurations (-14, -16, -23 LUFS); .fluxpreset v1 schema with JSON import/export, hostile-input validation, 8 factory presets, and ComparisonSlotManager; MetersScreen (#meters) and PresetsScreen (#presets); verified 100% test pass (71 TS unit tests, 106 Playwright/pytest tests green, 39 dsp cargo tests, 35 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green; Phase 3 Agent-complete.
 - 2026-11-03: P3.4-a, P3.4-b, P3.4-c, P3.4-d, P3.4-e, P3.4-f implemented classical audio restoration suite in Rust (flux-dsp) and TypeScript (@flux/app-core): StationaryNoiseReduction with spectral gating, decision-directed a-priori SNR, noise profile capture, kurtosis-controlled musical noise suppression, and difference audition; HumRemover dual cascaded 2nd-order notch filters at fundamental (50/60 Hz) and up to 8 harmonics with Q=30 (>= 40 dB suppression, off-frequency delta < 0.1 dB); DcOffsetFilter 10 Hz Butterworth HPF; DeWindFilter 4th-order steep low-cut; DeClicker innovation thresholding with cubic interpolation (>= 30 dB synthetic click attenuation); DeClipper peak crest reconstruction exceeding ceiling; SpectralRepair bounding box inpainting; SilenceRemover RMS pause detector with shorten-to-duration and crossfaded joins; StereoTools Mid/Side width (0-200%), pan, swap channels, phase invert, and phase correlation coefficient; CleanUpScreen (#fx-clean) and SilenceRemoverScreen (#fx-silence); verified 100% test pass (65 TS unit tests, 98 Playwright/pytest tests green, 35 dsp cargo tests, 34 testkit invariant tests) with >= 95.6% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green.
 
 - 2026-11-03: P3.3-a, P3.3-b, P3.3-c implemented time-stretch and pitch-shift engine in Rust (flux-dsp) and TypeScript (@flux/app-core): StretchNode with StretchMode (Music, Voice, Varispeed) linking speed ratio to pitch semitones via 12*log2(ratio), formant preservation toggle; musical TempoMap with beat conversion, subdivision snapping, and grid generation; TapTempo detector computing moving average BPM with 2.5s inactivity timeout reset; interactive SpeedPitchScreen (#fx-time) with waveform preview, speed and pitch preset chips, fine sliders with dynamic duration/cents readouts, mode selector, tap tempo button, and final render quality options; verified 100% test pass (61 TS unit tests, 94 Playwright/pytest tests green, 30 dsp cargo tests) with >= 99.7% pixel-diff match against prototype at 1440, 820, and 390 px (Desktop 99.74%, Tablet 99.87%, Phone 99.71%); full just ci gate green.
@@ -188,9 +189,9 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P3.4-d Spectral repair
 - [x] P3.4-e Auto-silence remover with preview and override
 - [x] P3.4-f Mono/stereo tools
-- [ ] P3.5-a Metering panel (LUFS, LRA, true peak, spectrum, goniometer)
-- [ ] P3.5-b Tone and silence generators, gain and fade tools
-- [ ] P3.5-c Preset system: versioned files, import/export, A/B slots
+- [x] P3.5-a Metering panel (LUFS, LRA, true peak, spectrum, goniometer)
+- [x] P3.5-b Tone and silence generators, gain and fade tools
+- [x] P3.5-c Preset system: versioned files, import/export, A/B slots
 
 ## Phase 4 — Spatial audio
 

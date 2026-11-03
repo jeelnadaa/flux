@@ -13,6 +13,7 @@ export interface CanvasVizProps {
     | "tape"
     | "transfer"
     | "gr"
+    | "lufs"
     | string;
   seed?: number;
   stereo?: boolean | string;
@@ -232,6 +233,46 @@ export function drawSpectrum(ctx: CanvasRenderingContext2D, width: number, heigh
   }
 }
 
+export function drawLufs(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  const docStyle =
+    typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+  const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+  ctx.clearRect(0, 0, width, height);
+  const n = Math.floor(width / 3);
+  const e = getEnvelope(9, n, "mix");
+  ctx.beginPath();
+  for (let i = 0; i < e.length; i++) {
+    let sum = 0;
+    const start = Math.max(0, i - 8);
+    const count = i - start + 1;
+    for (let k = start; k <= i; k++) {
+      sum += e[k];
+    }
+    const s = sum / count;
+    const y = height * 0.85 - s * height * 0.8;
+    if (i === 0) {
+      ctx.moveTo(0, y);
+    } else {
+      ctx.lineTo(i * 3, y);
+    }
+  }
+  ctx.strokeStyle = getCss("--ac-t");
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.strokeStyle = getCss("--sig");
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, height * 0.42);
+  ctx.lineTo(width, height * 0.42);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = getCss("--tx3");
+  ctx.font = '500 10.5px "Geist Mono",monospace';
+  ctx.fillText("Target −14 LUFS", 6, height * 0.42 - 5);
+}
+
 export const CanvasViz: React.FC<CanvasVizProps> = ({
   type,
   seed = 1,
@@ -294,6 +335,8 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         drawSpectrogram(ctx, rw, rh, seed);
       } else if (type === "spectrum") {
         drawSpectrum(ctx, rw, rh);
+      } else if (type === "lufs") {
+        drawLufs(ctx, rw, rh);
       } else if (type === "gonio") {
         ctx.clearRect(0, 0, rw, rh);
         const c = Math.min(rw, rh) / 2 - 8;

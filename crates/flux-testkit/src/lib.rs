@@ -234,6 +234,20 @@ mod tests {
     }
 
     #[test]
+    fn test_spectrum_analyzer_universal_invariants() {
+        let config = InvariantConfig::default();
+        let result = run_dsp_invariants(
+            || Box::new(flux_dsp::SpectrumAnalyzerNode::new(1024)),
+            &config,
+        );
+        assert!(
+            result.all_passed(),
+            "SpectrumAnalyzerNode failed invariants: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_sine_generator_and_spectrum() {
         let sample_rate = 48000.0;
         let freq = 1000.0;
