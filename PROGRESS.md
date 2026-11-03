@@ -19,7 +19,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
 | 3 | Core processing | Agent-complete | 22 / 22 |
-| 4 | Spatial audio | In progress | 13 / 18 |
+| 4 | Spatial audio | Agent-complete | 18 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
 | 7 | Advanced AI | Not started | 0 / 11 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P4.4-a, P4.4-b, P4.4-c, P4.4-d, P4.4-e completed Phase 4 (18/18 items, marked Agent-complete): implemented spatial reverb and acoustic environments in Rust (flux-dsp, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): AlgorithmicReverbNode 8-delay FDN with mutually prime delays at 48 kHz, lossless unitary Householder scattering matrix, 4 Schroeder allpass diffusers, 1-pole damping filters, and predelay; ConvolutionReverbNode partitioned FIR convolution; RoomReverbNode with 12 production presets (Cathedral, Bathroom, ConcertHall, Cave, ParkingGarage, StudioBooth, Stairwell, LivingRoom, CarInterior, Stadium, ForestClearing, SubwayTunnel) and custom room designer with analytical Sabine RT60 formula and boundary reflection arrival calculation; ConcertHallNode Row 10 acoustics with PA horn coloration filter, back-wall slapback delay, and procedural crowd murmur noise bed; NextDoorNode with 24 dB/oct transmission loss lowpass, flanking bass boost, diffuse secondary reflections, and level drift; WASM C ABI exports; RoomScreen (#rooms), RoomDesignScreen (#roomdesign), and HallScreen (#hall) with 3D perspective wireframe canvas (V.room) and exponential RT60 decay canvas (V.decay); verified 100% test pass (89 TS unit tests, 60 dsp cargo tests, 38 testkit invariant tests, 13 wasm tests); full just ci gate green; Phase 4 Agent-complete.
 - 2026-11-03: P4.3-a, P4.3-b, P4.3-c, P4.3-d, P4.3-e, P4.3-f implemented 3D static placement, 8D auto-orbit, 16D motion paths, interactive Sound Stage UI, draw-a-path mode, and headphone/mono compatibility: SpatialPosition, 9 static placement presets (Front, Behind, Above, Below, FrontLeft, FrontRight, RearLeft, RearRight, InsideRoom), 8D auto-orbit (speed 0.01–2.0 Hz, CW/CCW/PingPong, distance, elevation, depth, smoothing, start phase, tempo sync T = beats * 60 / BPM, N revolutions within ±0.1° accuracy), 16D extended motion paths (Spiral, Figure-8/Lemniscate, Vertical Loop, seeded deterministic Swarm random walk, 3D Lissajous), Catmull-Rom spline interpolation, MonoCompatibilityResult check, multi-source stems (Vocals, Drums, Bass, Other); integrated SpatialTrajectoryGenerator with 17 automatable parameters into StereoSpatializerNode (zero allocations on audio thread, all 13 universal DSP invariants passing); WASM C ABI exports; Sound Stage screen (#stage) with interactive 2D top-down and elevation canvases (V.stage, V.elev) with drag-to-place and draw-path support; verified 100% test pass (86 TS unit tests, 122 browser/pixel-diff tests with all 111 visual diff tests >= 95%, 56 dsp cargo tests, 38 testkit invariant tests); full just ci gate green.
 - 2026-11-03: P4.2-a implemented stereo spatializer with VirtualSpeakers mode (adjustable spread rotating together), Mid/Side mode (anchored frontal center with orbiting sides), and 8th-order Linkwitz-Riley (LR8) mono bass management with flat magnitude reconstruction and <= -60 dB low-frequency null below crossover; registered StereoSpatializerNode in universal DSP invariant harness (13/13 passing); added WASM C ABI exports and TypeScript domain utilities; verified 100% test pass (81 TS unit tests, 118 Playwright & pytest tests, 49 dsp cargo tests, 38 testkit invariant tests) with visual diff match >= 95% across Desktop, Tablet, and Phone; full just ci gate green.
 - 2026-11-03: P4.1-a, P4.1-b, P4.1-c, P4.1-d, P4.1-e, P4.1-f implemented binaural spatial rendering core: HrtfDataset with 6 profiles (A through F) decomposed into minimum-phase IRs and Woodworth fractional ITDs (600-700 µs at 90° azimuth); PartitionedConvolver with zero latency and cosine crossfading; DirectHrtfRenderer (Renderer A); AmbisonicRenderer (Renderer B) with 3rd-order Higher-Order Ambisonics (16 channels) spherical harmonic encoding and MagLS binaural decoding; DistanceCues with 1/r law, air absorption filtering, near-field ILD boost, and Doppler; MonoBassFilter 120 Hz crossover; Headphone Check screen (#hpcheck) and HRTF Profile screen (#hrtf); verified 100% test pass (77 TS unit tests, 116 Playwright/pytest tests green, 45 dsp cargo tests, 37 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green.
@@ -212,11 +213,11 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P4.3-d Sound stage UI: top and side views, drag to place
 - [x] P4.3-e Draw-a-path, record dragging to automation, multiple sources
 - [x] P4.3-f Headphone check wizard; speaker warning and mono-compatibility check
-- [ ] P4.4-a Convolution reverb with IR tools
-- [ ] P4.4-b Algorithmic reverb (FDN, plate, hall)
-- [ ] P4.4-c Room presets; custom room designer; binaural early reflections
-- [ ] P4.4-d Concert hall "row 10" mode
-- [ ] P4.4-e "Next door" effect; renderer choice ADR (queue the perceptual tests)
+- [x] P4.4-a Convolution reverb with IR tools
+- [x] P4.4-b Algorithmic reverb (FDN, plate, hall)
+- [x] P4.4-c Room presets; custom room designer; binaural early reflections
+- [x] P4.4-d Concert hall "row 10" mode
+- [x] P4.4-e "Next door" effect; renderer choice ADR (queue the perceptual tests)
 
 ## Phase 5 — Creative FX & voice
 

@@ -13,6 +13,7 @@ pub mod param;
 pub mod pyramid;
 pub mod resampler;
 pub mod restoration;
+pub mod reverb;
 pub mod sample;
 pub mod spatial;
 pub mod spatial_analysis;
@@ -43,6 +44,10 @@ pub use resampler::{Resampler, ResamplerQuality};
 pub use restoration::{
     DcOffsetFilter, DeClicker, DeClipper, DeWindFilter, HumRemover, PanLaw, PauseInterval,
     SilenceRemover, SpectralRepair, StationaryNoiseReduction, StereoTools,
+};
+pub use reverb::{
+    compute_sabine_rt60, AlgorithmicReverbNode, ConcertHallNode, ConvolutionReverbNode,
+    NextDoorNode, RoomPreset, RoomReverbNode, SurfaceMaterial,
 };
 pub use sample::Sample;
 pub use spatial::{

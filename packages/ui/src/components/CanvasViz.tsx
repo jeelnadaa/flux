@@ -30,6 +30,10 @@ export interface CanvasVizProps {
   ratio?: number;
   mode?: string;
   tool?: string;
+  rt?: number;
+  w?: number;
+  d?: number;
+  h?: number;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -292,6 +296,10 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
   ratio,
   mode,
   tool,
+  rt,
+  w,
+  d,
+  h,
   className = "",
   style,
 }) => {
@@ -892,6 +900,139 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         ctx.arc(px, y, 8, 0, Math.PI * 2);
         ctx.fillStyle = getCss("--t3");
         ctx.fill();
+      } else if (type === "decay") {
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        ctx.clearRect(0, 0, rw, rh);
+        const r = prng(11);
+        const rtVal = (rt !== undefined ? rt : 2.4) / 8;
+        ctx.fillStyle = getCss("--ac-t");
+        for (let i = 0; i < rw; i += 2) {
+          const u = i / rw;
+          const v = Math.exp((-u / rtVal) * 2.4) * (0.5 + 0.5 * r()) * (u < 0.03 ? u / 0.03 : 1);
+          const barH = v * rh * 0.9;
+          ctx.fillRect(i, rh - barH, 1.4, barH);
+        }
+      } else if (type === "room") {
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        ctx.clearRect(0, 0, rw, rh);
+        const t = (cv as unknown as { _t?: number })._t || 0;
+        const roomW = w !== undefined ? w : 1.3;
+        const roomD = d !== undefined ? d : 1.0;
+        const roomH = h !== undefined ? h : 0.6;
+        const yaw = -0.72 + Math.sin(t * 0.22) * 0.12;
+        const pitch = 0.46;
+        const S = Math.min(rw, rh) * 0.34;
+
+        const pj = (X: number, Y: number, Z: number): [number, number] => {
+          const cy = Math.cos(yaw), sy = Math.sin(yaw);
+          const x1 = X * cy - Z * sy, z1 = X * sy + Z * cy;
+          const cp = Math.cos(pitch), sp = Math.sin(pitch);
+          const y1 = Y * cp - z1 * sp, z2 = Y * sp + z1 * cp;
+          const f = 3.4 / (3.4 + z2);
+          return [rw / 2 + x1 * f * S, rh * 0.58 - y1 * f * S];
+        };
+
+        const C: [number, number, number][] = [
+          [-roomW, 0, -roomD],
+          [roomW, 0, -roomD],
+          [roomW, 0, roomD],
+          [-roomW, 0, roomD],
+          [-roomW, 2 * roomH, -roomD],
+          [roomW, 2 * roomH, -roomD],
+          [roomW, 2 * roomH, roomD],
+          [-roomW, 2 * roomH, roomD],
+        ];
+        const P = C.map((c) => pj(...c));
+        const line = (a: number, b: number) => {
+          ctx.beginPath();
+          ctx.moveTo(P[a][0], P[a][1]);
+          ctx.lineTo(P[b][0], P[b][1]);
+          ctx.stroke();
+        };
+
+        ctx.fillStyle = getCss("--ac-soft");
+        ctx.beginPath();
+        [0, 1, 2, 3].forEach((k, i) =>
+          i ? ctx.lineTo(P[k][0], P[k][1]) : ctx.moveTo(P[k][0], P[k][1]),
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = getCss("--tx2");
+        ctx.lineWidth = 1.5;
+        [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [3, 0],
+          [4, 5],
+          [5, 6],
+          [6, 7],
+          [7, 4],
+          [0, 4],
+          [1, 5],
+          [2, 6],
+          [3, 7],
+        ].forEach((l) => line(l[0], l[1]));
+
+        const sp = pj(-roomW * 0.5, roomH * 0.6, -roomD * 0.4);
+        const lp = pj(roomW * 0.45, roomH * 0.6, roomD * 0.45);
+        const ph = (t * 0.45) % 1;
+
+        const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+
+        const rays: [number, number, number][] = [
+          [-roomW, roomH * 0.9, 0],
+          [roomW, roomH * 0.9, -roomD * 0.2],
+          [0, 0, 0],
+          [0, 2 * roomH, roomD * 0.1],
+          [0, roomH, -roomD],
+          [0, roomH, roomD],
+        ];
+
+        rays.forEach((rf, i) => {
+          const q = pj(rf[0], rf[1], rf[2]);
+          ctx.strokeStyle = getCss("--sig");
+          ctx.globalAlpha = 0.55;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(sp[0], sp[1]);
+          ctx.lineTo(q[0], q[1]);
+          ctx.lineTo(lp[0], lp[1]);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+
+          const k = (ph + i * 0.13) % 1;
+          const seg1 = k < 0.5;
+          const u = seg1 ? k * 2 : (k - 0.5) * 2;
+          const a = seg1 ? sp : q;
+          const b = seg1 ? q : lp;
+          ctx.fillStyle = getCss("--sig");
+          ctx.beginPath();
+          ctx.arc(lerp(a[0], b[0], u), lerp(a[1], b[1], u), 2.6, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.fillStyle = getCss("--t4");
+        ctx.beginPath();
+        ctx.arc(sp[0], sp[1], 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = getCss("--tx");
+        ctx.beginPath();
+        ctx.arc(lp[0], lp[1], 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = getCss("--tx3");
+        ctx.font = '500 10.5px "Geist Mono",monospace';
+        ctx.fillText("Source", sp[0] + 11, sp[1] + 4);
+        ctx.fillText("You", lp[0] + 11, lp[1] + 4);
       }
     };
 
@@ -910,7 +1051,27 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         ro.disconnect();
       }
     };
-  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height, on, th, ratio, mode, tool]);
+  }, [
+    type,
+    seed,
+    stereo,
+    step,
+    kind,
+    color,
+    gain,
+    until,
+    ceil,
+    height,
+    on,
+    th,
+    ratio,
+    mode,
+    tool,
+    rt,
+    w,
+    d,
+    h,
+  ]);
 
   const canvasEl = (
     <canvas

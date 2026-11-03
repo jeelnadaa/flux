@@ -21,6 +21,11 @@ import {
   DEFAULT_STEREO_SPATIAL_CONFIG,
   HRTF_PROFILES,
   DEFAULT_HEAD_WIDTH_CM,
+  ROOM_PRESETS,
+  SURFACE_MATERIALS,
+  computeSabineRt60,
+  DEFAULT_CONCERT_HALL,
+  DEFAULT_NEXT_DOOR,
 } from "../SpatialModels.js";
 
 describe("Spatial Domain Models and Coordinates", () => {
@@ -235,5 +240,32 @@ describe("Spatial Domain Models and Coordinates", () => {
     assert.equal(DEFAULT_STAGE_STEMS[1].name, "Drums");
     assert.equal(DEFAULT_STAGE_STEMS[2].name, "Bass");
     assert.equal(DEFAULT_STAGE_STEMS[3].name, "Other");
+  });
+
+  it("provides 12 production room presets with RT60 and dimensions", () => {
+    assert.equal(ROOM_PRESETS.length, 12);
+    const presets = Object.fromEntries(ROOM_PRESETS.map((p) => [p.id, p]));
+    assert.equal(presets.cathedral.rt60, 6.8);
+    assert.equal(presets.bathroom.rt60, 0.9);
+    assert.equal(presets.concert_hall.rt60, 3.2);
+    assert.equal(presets.studio_booth.rt60, 0.2);
+    assert.equal(presets.car_interior.rt60, 0.1);
+    assert.equal(presets.stadium.rt60, 5.1);
+  });
+
+  it("calculates Sabine RT60 and first reflection delay accurately", () => {
+    // 12m x 18m x 6m room with plaster walls, wood floor, plaster ceiling
+    const res = computeSabineRt60(12, 18, 6, "plaster", "wood", "plaster");
+    assert.equal(res.volumeM3, 1296);
+    // Sabine formula ~3.81s
+    assert.ok(Math.abs(res.rt60 - 3.81) < 0.2, `Computed RT60 ${res.rt60}`);
+    assert.ok(res.firstReflectionMs >= 8 && res.firstReflectionMs <= 35);
+  });
+
+  it("defines default concert hall and next door configurations", () => {
+    assert.equal(DEFAULT_CONCERT_HALL.row, 10);
+    assert.equal(DEFAULT_CONCERT_HALL.enabled, true);
+    assert.equal(DEFAULT_NEXT_DOOR.cutoffHz, 620);
+    assert.equal(DEFAULT_NEXT_DOOR.bassBoostDb, 4.0);
   });
 });

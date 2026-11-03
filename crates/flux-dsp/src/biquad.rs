@@ -160,6 +160,11 @@ pub struct BiquadState {
 }
 
 impl BiquadState {
+    /// Creates a new biquad filter state.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Resets filter delay memories to zero.
     pub fn reset(&mut self) {
         self.s1 = 0.0;

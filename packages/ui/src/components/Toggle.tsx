@@ -1,7 +1,7 @@
 import React from "react";
 
 export interface ToggleProps {
-  label: string;
+  label?: string;
   sub?: string;
   checked?: boolean;
   defaultChecked?: boolean;
@@ -12,7 +12,7 @@ export interface ToggleProps {
 }
 
 export const Toggle: React.FC<ToggleProps> = ({
-  label,
+  label = "",
   sub,
   checked,
   defaultChecked = false,
@@ -35,14 +35,16 @@ export const Toggle: React.FC<ToggleProps> = ({
       className={`tg ${className}`}
       type="button"
       aria-pressed={isChecked}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel || label || undefined}
       onClick={handleClick}
       style={style}
     >
-      <span>
-        {label}
-        {sub && <small>{sub}</small>}
-      </span>
+      {label || sub ? (
+        <span>
+          {label}
+          {sub && <small>{sub}</small>}
+        </span>
+      ) : null}
       <i />
     </button>
   );

@@ -36,6 +36,9 @@ import { PresetsScreen } from "./screens/PresetsScreen.js";
 import { HrtfScreen } from "./screens/HrtfScreen.js";
 import { HpCheckScreen } from "./screens/HpCheckScreen.js";
 import { StageScreen } from "./screens/StageScreen.js";
+import { RoomsScreen } from "./screens/RoomsScreen.js";
+import { RoomDesignScreen } from "./screens/RoomDesignScreen.js";
+import { HallScreen } from "./screens/HallScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -99,6 +102,12 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <HpCheckScreen />;
     case "stage":
       return <StageScreen />;
+    case "rooms":
+      return <RoomsScreen />;
+    case "roomdesign":
+      return <RoomDesignScreen />;
+    case "hall":
+      return <HallScreen />;
     case "home":
     default:
       return <HomeScreen />;

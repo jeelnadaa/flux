@@ -68,6 +68,36 @@ impl DelayLine {
         self.write_pos = (self.write_pos + 1) % cap;
         out
     }
+
+    /// Writes a sample to the delay line buffer and advances the write position.
+    #[inline]
+    pub fn write(&mut self, input: f32) {
+        let cap = self.buffer.len();
+        self.buffer[self.write_pos] = input;
+        self.write_pos = (self.write_pos + 1) % cap;
+    }
+
+    /// Reads a sample at a given fractional delay relative to the current write position.
+    #[inline]
+    pub fn read_samples(&self, delay_samples: f32) -> f32 {
+        let cap = self.buffer.len();
+        let clamped = delay_samples.clamp(0.0, self.max_delay as f32);
+        let int_delay = clamped.floor() as usize;
+        let frac = clamped - (int_delay as f32);
+
+        let read_pos = (self.write_pos + cap * 2 - 1 - (int_delay % cap)) % cap;
+        let y0 = self.buffer[(read_pos + cap - 1) % cap];
+        let y1 = self.buffer[read_pos];
+        let y2 = self.buffer[(read_pos + 1) % cap];
+        let y3 = self.buffer[(read_pos + 2) % cap];
+
+        let c0 = y1;
+        let c1 = 0.5 * (y2 - y0);
+        let c2 = y0 - 2.5 * y1 + 2.0 * y2 - 0.5 * y3;
+        let c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+
+        ((c3 * frac + c2) * frac + c1) * frac + c0
+    }
 }
 
 impl DspNode for DelayLine {

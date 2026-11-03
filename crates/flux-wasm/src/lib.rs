@@ -7,6 +7,10 @@ use flux_dsp::dither::{BitDepth, Dither, DitherType};
 use flux_dsp::loudness::LoudnessMeter;
 use flux_dsp::node::DspNode;
 use flux_dsp::pyramid::PeakPyramid;
+use flux_dsp::reverb::{
+    compute_sabine_rt60, AlgorithmicReverbNode, ConcertHallNode, NextDoorNode, RoomPreset,
+    RoomReverbNode, SurfaceMaterial,
+};
 use flux_dsp::resampler::{Resampler, ResamplerQuality};
 use flux_dsp::spatial::{
     check_mono_compatibility, SpatialPreset, StereoInputMode, StereoSpatializerNode,
@@ -528,6 +532,359 @@ pub unsafe extern "C" fn stereo_check_mono_compatibility(
         *out_loss_db = res.mono_loss_db;
     }
     res.is_compatible
+}
+
+// ----------------------------------------------------------------------------
+// Reverb & Acoustic Environment C ABI
+// ----------------------------------------------------------------------------
+
+/// Creates a new Algorithmic Reverb node (FDN).
+#[no_mangle]
+pub extern "C" fn reverb_create(sample_rate: f32) -> *mut AlgorithmicReverbNode {
+    Box::into_raw(Box::new(AlgorithmicReverbNode::new(sample_rate)))
+}
+
+/// Destroys an Algorithmic Reverb node.
+///
+/// # Safety
+/// `ptr` must be a valid pointer returned by `reverb_create`.
+#[no_mangle]
+pub unsafe extern "C" fn reverb_destroy(ptr: *mut AlgorithmicReverbNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets reverb decay RT60 in seconds.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn reverb_set_decay(ptr: *mut AlgorithmicReverbNode, rt60: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_decay_time(rt60);
+    }
+}
+
+/// Sets reverb wet mix [0.0, 1.0].
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn reverb_set_wet(ptr: *mut AlgorithmicReverbNode, wet: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_wet(wet);
+    }
+}
+
+/// Sets reverb high-frequency damping [0.0, 1.0].
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn reverb_set_damping(ptr: *mut AlgorithmicReverbNode, damping: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_damping(damping);
+    }
+}
+
+/// Processes stereo audio frames through algorithmic reverb.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn reverb_process(
+    ptr: *mut AlgorithmicReverbNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Room Simulation node.
+#[no_mangle]
+pub extern "C" fn room_reverb_create(sample_rate: f32) -> *mut RoomReverbNode {
+    Box::into_raw(Box::new(RoomReverbNode::new(sample_rate)))
+}
+
+/// Destroys a Room Simulation node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn room_reverb_destroy(ptr: *mut RoomReverbNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Applies one of the 12 room presets (0=Cathedral ... 11=SubwayTunnel).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn room_reverb_apply_preset(ptr: *mut RoomReverbNode, preset_id: u32) {
+    if let Some(node) = ptr.as_mut() {
+        let preset = match preset_id {
+            0 => RoomPreset::Cathedral,
+            1 => RoomPreset::Bathroom,
+            2 => RoomPreset::ConcertHall,
+            3 => RoomPreset::Cave,
+            4 => RoomPreset::ParkingGarage,
+            5 => RoomPreset::StudioBooth,
+            6 => RoomPreset::Stairwell,
+            7 => RoomPreset::LivingRoom,
+            8 => RoomPreset::CarInterior,
+            9 => RoomPreset::Stadium,
+            10 => RoomPreset::ForestClearing,
+            _ => RoomPreset::SubwayTunnel,
+        };
+        node.apply_preset(preset);
+    }
+}
+
+/// Updates custom room dimensions and materials.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn room_reverb_update_custom(
+    ptr: *mut RoomReverbNode,
+    width_m: f32,
+    depth_m: f32,
+    height_m: f32,
+    wall_mat_id: u32,
+    floor_mat_id: u32,
+    ceiling_mat_id: u32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let parse_mat = |id: u32| match id {
+            0 => SurfaceMaterial::Plaster,
+            1 => SurfaceMaterial::Concrete,
+            2 => SurfaceMaterial::Brick,
+            3 => SurfaceMaterial::Wood,
+            4 => SurfaceMaterial::Glass,
+            5 => SurfaceMaterial::Curtain,
+            6 => SurfaceMaterial::Carpet,
+            7 => SurfaceMaterial::Stone,
+            8 => SurfaceMaterial::Tile,
+            _ => SurfaceMaterial::AcousticTile,
+        };
+        node.update_custom_room(
+            width_m,
+            depth_m,
+            height_m,
+            parse_mat(wall_mat_id),
+            parse_mat(floor_mat_id),
+            parse_mat(ceiling_mat_id),
+        );
+    }
+}
+
+/// Processes stereo audio frames through room reverb.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn room_reverb_process(
+    ptr: *mut RoomReverbNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Concert Hall Row 10 acoustics node.
+#[no_mangle]
+pub extern "C" fn concert_hall_create(sample_rate: f32) -> *mut ConcertHallNode {
+    Box::into_raw(Box::new(ConcertHallNode::new(sample_rate)))
+}
+
+/// Destroys a Concert Hall node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn concert_hall_destroy(ptr: *mut ConcertHallNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets Concert Hall seat row (1 to 30).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn concert_hall_set_row(ptr: *mut ConcertHallNode, row: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_parameter(1, row);
+    }
+}
+
+/// Sets Concert Hall crowd murmur noise gain.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn concert_hall_set_crowd_gain(ptr: *mut ConcertHallNode, gain: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_parameter(2, gain);
+    }
+}
+
+/// Processes stereo audio frames through Concert Hall acoustics.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn concert_hall_process(
+    ptr: *mut ConcertHallNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Next Door through-the-wall node.
+#[no_mangle]
+pub extern "C" fn next_door_create(sample_rate: f32) -> *mut NextDoorNode {
+    Box::into_raw(Box::new(NextDoorNode::new(sample_rate)))
+}
+
+/// Destroys a Next Door node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn next_door_destroy(ptr: *mut NextDoorNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Enables or disables the Next Door effect.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn next_door_set_enabled(ptr: *mut NextDoorNode, enabled: bool) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_parameter(0, if enabled { 1.0 } else { 0.0 });
+    }
+}
+
+/// Sets the transmission low-pass wall cutoff frequency (Hz).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn next_door_set_cutoff(ptr: *mut NextDoorNode, cutoff_hz: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_parameter(1, cutoff_hz);
+    }
+}
+
+/// Sets the structural flanking bass boost (dB).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn next_door_set_bass_boost(ptr: *mut NextDoorNode, bass_boost_db: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_parameter(2, bass_boost_db);
+    }
+}
+
+/// Processes stereo audio frames through Next Door acoustics.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn next_door_process(
+    ptr: *mut NextDoorNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Computes room Sabine RT60 and first reflection delay as JSON.
+#[wasm_bindgen]
+pub fn wasm_compute_room_acoustics(
+    width_m: f32,
+    depth_m: f32,
+    height_m: f32,
+    wall_mat_id: u32,
+    floor_mat_id: u32,
+    ceiling_mat_id: u32,
+) -> String {
+    let parse_mat = |id: u32| match id {
+        0 => SurfaceMaterial::Plaster,
+        1 => SurfaceMaterial::Concrete,
+        2 => SurfaceMaterial::Brick,
+        3 => SurfaceMaterial::Wood,
+        4 => SurfaceMaterial::Glass,
+        5 => SurfaceMaterial::Curtain,
+        6 => SurfaceMaterial::Carpet,
+        7 => SurfaceMaterial::Stone,
+        8 => SurfaceMaterial::Tile,
+        _ => SurfaceMaterial::AcousticTile,
+    };
+
+    let (rt60, first_refl_ms) = compute_sabine_rt60(
+        width_m,
+        depth_m,
+        height_m,
+        parse_mat(wall_mat_id),
+        parse_mat(floor_mat_id),
+        parse_mat(ceiling_mat_id),
+    );
+
+    format!(
+        "{{\"rt60\":{:.3},\"first_reflection_ms\":{:.1}}}",
+        rt60, first_refl_ms
+    )
 }
 
 /// Renders a synthesized test tone through the biquad chain.
@@ -2129,5 +2486,83 @@ mod tests {
         let stereo_json = wasm_analyze_stereo(&left, &right, 128).expect("Stereo test failed");
         assert!(stereo_json.contains("phase_correlation"));
         assert!(stereo_json.contains("\"phase_correlation\":1.0"));
+    }
+
+    #[test]
+    fn test_c_abi_reverb_and_acoustic_nodes() {
+        unsafe {
+            // Reverb FDN C ABI
+            let rev = reverb_create(48000.0);
+            reverb_set_decay(rev, 2.5);
+            reverb_set_wet(rev, 0.4);
+            reverb_set_damping(rev, 0.3);
+
+            let in_l = [0.5f32; 128];
+            let in_r = [0.5f32; 128];
+            let mut out_l = [0.0f32; 128];
+            let mut out_r = [0.0f32; 128];
+
+            reverb_process(
+                rev,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            reverb_destroy(rev);
+
+            // Room Reverb C ABI
+            let rm = room_reverb_create(48000.0);
+            room_reverb_apply_preset(rm, 2); // ConcertHall
+            room_reverb_update_custom(rm, 15.0, 20.0, 7.0, 0, 3, 0);
+            room_reverb_process(
+                rm,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            room_reverb_destroy(rm);
+
+            // Concert Hall C ABI
+            let hall = concert_hall_create(48000.0);
+            concert_hall_set_row(hall, 10.0);
+            concert_hall_set_crowd_gain(hall, 0.1);
+            concert_hall_process(
+                hall,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            concert_hall_destroy(hall);
+
+            // Next Door C ABI
+            let nd = next_door_create(48000.0);
+            next_door_set_enabled(nd, true);
+            next_door_set_cutoff(nd, 450.0);
+            next_door_set_bass_boost(nd, 5.0);
+            next_door_process(
+                nd,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            next_door_destroy(nd);
+
+            // JSON room calculation
+            let json = wasm_compute_room_acoustics(12.0, 18.0, 6.0, 0, 3, 0);
+            assert!(json.contains("rt60"));
+            assert!(json.contains("first_reflection_ms"));
+        }
     }
 }
