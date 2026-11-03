@@ -40,7 +40,14 @@ function buildStaticSite() {
   fs.writeFileSync(path.join(OUT_DIR, "download.html"), downloadHtml);
 
   // 3. Copy scripts and styles
-  const staticFiles = ["landing.js", "app.css", "themes.css", "fonts.css", "manifest.webmanifest"];
+  const staticFiles = [
+    "landing.js",
+    "download.js",
+    "app.css",
+    "themes.css",
+    "fonts.css",
+    "manifest.webmanifest",
+  ];
   for (const file of staticFiles) {
     const src = path.join(WEB_DIR, file);
     if (fs.existsSync(src)) {
