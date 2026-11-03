@@ -160,6 +160,9 @@ name = "flux-ml"
 version = "0.1.0"
 dependencies = [
  "flux-dsp",
+ "realfft",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -177,6 +180,7 @@ version = "0.1.0"
 dependencies = [
  "flux-dsp",
  "flux-engine",
+ "flux-ml",
  "serde",
  "serde_json",
  "wasm-bindgen",

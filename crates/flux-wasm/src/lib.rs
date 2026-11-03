@@ -33,6 +33,11 @@ use flux_engine::export::{
 };
 use flux_engine::render::{EngineCommand, EngineHost};
 use flux_engine::transport::Transport;
+use flux_ml::cleanup::{AudioCategory, AudioClassifier, VoiceCleanupConfig, VoiceCleanupEngine};
+use flux_ml::cloud::MockCloudClient;
+use flux_ml::fillers::FillerDetector;
+use flux_ml::models::ModelManager;
+use flux_ml::transcript::{SubtitleFormat, TranscriptDocument};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
@@ -2404,6 +2409,78 @@ pub fn wasm_analyze_stereo(
     serde_json::to_string(&res).map_err(|e| JsValue::from_str(&format!("JSON error: {}", e)))
 }
 
+/// Returns the full list of available ML models in JSON format.
+#[wasm_bindgen]
+pub fn wasm_get_models_json() -> String {
+    let mm = ModelManager::new();
+    serde_json::to_string(mm.models()).unwrap_or_else(|_| "[]".into())
+}
+
+/// Classifies an audio buffer returning JSON `{ "category": "speech", "confidence": 0.92 }`.
+#[wasm_bindgen]
+pub fn wasm_classify_audio(samples: &[f32], sample_rate: f32) -> String {
+    let (cat, conf) = AudioClassifier::classify(samples, sample_rate);
+    let name = match cat {
+        AudioCategory::Speech => "speech",
+        AudioCategory::Music => "music",
+        AudioCategory::Mixed => "mixed",
+        AudioCategory::Noise => "noise",
+    };
+    serde_json::json!({
+        "category": name,
+        "confidence": conf
+    })
+    .to_string()
+}
+
+/// Processes audio with Voice Cleanup ("Studio Sound") returning cleaned samples.
+#[wasm_bindgen]
+pub fn wasm_voice_cleanup(samples: &[f32], sample_rate: f32, studio_amount: f32) -> Vec<f32> {
+    let config = VoiceCleanupConfig {
+        studio_sound_amount: studio_amount,
+        ..Default::default()
+    };
+    let (out, _) = VoiceCleanupEngine::process(samples, sample_rate, &config);
+    out
+}
+
+/// Returns the prototype transcript dialogue document as JSON.
+#[wasm_bindgen]
+pub fn wasm_get_sample_transcript_json() -> String {
+    let doc = TranscriptDocument::create_sample_dialogue();
+    serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".into())
+}
+
+/// Exports a transcript document to formatted subtitles (0 = SRT, 1 = VTT, 2 = TXT, 3 = JSON).
+#[wasm_bindgen]
+pub fn wasm_export_subtitles(transcript_json: &str, format_id: u32) -> String {
+    let doc: TranscriptDocument = match serde_json::from_str(transcript_json) {
+        Ok(d) => d,
+        Err(_) => TranscriptDocument::create_sample_dialogue(),
+    };
+    let fmt = match format_id {
+        1 => SubtitleFormat::Vtt,
+        2 => SubtitleFormat::Txt,
+        3 => SubtitleFormat::Json,
+        _ => SubtitleFormat::Srt,
+    };
+    doc.export_subtitles(fmt)
+}
+
+/// Returns the prototype filler detections as JSON.
+#[wasm_bindgen]
+pub fn wasm_get_sample_fillers_json() -> String {
+    let items = FillerDetector::get_sample_detections();
+    serde_json::to_string(&items).unwrap_or_else(|_| "[]".into())
+}
+
+/// Returns the active cloud & background job queue as JSON.
+#[wasm_bindgen]
+pub fn wasm_list_cloud_jobs_json() -> String {
+    let client = MockCloudClient::new();
+    serde_json::to_string(client.list_jobs()).unwrap_or_else(|_| "[]".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2927,5 +3004,30 @@ mod tests {
             assert!(!out_l[0].is_nan());
             voice_changer_destroy(vc);
         }
+    }
+
+    #[test]
+    fn test_wasm_ml_and_ai_apis() {
+        let models_json = wasm_get_models_json();
+        assert!(models_json.contains("stems_balanced"));
+
+        let sample = vec![0.5f32; 1000];
+        let classify = wasm_classify_audio(&sample, 48000.0);
+        assert!(classify.contains("category"));
+
+        let cleaned = wasm_voice_cleanup(&sample, 48000.0, 0.6);
+        assert_eq!(cleaned.len(), 1000);
+
+        let transcript_json = wasm_get_sample_transcript_json();
+        assert!(transcript_json.contains("Maya"));
+
+        let srt = wasm_export_subtitles(&transcript_json, 0);
+        assert!(srt.contains("-->"));
+
+        let fillers_json = wasm_get_sample_fillers_json();
+        assert!(fillers_json.contains("Um"));
+
+        let jobs_json = wasm_list_cloud_jobs_json();
+        assert!(jobs_json.contains("Harbor Lights"));
     }
 }

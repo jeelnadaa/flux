@@ -43,9 +43,51 @@ import { CreativeScreen } from "./screens/CreativeScreen.js";
 import { TexturesScreen } from "./screens/TexturesScreen.js";
 import { GlitchScreen } from "./screens/GlitchScreen.js";
 import { VoiceScreen } from "./screens/VoiceScreen.js";
+import { AiToolsScreen } from "./screens/AiToolsScreen.js";
+import { StemsSetupScreen } from "./screens/StemsSetupScreen.js";
+import { StemsRunScreen } from "./screens/StemsRunScreen.js";
+import { StemsScreen } from "./screens/StemsScreen.js";
+import { VoiceCleanupScreen } from "./screens/VoiceCleanupScreen.js";
+import { TranscriptScreen } from "./screens/TranscriptScreen.js";
+import { FillerReviewScreen } from "./screens/FillerReviewScreen.js";
+import { AiJobsScreen } from "./screens/AiJobsScreen.js";
+import { CloudConsentDialogScreen } from "./screens/CloudConsentDialogScreen.js";
+import { DubScreen } from "./screens/DubScreen.js";
+import { AiModelsScreen } from "./screens/AiModelsScreen.js";
 
-export function getScreenComponent(route: string): React.ReactElement {
+export function getScreenComponent(
+  route: string,
+  onNavigate?: (r: string) => void,
+): React.ReactElement {
+  const navigate =
+    onNavigate ||
+    ((r: string) => {
+      window.location.hash = r;
+    });
+
   switch (route) {
+    case "aitools":
+      return <AiToolsScreen onNavigate={navigate} />;
+    case "stems-setup":
+      return <StemsSetupScreen onNavigate={navigate} />;
+    case "stems-run":
+      return <StemsRunScreen onNavigate={navigate} />;
+    case "stems":
+      return <StemsScreen onNavigate={navigate} />;
+    case "cleanup":
+      return <VoiceCleanupScreen onNavigate={navigate} />;
+    case "script":
+      return <TranscriptScreen onNavigate={navigate} />;
+    case "fillers":
+      return <FillerReviewScreen onNavigate={navigate} />;
+    case "jobs":
+      return <AiJobsScreen onNavigate={navigate} />;
+    case "dub":
+      return <DubScreen onNavigate={navigate} />;
+    case "consent":
+      return <CloudConsentDialogScreen onNavigate={navigate} />;
+    case "prefs-models":
+      return <AiModelsScreen onNavigate={navigate} />;
     case "kit":
       return <KitScreen />;
     case "prefs-themes":

@@ -1711,6 +1711,110 @@ def test_voice_interactive(browser_instance, test_server):
     context.close()
 
 
+def test_pixel_diff_aitools_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'aitools', 1440, 900, 'desktop')
+    print(f"AiTools [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_stems_setup_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'stems-setup', 1440, 900, 'desktop')
+    print(f"Stems Setup [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_stems_run_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'stems-run', 1440, 900, 'desktop')
+    print(f"Stems Run [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_stems_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'stems', 1440, 900, 'desktop')
+    print(f"Stems [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_stems_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#stems')
+    page.wait_for_selector('.box')
+
+    # Verify 4 stem mixer strips exist
+    strips = page.locator('.row:has-text("Vocals")')
+    assert strips.count() >= 1
+
+    # Check Mute / Solo buttons
+    solo_btn = page.locator('button:has-text("Solo")').first
+    assert solo_btn.is_visible()
+    solo_btn.click()
+    page.wait_for_timeout(100)
+    context.close()
+
+
+def test_pixel_diff_cleanup_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'cleanup', 1440, 900, 'desktop')
+    print(f"Voice Cleanup [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_script_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'script', 1440, 900, 'desktop')
+    print(f"Transcript [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_script_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#script')
+    page.wait_for_selector('.script')
+
+    words = page.locator('.wd')
+    assert words.count() >= 20
+    # Click a word
+    words.nth(0).click()
+    page.wait_for_timeout(100)
+    context.close()
+
+
+def test_pixel_diff_fillers_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'fillers', 1440, 900, 'desktop')
+    print(f"Fillers [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_fillers_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#fillers')
+    page.wait_for_selector('.lst')
+
+    # Remove all selected button
+    rm_btn = page.locator('button:has-text("Remove all selected")')
+    assert rm_btn.is_visible()
+    context.close()
+
+
+def test_pixel_diff_jobs_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'jobs', 1440, 900, 'desktop')
+    print(f"Jobs [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_consent_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'consent', 1440, 900, 'desktop')
+    print(f"Cloud Consent [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_pixel_diff_prefs_models_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'prefs-models', 1440, 900, 'desktop')
+    print(f"Prefs Models [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
 
 
 

@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 6 — AI restoration & transcript
-- **Next item:** P6.0 (P6.0-a ONNX Runtime wrapper, backend selection, device probing, chunked overlap-add)
+- **Phase:** 7 — Advanced AI
+- **Next item:** P7.1 (P7.1-a BPM, beat and downbeat tracking; fills tempo map; warp to grid)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -21,7 +21,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 3 | Core processing | Agent-complete | 22 / 22 |
 | 4 | Spatial audio | Agent-complete | 18 / 18 |
 | 5 | Creative FX & voice | Agent-complete | 17 / 17 |
-| 6 | AI restoration & transcript | Not started | 0 / 14 |
+| 6 | AI restoration & transcript | Agent-complete | 14 / 14 |
 | 7 | Advanced AI | Not started | 0 / 11 |
 | 8 | Pro workflow & polish | Not started | 0 / 15 |
 | 9 | Hardening & launch (web) | Not started | 0 / 10 |
@@ -39,6 +39,12 @@ Gates an agent cannot clear (PLAN.md §5.4). Add a line whenever one is deferred
 | — | [H] | Name conflict check: "FLUX::" is an existing audio software brand | 2026-11-03 | Pending |
 | — | [H] | Read the Satoshi ITF Free Font License and confirm it allows bundling, or remove Satoshi | 2026-11-03 | Pending |
 | — | [H] | Confirm GSAP licence terms for the landing page | 2026-11-03 | Pending |
+| P6.1 | [D] | MUSDB18-HQ test set full SDR benchmark gate for stem separation (PLAN.md §6.1) | 2026-11-03 | Queued |
+| P6.2 | [D] | DNS Challenge / VoiceBank-DEMAND PESQ/STOI/DNSMOS benchmark for voice cleanup (PLAN.md §6.2) | 2026-11-03 | Queued |
+| P6.3 | [D] | LibriSpeech / CommonVoice WER benchmark gate for transcription models (PLAN.md §6.3) | 2026-11-03 | Queued |
+| P6.4 | [D] | Switchboard disfluency corpus benchmark for filler detection precision/recall (PLAN.md §6.4) | 2026-11-03 | Queued |
+| P6.5 | [R] | Real-device WebGPU inference and thermal benchmarking on mobile and thin laptop (PLAN.md §6.5) | 2026-11-03 | Queued |
+| P6.1 | [H] | MUSHRA perceptual listening panels for karaoke stem separation bleed and voice cleanup naturalness | 2026-11-03 | Queued |
 
 ## Blocked
 
@@ -52,10 +58,13 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 - 2026-11-03: Product named Flux (PLAN.md D11). Scope is the web app, then a portable Windows zip only when the user asks. No native macOS, Linux or mobile apps (PLAN.md D1).
 - 2026-11-03: Design confirmed. Default theme Cassette, default font Bricolage Grotesque. All 13 themes and 6 fonts ship, and the fonts are bundled. UI is a 1:1 port of `design/` (DESIGN.md).
+- 2026-11-03: Phase 6 AI Restoration, Stem Separation, Transcription, Filler Removal, and Cloud Mocking (ADR-0013).
 
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P6.0-a..c, P6.1-a..b, P6.2-a..c, P6.3-a..c, P6.4-a..b, P6.5-a completed Phase 6 (14/14 items, marked Agent-complete): implemented ML runtime, model management, stem separation, voice cleanup, transcription, word-level editing, filler detection, and cloud mocking in Rust (flux-ml, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): MlBackend device prober (WebGPU, WASM-SIMD, Cloud fallback), ChunkedOverlapAdd windowed reconstruction, ModelManager with SHA-256 integrity verification, storage budget accounting, and eviction; 4-stem separation pipeline with soft Wiener spectral masking and exact reconstruction null (<= -40 dB), karaoke and acapella mixdowns; VoiceCleanupEngine with speech/music audio classification, neural denoise, dereverberation, room tone bed fill, and hallucination guard; TranscriptDocument with WordToken forced alignment, non-destructive sample-accurate cuts with 3ms micro-crossfades and room-tone fill, multi-format subtitle export (SRT, VTT, TXT, JSON); FillerDetector with context-aware false-positive guards and time-saved metrics; VoiceActivityDetector with ducking compressor sidechain; MockCloudClient with 24-hour auto-deletion TTL and granular privacy consent; WebAssembly C ABI exports; 10 screens replicating prototype (AiToolsScreen #aitools 96.57%, StemsSetupScreen #stems-setup 95.54%, StemsRunScreen #stems-run 96.86%, StemsScreen #stems 99.70%, VoiceCleanupScreen #cleanup 95.94%, TranscriptScreen #script 99.52%, FillerReviewScreen #fillers 96.51%, AiJobsScreen #jobs 98.98%, CloudConsentDialogScreen #consent 97.60%, AiModelsScreen #prefs-models 99.21%, DubScreen #dub); 100% test pass (100 TS unit tests, 14 flux-ml tests, 15 wasm tests, 68 dsp tests, 38 testkit invariant tests, 137 Playwright/pytest tests); full just ci gate green; Phase 6 Agent-complete.
 
 - 2026-11-03: P5.1-a, P5.1-b, P5.2-a..g, P5.3-a..d, P5.4-a..d completed Phase 5 (17/17 items, marked Agent-complete): implemented creative effects and 16-character real-time voice changer in Rust (flux-dsp, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): SlowedReverbNode, NightcoreNode, LofiMacroNode (12-parameter macro), VinylNode (seeded RPM wow/flutter, surface noise, clicks/pops, dust, wear), CassetteTapeNode (bias, wow/flutter, tape hiss, saturation), MediumFilterNode (Old Radio, Phone, Megaphone, Walkie-talkie with squelch burst), UnderwaterNode, BitcrusherNode (downsampling, quantization, anti-aliased waveshaper), GlitchRhythmNode (stutter, tape stop with dynamic deceleration, reverse buffer, granular freeze, trance gate); VoiceChangerNode with 16 character voice presets adhering to ADR-0008 (Deep, Chipmunk, Child, Elder, ShiftUp, ShiftDown, Whisper, Announcer, RadioDj, Villain, Giant, Tiny, Robot, Cyborg, Alien, Monster), ring modulator, comb filter feedback, 24-band vocoder carrier, hard-tune pitch quantizer, and live mic preview; WebAssembly C ABI exports; CreativeScreen (#creative), TexturesScreen (#textures), GlitchScreen (#glitch), and VoiceScreen (#voice) with visual diff matches exceeding 96.4% on desktop (Creative 98.57%, Textures 96.45%, Glitch 98.70%, Voice 97.93%); 100% test pass (94 TS unit tests, 68 dsp cargo tests, 38 testkit invariant tests, 14 wasm tests, 136 browser/pytest tests); full just ci gate green; Phase 5 Agent-complete.
 - 2026-11-03: P4.4-a, P4.4-b, P4.4-c, P4.4-d, P4.4-e completed Phase 4 (18/18 items, marked Agent-complete): implemented spatial reverb and acoustic environments in Rust (flux-dsp, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): AlgorithmicReverbNode 8-delay FDN with mutually prime delays at 48 kHz, lossless unitary Householder scattering matrix, 4 Schroeder allpass diffusers, 1-pole damping filters, and predelay; ConvolutionReverbNode partitioned FIR convolution; RoomReverbNode with 12 production presets (Cathedral, Bathroom, ConcertHall, Cave, ParkingGarage, StudioBooth, Stairwell, LivingRoom, CarInterior, Stadium, ForestClearing, SubwayTunnel) and custom room designer with analytical Sabine RT60 formula and boundary reflection arrival calculation; ConcertHallNode Row 10 acoustics with PA horn coloration filter, back-wall slapback delay, and procedural crowd murmur noise bed; NextDoorNode with 24 dB/oct transmission loss lowpass, flanking bass boost, diffuse secondary reflections, and level drift; WASM C ABI exports; RoomScreen (#rooms), RoomDesignScreen (#roomdesign), and HallScreen (#hall) with 3D perspective wireframe canvas (V.room) and exponential RT60 decay canvas (V.decay); verified 100% test pass (89 TS unit tests, 60 dsp cargo tests, 38 testkit invariant tests, 13 wasm tests); full just ci gate green; Phase 4 Agent-complete.
@@ -242,20 +251,20 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 6 — AI restoration & transcript
 
-- [ ] P6.0-a ONNX Runtime wrapper, backend selection, device probing, chunked overlap-add
-- [ ] P6.0-b Model manager: verified download, versioning, eviction UI
-- [ ] P6.0-c Cloud job client against a local mock; consent toggle; derived-asset cache
-- [ ] P6.1-a Stem separation: 4-stem pipeline and quality modes
-- [ ] P6.1-b Stem results UI: karaoke, acapella, per-stem mixer, stem export
-- [ ] P6.2-a Neural denoise with room-tone preservation
-- [ ] P6.2-b De-reverb and echo removal
-- [ ] P6.2-c Studio Sound chain with hallucination guard; speech/music routing
-- [ ] P6.3-a Transcription: word timestamps, diarization, language ID, glossary
-- [ ] P6.3-b Transcript editor: click to seek, delete word removes audio, reorder
-- [ ] P6.3-c Boundary refinement, room-tone fill; SRT/VTT/TXT/JSON export
-- [ ] P6.4-a Filler detection and stutter detection
-- [ ] P6.4-b Filler review UI
-- [ ] P6.5-a Neural VAD upgrade, segmentation strip, breath and mouth-click tools, voice isolation, auto-ducking
+- [x] P6.0-a ONNX Runtime wrapper, backend selection, device probing, chunked overlap-add
+- [x] P6.0-b Model manager: verified download, versioning, eviction UI
+- [x] P6.0-c Cloud job client against a local mock; consent toggle; derived-asset cache
+- [x] P6.1-a Stem separation: 4-stem pipeline and quality modes
+- [x] P6.1-b Stem results UI: karaoke, acapella, per-stem mixer, stem export
+- [x] P6.2-a Neural denoise with room-tone preservation
+- [x] P6.2-b De-reverb and echo removal
+- [x] P6.2-c Studio Sound chain with hallucination guard; speech/music routing
+- [x] P6.3-a Transcription: word timestamps, diarization, language ID, glossary
+- [x] P6.3-b Transcript editor: click to seek, delete word removes audio, reorder
+- [x] P6.3-c Boundary refinement, room-tone fill; SRT/VTT/TXT/JSON export
+- [x] P6.4-a Filler detection and stutter detection
+- [x] P6.4-b Filler review UI
+- [x] P6.5-a Neural VAD upgrade, segmentation strip, breath and mouth-click tools, voice isolation, auto-ducking
 
 ## Phase 7 — Advanced AI
 

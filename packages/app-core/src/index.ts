@@ -44,3 +44,5 @@ export * from "./restoration/Restoration.js";
 export * from "./utility/Metering.js";
 export * from "./utility/PresetSystem.js";
 export * from "./spatial/SpatialModels.js";
+export * from "./creative/CreativeModels.js";
+export * from "./ai/AiModels.js";
