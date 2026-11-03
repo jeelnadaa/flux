@@ -4,8 +4,14 @@
 use flux_dsp::binaural::BinauralNode;
 use flux_dsp::biquad::{BiquadChain, BiquadType};
 use flux_dsp::dither::{BitDepth, Dither, DitherType};
+use flux_dsp::loudness::LoudnessMeter;
 use flux_dsp::node::DspNode;
+use flux_dsp::pyramid::PeakPyramid;
 use flux_dsp::resampler::{Resampler, ResamplerQuality};
+use flux_dsp::spatial_analysis::StereoAnalyzer;
+use flux_dsp::spectrogram::{
+    ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTileGenerator,
+};
 use flux_dsp::stretch::StretchNode;
 use flux_engine::capture::{ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
@@ -1265,6 +1271,232 @@ fn parse_normalization_mode(norm_str: &str) -> NormalizationMode {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Audio Analysis Foundations WASM APIs (Pyramid, Spectrogram, Loudness, Stereo)
+// ----------------------------------------------------------------------------
+
+/// JSON payload structure for loudness measurement.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmLoudnessResult {
+    /// Integrated loudness in LUFS / LKFS.
+    pub integrated_lufs: f32,
+    /// Maximum momentary loudness (400 ms window) in LUFS.
+    pub max_momentary_lufs: f32,
+    /// Maximum short-term loudness (3000 ms window) in LUFS.
+    pub max_short_term_lufs: f32,
+    /// Loudness range in LU (EBU Tech 3342).
+    pub loudness_range_lu: f32,
+    /// Maximum True Peak level in dBTP.
+    pub max_true_peak_dbtp: f32,
+    /// Linear True Peak amplitude.
+    pub max_true_peak_linear: f32,
+}
+
+/// JSON payload structure for stereo spatial analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmStereoResult {
+    /// Phase correlation in [-1.0, +1.0].
+    pub phase_correlation: f32,
+    /// Stereo width ratio RMS(Side) / RMS(Mid).
+    pub stereo_width: f32,
+    /// Mid channel RMS amplitude.
+    pub mid_rms: f32,
+    /// Side channel RMS amplitude.
+    pub side_rms: f32,
+    /// Decimated goniometer points [x0, y0, x1, y1, ...].
+    pub goniometer_coords: Vec<f32>,
+}
+
+/// Builds a multi-resolution peak pyramid and returns serialized bytes (`FPYR`).
+#[wasm_bindgen]
+pub fn wasm_build_peak_pyramid(
+    samples: &[f32],
+    num_channels: usize,
+    base_bin_size: usize,
+) -> Result<Vec<u8>, JsValue> {
+    if num_channels == 0 || samples.is_empty() {
+        return Err(JsValue::from_str("Invalid samples or channel count"));
+    }
+
+    let frames = samples.len() / num_channels;
+    let mut channel_vecs = vec![Vec::with_capacity(frames); num_channels];
+    for f in 0..frames {
+        for c in 0..num_channels {
+            channel_vecs[c].push(samples[f * num_channels + c]);
+        }
+    }
+
+    let slices: Vec<&[f32]> = channel_vecs.iter().map(|c| c.as_slice()).collect();
+    let pyramid = PeakPyramid::build(&slices, base_bin_size);
+    Ok(pyramid.to_bytes())
+}
+
+/// Queries a timeline range from serialized pyramid bytes, returning packed `[min0, max0, rms0, min1, max1, rms1, ...]`.
+#[wasm_bindgen]
+pub fn wasm_query_peak_pyramid(
+    pyramid_bytes: &[u8],
+    channel: usize,
+    start_frame: usize,
+    end_frame: usize,
+    max_bins: usize,
+) -> Result<Vec<f32>, JsValue> {
+    let pyramid = PeakPyramid::from_bytes(pyramid_bytes)
+        .map_err(|e| JsValue::from_str(&format!("Pyramid deserialize failed: {}", e)))?;
+
+    let bins = pyramid.query_range(channel, start_frame, end_frame, max_bins);
+    let mut out = Vec::with_capacity(bins.len() * 3);
+    for b in bins {
+        out.push(b.min);
+        out.push(b.max);
+        out.push(b.rms);
+    }
+
+    Ok(out)
+}
+
+/// JSON configuration for spectrogram tile generation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmSpectrogramConfig {
+    /// FFT window size in samples.
+    pub window_size: Option<usize>,
+    /// Hop size in samples.
+    pub hop_size: Option<usize>,
+    /// Number of frequency bins.
+    pub num_bins: Option<usize>,
+    /// Scale mapping ("linear", "logarithmic", "mel").
+    pub scale: Option<String>,
+    /// Colormap name ("magma", "viridis", "inferno").
+    pub colormap: Option<String>,
+    /// Dynamic range minimum floor in dBFS.
+    pub min_dbfs: Option<f32>,
+    /// Dynamic range ceiling in dBFS.
+    pub max_dbfs: Option<f32>,
+}
+
+/// Generates a 2D spectrogram tile and returns packed RGBA pixel bytes.
+#[wasm_bindgen]
+pub fn wasm_generate_spectrogram_tile(
+    samples: &[f32],
+    sample_rate: u32,
+    config_json: &str,
+) -> Result<Vec<u8>, JsValue> {
+    if samples.is_empty() {
+        return Err(JsValue::from_str("Input signal is empty"));
+    }
+
+    let parsed_cfg: WasmSpectrogramConfig = if config_json.trim().is_empty() {
+        WasmSpectrogramConfig {
+            window_size: None,
+            hop_size: None,
+            num_bins: None,
+            scale: None,
+            colormap: None,
+            min_dbfs: None,
+            max_dbfs: None,
+        }
+    } else {
+        serde_json::from_str(config_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid config JSON: {}", e)))?
+    };
+
+    let scale = match parsed_cfg
+        .scale
+        .as_deref()
+        .unwrap_or("linear")
+        .to_lowercase()
+        .as_str()
+    {
+        "log" | "logarithmic" => FrequencyScale::Logarithmic,
+        "mel" => FrequencyScale::Mel,
+        _ => FrequencyScale::Linear,
+    };
+
+    let colormap = match parsed_cfg
+        .colormap
+        .as_deref()
+        .unwrap_or("magma")
+        .to_lowercase()
+        .as_str()
+    {
+        "viridis" => ColorMap::Viridis,
+        "inferno" => ColorMap::Inferno,
+        _ => ColorMap::Magma,
+    };
+
+    let cfg = SpectrogramConfig {
+        window_size: parsed_cfg.window_size.unwrap_or(1024),
+        hop_size: parsed_cfg.hop_size.unwrap_or(512),
+        scale,
+        num_freq_bins: parsed_cfg.num_bins.unwrap_or(256),
+        min_dbfs: parsed_cfg.min_dbfs.unwrap_or(-100.0),
+        max_dbfs: parsed_cfg.max_dbfs.unwrap_or(0.0),
+        colormap,
+    };
+
+    let tile = SpectrogramTileGenerator::generate_tile(samples, sample_rate, &cfg);
+    Ok(tile.rgba_pixels)
+}
+
+/// Measures ITU-R BS.1770-4 / EBU R128 integrated loudness, momentary, short-term, LRA, and true peak.
+#[wasm_bindgen]
+pub fn wasm_measure_loudness(
+    samples: &[f32],
+    num_channels: usize,
+    sample_rate: u32,
+) -> Result<String, JsValue> {
+    if num_channels == 0 || samples.is_empty() {
+        return Err(JsValue::from_str("Invalid audio buffer parameters"));
+    }
+
+    let frames = samples.len() / num_channels;
+    let mut channel_vecs = vec![Vec::with_capacity(frames); num_channels];
+    for f in 0..frames {
+        for c in 0..num_channels {
+            channel_vecs[c].push(samples[f * num_channels + c]);
+        }
+    }
+
+    let slices: Vec<&[f32]> = channel_vecs.iter().map(|c| c.as_slice()).collect();
+    let meas = LoudnessMeter::analyze(&slices, sample_rate);
+
+    let res = WasmLoudnessResult {
+        integrated_lufs: meas.integrated_lufs,
+        max_momentary_lufs: meas.max_momentary_lufs,
+        max_short_term_lufs: meas.max_short_term_lufs,
+        loudness_range_lu: meas.loudness_range_lu,
+        max_true_peak_dbtp: meas.max_true_peak_dbtp,
+        max_true_peak_linear: meas.max_true_peak_linear,
+    };
+
+    serde_json::to_string(&res).map_err(|e| JsValue::from_str(&format!("JSON error: {}", e)))
+}
+
+/// Computes stereo phase correlation, stereo width ratio, mid/side RMS, and goniometer vectorscope coordinates.
+#[wasm_bindgen]
+pub fn wasm_analyze_stereo(
+    left: &[f32],
+    right: &[f32],
+    max_goniometer_points: usize,
+) -> Result<String, JsValue> {
+    let result = StereoAnalyzer::analyze(left, right, max_goniometer_points);
+
+    let mut coords = Vec::with_capacity(result.goniometer_points.len() * 2);
+    for pt in result.goniometer_points {
+        coords.push(pt.x);
+        coords.push(pt.y);
+    }
+
+    let res = WasmStereoResult {
+        phase_correlation: result.phase_correlation,
+        stereo_width: result.stereo_width,
+        mid_rms: result.mid_rms,
+        side_rms: result.side_rms,
+        goniometer_coords: coords,
+    };
+
+    serde_json::to_string(&res).map_err(|e| JsValue::from_str(&format!("JSON error: {}", e)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1534,5 +1766,43 @@ mod tests {
         let conv_bytes =
             wasm_convert_audio_format(&wav_bytes, conv_config).expect("WASM convert failed");
         assert!(conv_bytes.starts_with(b"RIFF"));
+    }
+
+    #[test]
+    fn test_wasm_analysis_apis() {
+        let left = vec![0.5f32; 2048];
+        let right = vec![0.5f32; 2048];
+        let mut interleaved = Vec::with_capacity(4096);
+        for i in 0..2048 {
+            interleaved.push(left[i]);
+            interleaved.push(right[i]);
+        }
+
+        // Peak pyramid test
+        let pyr_bytes = wasm_build_peak_pyramid(&interleaved, 2, 64).expect("Pyramid build failed");
+        assert!(pyr_bytes.starts_with(b"FPYR"));
+
+        let queried_bins =
+            wasm_query_peak_pyramid(&pyr_bytes, 0, 0, 1024, 64).expect("Query failed");
+        assert!(!queried_bins.is_empty());
+
+        // Spectrogram tile test
+        let tile_rgba = wasm_generate_spectrogram_tile(
+            &left,
+            48000,
+            r#"{"window_size":512,"hop_size":256,"num_bins":64,"scale":"linear","colormap":"magma"}"#,
+        )
+        .expect("Spectrogram tile failed");
+        assert!(!tile_rgba.is_empty());
+
+        // Loudness meter test
+        let loudness_json =
+            wasm_measure_loudness(&interleaved, 2, 48000).expect("Loudness test failed");
+        assert!(loudness_json.contains("integrated_lufs"));
+
+        // Stereo analysis test (Left = Right -> correlation = 1.0)
+        let stereo_json = wasm_analyze_stereo(&left, &right, 128).expect("Stereo test failed");
+        assert!(stereo_json.contains("phase_correlation"));
+        assert!(stereo_json.contains("\"phase_correlation\":1.0"));
     }
 }

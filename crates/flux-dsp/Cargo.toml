@@ -6,5 +6,6 @@ license.workspace = true
 description = "Flux DSP core processing library"
 
 [dependencies]
+realfft = "3.4"
 
 [dev-dependencies]

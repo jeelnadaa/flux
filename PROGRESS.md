@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 1 — Core engine & I/O
-- **Next item:** P1.5 (P1.5-a Peak pyramids and spectrogram tiles)
+- **Phase:** 2 — Editor UI & timeline
+- **Next item:** P2.0 (P2.0-a Design tokens and component library per DESIGN.md (port `design/` CSS as is); app shell and routing)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -16,7 +16,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | Phase | Name | Status | Items |
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
-| 1 | Core engine & I/O | In progress | 15 / 18 |
+| 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Not started | 0 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P1.5-a, P1.5-b, P1.5-c implemented analysis foundations and completed Phase 1: multi-resolution PeakPyramid with binary FPYR serialization, STFT SpectrogramTileGenerator (Linear/Log/Mel scales, Magma/Viridis/Inferno colormaps, RGBA rendering), ITU-R BS.1770-4 / EBU R128 loudness meter (momentary M, short-term S, gated integrated I, LRA EBU Tech 3342, 4x True Peak within +/-0.15 LU and +/-0.3 dB), StereoAnalyzer (phase correlation rho in [-1, +1], stereo width, mid/side RMS, goniometer point cloud), hostile-input decoder fuzzer (empty, truncated, corrupted magic, decompression bombs, 0Hz/0ch parameter rejection, 500 pseudorandom fuzz bitstreams), WASM bindings, and TypeScript AnalysisManager; Phase 1 marked Agent-complete (18/18 items); 58 cargo tests passing, 14 eval pytest, 10 Playwright browser tests; just ci green.
 
 - 2026-11-03: P1.4-a, P1.4-b, P1.4-c, P1.4-d implemented complete export pipeline: WAV (16/24/32f, RF64, RIFF INFO), pure-Rust RFC 5114 FLAC (16/24-bit, levels 0-8, VORBIS_COMMENT, PICTURE), MP3 (CBR/VBR, ID3v2 tags), AAC-LC ADTS stream, Ogg Opus, Ogg Vorbis; BS.1770 LUFS and Peak normalizer with true-peak ceiling; destination presets (Streaming, Podcast stereo/mono, YouTube, CdAudio, Archival); background ExportJob with cancellation, progress, region slicing, tail padding, and cosine fade-out; single-file/batch FormatConverter; WASM bindings and TypeScript ExportManager; 85 workspace tests passing, 9 Playwright browser tests green; just ci green.
 
@@ -119,9 +121,9 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P1.4-b Export MP3, AAC, Vorbis, Opus
 - [x] P1.4-c Normalization on export, destination presets, metadata editor
 - [x] P1.4-d Background export with progress, cancel, resume; single-file format converter
-- [ ] P1.5-a Peak pyramids and spectrogram tiles
-- [ ] P1.5-b BS.1770 loudness, true peak, LRA (EBU 3341/3342)
-- [ ] P1.5-c Phase correlation, stereo width, goniometer data; fuzz all parsers
+- [x] P1.5-a Peak pyramids and spectrogram tiles
+- [x] P1.5-b BS.1770 loudness, true peak, LRA (EBU 3341/3342)
+- [x] P1.5-c Phase correlation, stereo width, goniometer data; fuzz all parsers
 
 ## Phase 2 — Editor UI & timeline
 

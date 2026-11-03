@@ -1,6 +1,7 @@
 //! Flux engine graph and playback orchestration.
 #![deny(missing_docs)]
 
+pub mod analysis;
 pub mod capture;
 pub mod codec;
 pub mod decoder;
@@ -9,6 +10,7 @@ pub mod graph;
 pub mod render;
 pub mod transport;
 
+pub use analysis::*;
 pub use capture::{ChannelMeter, ChunkHeader, ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 
 pub use codec::{AudioMetadata, ExportFormat, Mp3Encoder, OpusEncoder, VorbisEncoder};
