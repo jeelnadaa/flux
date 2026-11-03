@@ -254,6 +254,7 @@ describe("Spatial Domain Models and Coordinates", () => {
   });
 
   it("calculates Sabine RT60 and first reflection delay accurately", () => {
+    assert.ok(SURFACE_MATERIALS.concrete.absorption > 0);
     // 12m x 18m x 6m room with plaster walls, wood floor, plaster ceiling
     const res = computeSabineRt60(12, 18, 6, "plaster", "wood", "plaster");
     assert.equal(res.volumeM3, 1296);

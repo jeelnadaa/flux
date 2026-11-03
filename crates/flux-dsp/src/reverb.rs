@@ -301,22 +301,26 @@ impl AlgorithmicReverbNode {
 
     /// Sets the target RT60 in seconds.
     pub fn set_decay_time(&mut self, rt60_sec: f32) {
-        self.decay_time.set_target(rt60_sec.clamp(0.1, 20.0), 0.02, SmoothingMode::Linear);
+        self.decay_time
+            .set_target(rt60_sec.clamp(0.1, 20.0), 0.02, SmoothingMode::Linear);
     }
 
     /// Sets the wet mix [0.0, 1.0].
     pub fn set_wet(&mut self, wet: f32) {
-        self.wet.set_target(wet.clamp(0.0, 1.0), 0.02, SmoothingMode::Linear);
+        self.wet
+            .set_target(wet.clamp(0.0, 1.0), 0.02, SmoothingMode::Linear);
     }
 
     /// Sets predelay in milliseconds.
     pub fn set_predelay_ms(&mut self, ms: f32) {
-        self.predelay_ms.set_target(ms.clamp(0.0, 500.0), 0.02, SmoothingMode::Linear);
+        self.predelay_ms
+            .set_target(ms.clamp(0.0, 500.0), 0.02, SmoothingMode::Linear);
     }
 
     /// Sets high-frequency damping factor [0.0, 1.0].
     pub fn set_damping(&mut self, damping: f32) {
-        self.damping.set_target(damping.clamp(0.0, 0.95), 0.02, SmoothingMode::Linear);
+        self.damping
+            .set_target(damping.clamp(0.0, 0.95), 0.02, SmoothingMode::Linear);
     }
 }
 
@@ -339,7 +343,11 @@ impl DspNode for AlgorithmicReverbNode {
         }
 
         let in_l = inputs[0];
-        let in_r = if inputs.len() > 1 { inputs[1] } else { inputs[0] };
+        let in_r = if inputs.len() > 1 {
+            inputs[1]
+        } else {
+            inputs[0]
+        };
 
         let (out_l, out_r) = match outputs.split_at_mut(1) {
             (first, rest) if !rest.is_empty() => (&mut first[0][..], &mut rest[0][..]),
@@ -393,7 +401,7 @@ impl DspNode for AlgorithmicReverbNode {
             let lfo = (self.lfo_phase * std::f32::consts::TAU).sin() * 3.5;
 
             // 4. Read FDN delay lines
-            for i in 0..FDN_LINES {
+            for (i, out_sample) in fdn_outs.iter_mut().enumerate().take(FDN_LINES) {
                 let mod_offset = if i % 2 == 0 { lfo } else { -lfo };
                 let delay_time =
                     (self.delay_lengths[i] as f32 * size + mod_offset).clamp(10.0, 10000.0);
@@ -406,7 +414,7 @@ impl DspNode for AlgorithmicReverbNode {
                 let filtered = (1.0 - damp) * delayed_sample + damp * self.damping_filters[i];
                 self.damping_filters[i] = filtered;
 
-                fdn_outs[i] = filtered * loop_gain;
+                *out_sample = filtered * loop_gain;
             }
 
             // 5. Lossless Householder feedback matrix multiplication:
@@ -414,8 +422,8 @@ impl DspNode for AlgorithmicReverbNode {
             let sum_outs: f32 = fdn_outs.iter().sum();
             let avg_factor = (2.0 / FDN_LINES as f32) * sum_outs;
 
-            for i in 0..FDN_LINES {
-                let mixed = fdn_outs[i] - avg_factor;
+            for (i, &out_sample) in fdn_outs.iter().enumerate().take(FDN_LINES) {
+                let mixed = out_sample - avg_factor;
                 let injection = if i % 2 == 0 { diff_l } else { diff_r };
                 self.delay_lines[i].write(mixed + injection * 0.45);
             }
@@ -456,12 +464,22 @@ impl DspNode for AlgorithmicReverbNode {
             0 => self.set_bypass(value >= 0.5),
             1 => self.wet.set_target(value, 0.02, SmoothingMode::Linear),
             2 => self.dry.set_target(value, 0.02, SmoothingMode::Linear),
-            3 => self.room_size.set_target(value, 0.02, SmoothingMode::Linear),
-            4 => self.decay_time.set_target(value, 0.02, SmoothingMode::Linear),
+            3 => self
+                .room_size
+                .set_target(value, 0.02, SmoothingMode::Linear),
+            4 => self
+                .decay_time
+                .set_target(value, 0.02, SmoothingMode::Linear),
             5 => self.damping.set_target(value, 0.02, SmoothingMode::Linear),
-            6 => self.diffusion.set_target(value, 0.02, SmoothingMode::Linear),
-            7 => self.predelay_ms.set_target(value, 0.02, SmoothingMode::Linear),
-            8 => self.early_late_mix.set_target(value, 0.02, SmoothingMode::Linear),
+            6 => self
+                .diffusion
+                .set_target(value, 0.02, SmoothingMode::Linear),
+            7 => self
+                .predelay_ms
+                .set_target(value, 0.02, SmoothingMode::Linear),
+            8 => self
+                .early_late_mix
+                .set_target(value, 0.02, SmoothingMode::Linear),
             _ => {}
         }
     }
@@ -632,7 +650,11 @@ impl DspNode for ConvolutionReverbNode {
         }
 
         let in_l = inputs[0];
-        let in_r = if inputs.len() > 1 { inputs[1] } else { inputs[0] };
+        let in_r = if inputs.len() > 1 {
+            inputs[1]
+        } else {
+            inputs[0]
+        };
 
         let (out_l, out_r) = match outputs.split_at_mut(1) {
             (first, rest) if !rest.is_empty() => (&mut first[0][..], &mut rest[0][..]),
@@ -683,8 +705,12 @@ impl DspNode for ConvolutionReverbNode {
             self.write_pos = (self.write_pos + 1) % buf_len;
 
             // Damping high cut
-            let filtered_l = self.high_cut_l.process_sample(conv_acc_l, &self.high_cut_coeffs);
-            let filtered_r = self.high_cut_r.process_sample(conv_acc_r, &self.high_cut_coeffs);
+            let filtered_l = self
+                .high_cut_l
+                .process_sample(conv_acc_l, &self.high_cut_coeffs);
+            let filtered_r = self
+                .high_cut_r
+                .process_sample(conv_acc_r, &self.high_cut_coeffs);
 
             out_l[n] = in_l[n] * dry + filtered_l * wet;
             if !out_r.is_empty() {
@@ -712,10 +738,15 @@ impl DspNode for ConvolutionReverbNode {
             0 => self.set_bypass(value >= 0.5),
             1 => self.wet.set_target(value, 0.02, SmoothingMode::Linear),
             2 => self.dry.set_target(value, 0.02, SmoothingMode::Linear),
-            3 => self.predelay_ms.set_target(value, 0.02, SmoothingMode::Linear),
-            4 => self.decay_scale.set_target(value, 0.02, SmoothingMode::Linear),
+            3 => self
+                .predelay_ms
+                .set_target(value, 0.02, SmoothingMode::Linear),
+            4 => self
+                .decay_scale
+                .set_target(value, 0.02, SmoothingMode::Linear),
             5 => {
-                self.high_cut_hz.set_target(value, 0.02, SmoothingMode::Linear);
+                self.high_cut_hz
+                    .set_target(value, 0.02, SmoothingMode::Linear);
                 self.high_cut_coeffs = BiquadCoeffs::calculate(
                     BiquadType::Lowpass,
                     self.sample_rate as f64,
@@ -743,13 +774,8 @@ impl DspNode for ConvolutionReverbNode {
             3 => self.predelay_ms.current(),
             4 => self.decay_scale.current(),
             5 => self.high_cut_hz.current(),
-            6 => {
-                if self.is_reverse {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            6 if self.is_reverse => 1.0,
+            6 => 0.0,
             _ => 0.0,
         }
     }
@@ -843,8 +869,14 @@ impl RoomReverbNode {
         self.floor_mat = floor;
         self.ceiling_mat = ceiling;
 
-        let (rt60, _) =
-            compute_sabine_rt60(width, depth, height, self.wall_mat, self.floor_mat, self.ceiling_mat);
+        let (rt60, _) = compute_sabine_rt60(
+            width,
+            depth,
+            height,
+            self.wall_mat,
+            self.floor_mat,
+            self.ceiling_mat,
+        );
         self.inner_fdn.set_decay_time(rt60);
     }
 
@@ -875,7 +907,11 @@ impl DspNode for RoomReverbNode {
         if self.bypassed {
             if !inputs.is_empty() && !outputs.is_empty() {
                 let in_l = inputs[0];
-                let in_r = if inputs.len() > 1 { inputs[1] } else { inputs[0] };
+                let in_r = if inputs.len() > 1 {
+                    inputs[1]
+                } else {
+                    inputs[0]
+                };
                 let num = outputs[0].len().min(in_l.len()).min(in_r.len());
                 if outputs.len() >= 2 {
                     let (first, rest) = outputs.split_at_mut(1);
@@ -923,8 +959,12 @@ impl DspNode for RoomReverbNode {
             5 => self.width_m = value.clamp(1.0, 100.0),
             6 => self.depth_m = value.clamp(1.0, 100.0),
             7 => self.height_m = value.clamp(1.0, 40.0),
-            8 => self.distance_m.set_target(value, 0.02, SmoothingMode::Linear),
-            9 => self.early_level.set_target(value, 0.02, SmoothingMode::Linear),
+            8 => self
+                .distance_m
+                .set_target(value, 0.02, SmoothingMode::Linear),
+            9 => self
+                .early_level
+                .set_target(value, 0.02, SmoothingMode::Linear),
             _ => {}
         }
     }
@@ -1050,13 +1090,8 @@ impl DspNode for ConcertHallNode {
     fn prepare(&mut self, sample_rate: f32, channels: usize) {
         self.inner_fdn.prepare(sample_rate, channels);
         self.sample_rate = sample_rate;
-        self.pa_coeffs = BiquadCoeffs::calculate(
-            BiquadType::Peaking,
-            sample_rate as f64,
-            2400.0,
-            1.2,
-            3.0,
-        );
+        self.pa_coeffs =
+            BiquadCoeffs::calculate(BiquadType::Peaking, sample_rate as f64, 2400.0, 1.2, 3.0);
         self.reset();
     }
 
@@ -1066,7 +1101,11 @@ impl DspNode for ConcertHallNode {
         }
 
         let in_l = inputs[0];
-        let in_r = if inputs.len() > 1 { inputs[1] } else { inputs[0] };
+        let in_r = if inputs.len() > 1 {
+            inputs[1]
+        } else {
+            inputs[0]
+        };
 
         if self.bypassed || !self.enabled {
             let (out_l, out_r) = match outputs.split_at_mut(1) {
@@ -1113,7 +1152,10 @@ impl DspNode for ConcertHallNode {
             let main_l = out_l[n] * (1.0 - pa_col) + pa_l * pa_col + slap_l;
 
             // Procedural crowd noise bed (seeded murmur / subtle applause)
-            self.noise_seed = self.noise_seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            self.noise_seed = self
+                .noise_seed
+                .wrapping_mul(1664525)
+                .wrapping_add(1013904223);
             let raw_noise = (self.noise_seed as f32 / 4294967296.0) * 2.0 - 1.0;
             let crowd_sig = raw_noise * crowd_lvl * 0.04;
 
@@ -1143,7 +1185,9 @@ impl DspNode for ConcertHallNode {
         match index {
             0 => self.enabled = value > 0.5,
             1 => self.row.set_target(value, 0.02, SmoothingMode::Linear),
-            2 => self.crowd_gain.set_target(value, 0.02, SmoothingMode::Linear),
+            2 => self
+                .crowd_gain
+                .set_target(value, 0.02, SmoothingMode::Linear),
             3 => self.pa_color.set_target(value, 0.02, SmoothingMode::Linear),
             4 => self.applause_active = value > 0.5,
             _ => {}
@@ -1162,13 +1206,8 @@ impl DspNode for ConcertHallNode {
             1 => self.row.current(),
             2 => self.crowd_gain.current(),
             3 => self.pa_color.current(),
-            4 => {
-                if self.applause_active {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            4 if self.applause_active => 1.0,
+            4 => 0.0,
             _ => 0.0,
         }
     }
@@ -1300,7 +1339,11 @@ impl DspNode for NextDoorNode {
         }
 
         let in_l = inputs[0];
-        let in_r = if inputs.len() > 1 { inputs[1] } else { inputs[0] };
+        let in_r = if inputs.len() > 1 {
+            inputs[1]
+        } else {
+            inputs[0]
+        };
 
         let (out_l, out_r) = match outputs.split_at_mut(1) {
             (first, rest) if !rest.is_empty() => (&mut first[0][..], &mut rest[0][..]),
@@ -1328,11 +1371,15 @@ impl DspNode for NextDoorNode {
             let drift = 1.0 + (self.drift_phase * std::f32::consts::TAU).sin() * 0.18;
 
             // 2. Steep 24 dB/oct transmission loss low-pass filter
-            let lp1_l = self.wall_filter1_l.process_sample(in_l[n], &self.wall_coeffs);
+            let lp1_l = self
+                .wall_filter1_l
+                .process_sample(in_l[n], &self.wall_coeffs);
             let lp2_l = self.wall_filter2_l.process_sample(lp1_l, &self.wall_coeffs);
 
             // 3. Structural flanking low-frequency boost
-            let bass_l = self.flank_bass_l.process_sample(lp2_l, &self.flank_bass_coeffs);
+            let bass_l = self
+                .flank_bass_l
+                .process_sample(lp2_l, &self.flank_bass_coeffs);
 
             // 4. Secondary neighbor room diffuse reflections (decay 0.6s)
             self.diffuse_delay_l.write(bass_l);
@@ -1341,9 +1388,13 @@ impl DspNode for NextDoorNode {
             out_l[n] = (bass_l + diff_l) * drift * 0.75;
 
             if !out_r.is_empty() {
-                let lp1_r = self.wall_filter1_r.process_sample(in_r[n], &self.wall_coeffs);
+                let lp1_r = self
+                    .wall_filter1_r
+                    .process_sample(in_r[n], &self.wall_coeffs);
                 let lp2_r = self.wall_filter2_r.process_sample(lp1_r, &self.wall_coeffs);
-                let bass_r = self.flank_bass_r.process_sample(lp2_r, &self.flank_bass_coeffs);
+                let bass_r = self
+                    .flank_bass_r
+                    .process_sample(lp2_r, &self.flank_bass_coeffs);
                 self.diffuse_delay_r.write(bass_r);
                 let diff_r = self.diffuse_delay_r.read_samples(self.sample_rate * 0.058) * 0.35;
                 out_r[n] = (bass_r + diff_r) * drift * 0.75;
@@ -1370,7 +1421,8 @@ impl DspNode for NextDoorNode {
         match index {
             0 => self.enabled = value > 0.5,
             1 => {
-                self.wall_cutoff_hz.set_target(value, 0.02, SmoothingMode::Linear);
+                self.wall_cutoff_hz
+                    .set_target(value, 0.02, SmoothingMode::Linear);
                 self.wall_coeffs = BiquadCoeffs::calculate(
                     BiquadType::Lowpass,
                     self.sample_rate as f64,
@@ -1380,7 +1432,8 @@ impl DspNode for NextDoorNode {
                 );
             }
             2 => {
-                self.bass_boost_db.set_target(value, 0.02, SmoothingMode::Linear);
+                self.bass_boost_db
+                    .set_target(value, 0.02, SmoothingMode::Linear);
                 self.flank_bass_coeffs = BiquadCoeffs::calculate(
                     BiquadType::LowShelf,
                     self.sample_rate as f64,
@@ -1389,21 +1442,20 @@ impl DspNode for NextDoorNode {
                     value.clamp(0.0, 12.0) as f64,
                 );
             }
-            3 => self.room_decay_sec.set_target(value, 0.02, SmoothingMode::Linear),
-            4 => self.drift_level.set_target(value, 0.02, SmoothingMode::Linear),
+            3 => self
+                .room_decay_sec
+                .set_target(value, 0.02, SmoothingMode::Linear),
+            4 => self
+                .drift_level
+                .set_target(value, 0.02, SmoothingMode::Linear),
             _ => {}
         }
     }
 
     fn get_parameter(&self, index: usize) -> f32 {
         match index {
-            0 => {
-                if self.enabled {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            0 if self.enabled => 1.0,
+            0 => 0.0,
             1 => self.wall_cutoff_hz.current(),
             2 => self.bass_boost_db.current(),
             3 => self.room_decay_sec.current(),
@@ -1478,7 +1530,7 @@ mod tests {
             rt60
         );
         assert!(
-            first_refl >= 8.0 && first_refl <= 35.0,
+            (8.0..=35.0).contains(&first_refl),
             "First reflection {} out of expected 8-35 ms range",
             first_refl
         );
@@ -1500,18 +1552,18 @@ mod tests {
 
     #[test]
     fn test_next_door_steep_attenuation() {
-        let mut nd = NextDoorNode::new(48000.0);
-        nd.set_parameter(0, 1.0); // enable
+        let mut next_door = NextDoorNode::new(48000.0);
+        next_door.set_parameter(0, 1.0); // enable
 
         // High frequency 8 kHz tone should be heavily attenuated by 24 dB/oct lowpass
         let mut in_high = [0.0f32; 512];
-        for i in 0..512 {
-            in_high[i] = (i as f32 * 8000.0 / 48000.0 * std::f32::consts::TAU).sin();
+        for (i, sample) in in_high.iter_mut().enumerate() {
+            *sample = (i as f32 * 8000.0 / 48000.0 * std::f32::consts::TAU).sin();
         }
 
         let mut out_l = [0.0f32; 512];
         let mut out_r = [0.0f32; 512];
-        nd.process(&[&in_high], &mut [&mut out_l, &mut out_r]);
+        next_door.process(&[&in_high], &mut [&mut out_l, &mut out_r]);
 
         let rms_out = (out_l[256..].iter().map(|&x| x * x).sum::<f32>() / 256.0).sqrt();
         assert!(

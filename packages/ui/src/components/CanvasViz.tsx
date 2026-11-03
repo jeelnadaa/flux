@@ -930,10 +930,14 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         const S = Math.min(rw, rh) * 0.34;
 
         const pj = (X: number, Y: number, Z: number): [number, number] => {
-          const cy = Math.cos(yaw), sy = Math.sin(yaw);
-          const x1 = X * cy - Z * sy, z1 = X * sy + Z * cy;
-          const cp = Math.cos(pitch), sp = Math.sin(pitch);
-          const y1 = Y * cp - z1 * sp, z2 = Y * sp + z1 * cp;
+          const cy = Math.cos(yaw),
+            sy = Math.sin(yaw);
+          const x1 = X * cy - Z * sy,
+            z1 = X * sy + Z * cy;
+          const cp = Math.cos(pitch),
+            sp = Math.sin(pitch);
+          const y1 = Y * cp - z1 * sp,
+            z2 = Y * sp + z1 * cp;
           const f = 3.4 / (3.4 + z2);
           return [rw / 2 + x1 * f * S, rh * 0.58 - y1 * f * S];
         };

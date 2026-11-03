@@ -54,12 +54,7 @@ export const RoomsScreen: React.FC = () => {
         </div>
 
         <div className="box g3">
-          <Slider
-            label="Mix"
-            value={mix}
-            valueText={`${mix}%`}
-            onChange={setMix}
-          />
+          <Slider label="Mix" value={mix} valueText={`${mix}%`} onChange={setMix} />
           <Slider
             label="Your distance"
             value={distance}

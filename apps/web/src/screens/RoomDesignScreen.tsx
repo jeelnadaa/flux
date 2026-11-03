@@ -28,13 +28,7 @@ export const RoomDesignScreen: React.FC = () => {
           <div className="tlbar">
             <b style={{ fontSize: "15px", fontWeight: 800 }}>Room designer</b>
             <span className="sp" style={{ flex: 1 }} />
-            <a
-              className="btn g"
-              href="#rooms"
-              data-go="rooms"
-              aria-label="Close"
-              title="Close"
-            >
+            <a className="btn g" href="#rooms" data-go="rooms" aria-label="Close" title="Close">
               <Icon name="x" size={16} />
             </a>
           </div>
@@ -71,24 +65,9 @@ export const RoomDesignScreen: React.FC = () => {
         <aside className="b in">
           <h3 className="h3">Size</h3>
           <div className="col">
-            <Slider
-              label="Width"
-              value={width}
-              valueText={`${widthM} m`}
-              onChange={setWidth}
-            />
-            <Slider
-              label="Depth"
-              value={depth}
-              valueText={`${depthM} m`}
-              onChange={setDepth}
-            />
-            <Slider
-              label="Height"
-              value={height}
-              valueText={`${heightM} m`}
-              onChange={setHeight}
-            />
+            <Slider label="Width" value={width} valueText={`${widthM} m`} onChange={setWidth} />
+            <Slider label="Depth" value={depth} valueText={`${depthM} m`} onChange={setDepth} />
+            <Slider label="Height" value={height} valueText={`${heightM} m`} onChange={setHeight} />
           </div>
 
           <Section title="Walls">

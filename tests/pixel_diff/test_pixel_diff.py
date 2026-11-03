@@ -1554,6 +1554,164 @@ def test_stage_interactive(browser_instance, test_server):
     context.close()
 
 
+# -----------------------------------------------------------------------------
+# Phase 4.4 & Phase 5 Desktop Tests
+# -----------------------------------------------------------------------------
+
+
+def test_pixel_diff_rooms_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'rooms', 1440, 900, 'desktop')
+    print(f"Rooms [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_rooms_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#rooms')
+    page.wait_for_selector('.tile')
+
+    tiles = page.locator('.tile')
+    assert tiles.count() == 12
+
+    # Click Bathroom preset
+    tiles.nth(1).click()
+    page.wait_for_timeout(100)
+    assert 'on' in (tiles.nth(1).get_attribute('class') or '')
+
+    # Link to room designer
+    link = page.locator('a[data-go="roomdesign"]')
+    assert link.count() == 1
+    context.close()
+
+
+def test_pixel_diff_roomdesign_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'roomdesign', 1440, 900, 'desktop')
+    print(f"RoomDesign [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_roomdesign_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#roomdesign')
+    page.wait_for_selector('canvas[data-v="room"]')
+
+    room_canvas = page.locator('canvas[data-v="room"]')
+    decay_canvas = page.locator('canvas[data-v="decay"]')
+    assert room_canvas.count() == 1
+    assert decay_canvas.count() == 1
+
+    # Check close button
+    close_btn = page.locator('a[data-go="rooms"]')
+    assert close_btn.count() == 1
+    context.close()
+
+
+def test_pixel_diff_hall_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'hall', 1440, 900, 'desktop')
+    print(f"Hall [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_hall_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#hall')
+    page.wait_for_selector('.box')
+
+    boxes = page.locator('.box')
+    assert boxes.count() == 2
+    context.close()
+
+
+def test_pixel_diff_creative_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'creative', 1440, 900, 'desktop')
+    print(f"Creative [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_creative_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#creative')
+    page.wait_for_selector('.pal-slowed')
+
+    assert page.locator('.pal-slowed').count() == 1
+    assert page.locator('.pal-nightcore').count() == 1
+    assert page.locator('.pal-lofi').count() == 1
+    context.close()
+
+
+def test_pixel_diff_textures_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'textures', 1440, 900, 'desktop')
+    print(f"Textures [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_textures_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#textures')
+    page.wait_for_selector('.fxc')
+
+    cards = page.locator('.fxc')
+    assert cards.count() == 12
+
+    # Click Cassette
+    cards.nth(1).click()
+    page.wait_for_timeout(100)
+    assert 'Cassette' in (page.locator('aside h3').text_content() or '')
+    context.close()
+
+
+def test_pixel_diff_glitch_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'glitch', 1440, 900, 'desktop')
+    print(f"Glitch [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_glitch_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#glitch')
+    page.wait_for_selector('.pal-stutter')
+
+    assert page.locator('.pal-stutter').count() == 1
+    assert page.locator('.pal-tapestop').count() == 1
+    assert page.locator('.pal-reverse').count() == 1
+
+    # Toggle a trance gate step
+    gate_btns = page.locator('button[data-toggle]')
+    assert gate_btns.count() >= 16
+    gate_btns.nth(1).click()
+    page.wait_for_timeout(100)
+    context.close()
+
+
+def test_pixel_diff_voice_desktop(browser_instance, test_server):
+    res = capture_and_compare(browser_instance, test_server, 'voice', 1440, 900, 'desktop')
+    print(f"Voice [desktop] match: {res['match_percentage']:.2f}%")
+    assert res['match_percentage'] >= 85.0
+
+
+def test_voice_interactive(browser_instance, test_server):
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#voice')
+    page.wait_for_selector('.fxc')
+
+    cards = page.locator('.fxc')
+    assert cards.count() == 16
+
+    # Click Monster
+    cards.nth(15).click()
+    page.wait_for_timeout(100)
+    assert 'Monster' in (page.locator('aside h3').text_content() or '')
+    context.close()
+
+
+
 
 
 

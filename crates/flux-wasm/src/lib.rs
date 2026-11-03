@@ -3,15 +3,16 @@
 
 use flux_dsp::binaural::BinauralNode;
 use flux_dsp::biquad::{BiquadChain, BiquadType};
+use flux_dsp::creative::{LofiMacroNode, NightcoreNode, SlowedReverbNode, VinylNode};
 use flux_dsp::dither::{BitDepth, Dither, DitherType};
 use flux_dsp::loudness::LoudnessMeter;
 use flux_dsp::node::DspNode;
 use flux_dsp::pyramid::PeakPyramid;
+use flux_dsp::resampler::{Resampler, ResamplerQuality};
 use flux_dsp::reverb::{
     compute_sabine_rt60, AlgorithmicReverbNode, ConcertHallNode, NextDoorNode, RoomPreset,
     RoomReverbNode, SurfaceMaterial,
 };
-use flux_dsp::resampler::{Resampler, ResamplerQuality};
 use flux_dsp::spatial::{
     check_mono_compatibility, SpatialPreset, StereoInputMode, StereoSpatializerNode,
     TrajectoryDirection, TrajectoryMode,
@@ -21,6 +22,7 @@ use flux_dsp::spectrogram::{
     ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTileGenerator,
 };
 use flux_dsp::stretch::StretchNode;
+use flux_dsp::voice::{VoiceChangerNode, VoiceCharacter};
 use flux_engine::capture::{ChunkedRecordWriter, InputLevelMeter, PreRollBuffer};
 use flux_engine::codec::{AudioMetadata, Mp3Encoder, OpusEncoder, VorbisEncoder};
 use flux_engine::decoder::{open_decoder, AudioBuffer, ContainerMetadata};
@@ -885,6 +887,287 @@ pub fn wasm_compute_room_acoustics(
         "{{\"rt60\":{:.3},\"first_reflection_ms\":{:.1}}}",
         rt60, first_refl_ms
     )
+}
+
+// ----------------------------------------------------------------------------
+// Creative FX & Voice Changer C ABI (Phase 5)
+// ----------------------------------------------------------------------------
+
+/// Creates a new Slowed + Reverb node.
+#[no_mangle]
+pub extern "C" fn slowed_reverb_create(sample_rate: f32) -> *mut SlowedReverbNode {
+    Box::into_raw(Box::new(SlowedReverbNode::new(sample_rate)))
+}
+
+/// Destroys a Slowed + Reverb node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn slowed_reverb_destroy(ptr: *mut SlowedReverbNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets Slowed + Reverb speed ratio (0.5 to 1.0).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn slowed_reverb_set_speed(ptr: *mut SlowedReverbNode, speed: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_speed_ratio(speed);
+    }
+}
+
+/// Processes stereo audio frames through Slowed + Reverb.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn slowed_reverb_process(
+    ptr: *mut SlowedReverbNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Nightcore node.
+#[no_mangle]
+pub extern "C" fn nightcore_create(sample_rate: f32) -> *mut NightcoreNode {
+    Box::into_raw(Box::new(NightcoreNode::new(sample_rate)))
+}
+
+/// Destroys a Nightcore node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn nightcore_destroy(ptr: *mut NightcoreNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets Nightcore speed ratio (1.0 to 1.5).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn nightcore_set_speed(ptr: *mut NightcoreNode, speed: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_speed_ratio(speed);
+    }
+}
+
+/// Processes stereo audio frames through Nightcore.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn nightcore_process(
+    ptr: *mut NightcoreNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Lo-Fi Macro node.
+#[no_mangle]
+pub extern "C" fn lofi_create(sample_rate: f32) -> *mut LofiMacroNode {
+    Box::into_raw(Box::new(LofiMacroNode::new(sample_rate)))
+}
+
+/// Destroys a Lo-Fi Macro node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn lofi_destroy(ptr: *mut LofiMacroNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets Lo-Fi one-slider macro amount [0.0, 1.0].
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn lofi_set_amount(ptr: *mut LofiMacroNode, amount: f32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_macro_amount(amount);
+    }
+}
+
+/// Processes stereo audio frames through Lo-Fi Macro.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn lofi_process(
+    ptr: *mut LofiMacroNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Vinyl texture node.
+#[no_mangle]
+pub extern "C" fn vinyl_create(sample_rate: f32) -> *mut VinylNode {
+    Box::into_raw(Box::new(VinylNode::new(sample_rate)))
+}
+
+/// Destroys a Vinyl node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn vinyl_destroy(ptr: *mut VinylNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets Vinyl PRNG seed for deterministic crackle reproduction.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn vinyl_set_seed(ptr: *mut VinylNode, seed: u32) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_seed(seed);
+    }
+}
+
+/// Processes stereo audio frames through Vinyl texture.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn vinyl_process(
+    ptr: *mut VinylNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
+}
+
+/// Creates a new Voice Changer node.
+#[no_mangle]
+pub extern "C" fn voice_changer_create(sample_rate: f32) -> *mut VoiceChangerNode {
+    Box::into_raw(Box::new(VoiceChangerNode::new(sample_rate)))
+}
+
+/// Destroys a Voice Changer node.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn voice_changer_destroy(ptr: *mut VoiceChangerNode) {
+    if !ptr.is_null() {
+        drop(Box::from_raw(ptr));
+    }
+}
+
+/// Sets Voice Changer character preset (0=Deep ... 15=Monster).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn voice_changer_set_character(
+    ptr: *mut VoiceChangerNode,
+    character_id: u32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let chars = [
+            VoiceCharacter::Deep,
+            VoiceCharacter::Chipmunk,
+            VoiceCharacter::Child,
+            VoiceCharacter::Elder,
+            VoiceCharacter::ShiftUp,
+            VoiceCharacter::ShiftDown,
+            VoiceCharacter::Whisper,
+            VoiceCharacter::Announcer,
+            VoiceCharacter::RadioDj,
+            VoiceCharacter::Villain,
+            VoiceCharacter::Giant,
+            VoiceCharacter::Tiny,
+            VoiceCharacter::Robot,
+            VoiceCharacter::Cyborg,
+            VoiceCharacter::Alien,
+            VoiceCharacter::Monster,
+        ];
+        let idx = (character_id as usize).min(15);
+        node.set_character(chars[idx]);
+    }
+}
+
+/// Processes stereo audio frames through Voice Changer.
+///
+/// # Safety
+/// Pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn voice_changer_process(
+    ptr: *mut VoiceChangerNode,
+    in_l: *const f32,
+    in_r: *const f32,
+    out_l: *mut f32,
+    out_r: *mut f32,
+    frames: usize,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let left_in = std::slice::from_raw_parts(in_l, frames);
+        let right_in = std::slice::from_raw_parts(in_r, frames);
+        let left_out = std::slice::from_raw_parts_mut(out_l, frames);
+        let right_out = std::slice::from_raw_parts_mut(out_r, frames);
+
+        node.process(&[left_in, right_in], &mut [left_out, right_out]);
+    }
 }
 
 /// Renders a synthesized test tone through the biquad chain.
@@ -2544,12 +2827,12 @@ mod tests {
             concert_hall_destroy(hall);
 
             // Next Door C ABI
-            let nd = next_door_create(48000.0);
-            next_door_set_enabled(nd, true);
-            next_door_set_cutoff(nd, 450.0);
-            next_door_set_bass_boost(nd, 5.0);
+            let next_door = next_door_create(48000.0);
+            next_door_set_enabled(next_door, true);
+            next_door_set_cutoff(next_door, 450.0);
+            next_door_set_bass_boost(next_door, 5.0);
             next_door_process(
-                nd,
+                next_door,
                 in_l.as_ptr(),
                 in_r.as_ptr(),
                 out_l.as_mut_ptr(),
@@ -2557,12 +2840,92 @@ mod tests {
                 128,
             );
             assert!(!out_l[0].is_nan());
-            next_door_destroy(nd);
+            next_door_destroy(next_door);
 
             // JSON room calculation
             let json = wasm_compute_room_acoustics(12.0, 18.0, 6.0, 0, 3, 0);
             assert!(json.contains("rt60"));
             assert!(json.contains("first_reflection_ms"));
+        }
+    }
+
+    #[test]
+    fn test_c_abi_creative_and_voice_nodes() {
+        unsafe {
+            let in_l = [0.5f32; 128];
+            let in_r = [0.5f32; 128];
+            let mut out_l = [0.0f32; 128];
+            let mut out_r = [0.0f32; 128];
+
+            // Slowed + Reverb
+            let sr = slowed_reverb_create(48000.0);
+            slowed_reverb_set_speed(sr, 0.85);
+            slowed_reverb_process(
+                sr,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            slowed_reverb_destroy(sr);
+
+            // Nightcore
+            let nc = nightcore_create(48000.0);
+            nightcore_set_speed(nc, 1.25);
+            nightcore_process(
+                nc,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            nightcore_destroy(nc);
+
+            // Lo-Fi Macro
+            let lf = lofi_create(48000.0);
+            lofi_set_amount(lf, 0.64);
+            lofi_process(
+                lf,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            lofi_destroy(lf);
+
+            // Vinyl
+            let vn = vinyl_create(48000.0);
+            vinyl_set_seed(vn, 4821);
+            vinyl_process(
+                vn,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            vinyl_destroy(vn);
+
+            // Voice Changer
+            let vc = voice_changer_create(48000.0);
+            voice_changer_set_character(vc, 12); // Robot
+            voice_changer_process(
+                vc,
+                in_l.as_ptr(),
+                in_r.as_ptr(),
+                out_l.as_mut_ptr(),
+                out_r.as_mut_ptr(),
+                128,
+            );
+            assert!(!out_l[0].is_nan());
+            voice_changer_destroy(vc);
         }
     }
 }

@@ -27,9 +27,7 @@ export const HallScreen: React.FC = () => {
               <h2 className="h2">Row 10</h2>
               <Toggle checked={row10Enabled} onChange={setRow10Enabled} />
             </div>
-            <p className="dim">
-              You're at a show, ten rows back, with the crowd around you.
-            </p>
+            <p className="dim">You're at a show, ten rows back, with the crowd around you.</p>
             <div className="vz" style={{ height: "210px" }}>
               <CanvasViz type="room" w={1.5} d={1.2} h={0.7} height={210} />
             </div>
@@ -66,14 +64,7 @@ export const HallScreen: React.FC = () => {
             </div>
             <p className="dim">The same song, through your neighbor's wall.</p>
             <div className="vz" style={{ height: "210px", filter: "blur(2px)" }}>
-              <CanvasViz
-                type="wave"
-                seed={1}
-                stereo={true}
-                gain={0.55}
-                step={3}
-                height={210}
-              />
+              <CanvasViz type="wave" seed={1} stereo={true} gain={0.55} step={3} height={210} />
             </div>
             <Slider
               label="Wall thickness"
@@ -89,9 +80,7 @@ export const HallScreen: React.FC = () => {
               label="Bass through wall"
               value={bassThroughWall}
               valueText={
-                bassThroughWall === 60
-                  ? "+4 dB"
-                  : `+${Math.round((bassThroughWall / 100) * 10)} dB`
+                bassThroughWall === 60 ? "+4 dB" : `+${Math.round((bassThroughWall / 100) * 10)} dB`
               }
               onChange={setBassThroughWall}
             />
@@ -99,9 +88,7 @@ export const HallScreen: React.FC = () => {
               label="Their room"
               value={theirRoom}
               valueText={
-                theirRoom === 35
-                  ? "0.6 s"
-                  : `${(0.1 + (theirRoom / 100) * 1.5).toFixed(1)} s`
+                theirRoom === 35 ? "0.6 s" : `${(0.1 + (theirRoom / 100) * 1.5).toFixed(1)} s`
               }
               onChange={setTheirRoom}
             />

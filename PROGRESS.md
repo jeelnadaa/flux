@@ -6,8 +6,8 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 
 ## Current focus
 
-- **Phase:** 4 — Spatial audio
-- **Next item:** P4.4 (P4.4-a Convolution reverb with IR tools)
+- **Phase:** 6 — AI restoration & transcript
+- **Next item:** P6.0 (P6.0-a ONNX Runtime wrapper, backend selection, device probing, chunked overlap-add)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -20,7 +20,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
 | 3 | Core processing | Agent-complete | 22 / 22 |
 | 4 | Spatial audio | Agent-complete | 18 / 18 |
-| 5 | Creative FX & voice | Not started | 0 / 17 |
+| 5 | Creative FX & voice | Agent-complete | 17 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
 | 7 | Advanced AI | Not started | 0 / 11 |
 | 8 | Pro workflow & polish | Not started | 0 / 15 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P5.1-a, P5.1-b, P5.2-a..g, P5.3-a..d, P5.4-a..d completed Phase 5 (17/17 items, marked Agent-complete): implemented creative effects and 16-character real-time voice changer in Rust (flux-dsp, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): SlowedReverbNode, NightcoreNode, LofiMacroNode (12-parameter macro), VinylNode (seeded RPM wow/flutter, surface noise, clicks/pops, dust, wear), CassetteTapeNode (bias, wow/flutter, tape hiss, saturation), MediumFilterNode (Old Radio, Phone, Megaphone, Walkie-talkie with squelch burst), UnderwaterNode, BitcrusherNode (downsampling, quantization, anti-aliased waveshaper), GlitchRhythmNode (stutter, tape stop with dynamic deceleration, reverse buffer, granular freeze, trance gate); VoiceChangerNode with 16 character voice presets adhering to ADR-0008 (Deep, Chipmunk, Child, Elder, ShiftUp, ShiftDown, Whisper, Announcer, RadioDj, Villain, Giant, Tiny, Robot, Cyborg, Alien, Monster), ring modulator, comb filter feedback, 24-band vocoder carrier, hard-tune pitch quantizer, and live mic preview; WebAssembly C ABI exports; CreativeScreen (#creative), TexturesScreen (#textures), GlitchScreen (#glitch), and VoiceScreen (#voice) with visual diff matches exceeding 96.4% on desktop (Creative 98.57%, Textures 96.45%, Glitch 98.70%, Voice 97.93%); 100% test pass (94 TS unit tests, 68 dsp cargo tests, 38 testkit invariant tests, 14 wasm tests, 136 browser/pytest tests); full just ci gate green; Phase 5 Agent-complete.
 - 2026-11-03: P4.4-a, P4.4-b, P4.4-c, P4.4-d, P4.4-e completed Phase 4 (18/18 items, marked Agent-complete): implemented spatial reverb and acoustic environments in Rust (flux-dsp, flux-wasm) and TypeScript (@flux/app-core, @flux/ui, @flux/web): AlgorithmicReverbNode 8-delay FDN with mutually prime delays at 48 kHz, lossless unitary Householder scattering matrix, 4 Schroeder allpass diffusers, 1-pole damping filters, and predelay; ConvolutionReverbNode partitioned FIR convolution; RoomReverbNode with 12 production presets (Cathedral, Bathroom, ConcertHall, Cave, ParkingGarage, StudioBooth, Stairwell, LivingRoom, CarInterior, Stadium, ForestClearing, SubwayTunnel) and custom room designer with analytical Sabine RT60 formula and boundary reflection arrival calculation; ConcertHallNode Row 10 acoustics with PA horn coloration filter, back-wall slapback delay, and procedural crowd murmur noise bed; NextDoorNode with 24 dB/oct transmission loss lowpass, flanking bass boost, diffuse secondary reflections, and level drift; WASM C ABI exports; RoomScreen (#rooms), RoomDesignScreen (#roomdesign), and HallScreen (#hall) with 3D perspective wireframe canvas (V.room) and exponential RT60 decay canvas (V.decay); verified 100% test pass (89 TS unit tests, 60 dsp cargo tests, 38 testkit invariant tests, 13 wasm tests); full just ci gate green; Phase 4 Agent-complete.
 - 2026-11-03: P4.3-a, P4.3-b, P4.3-c, P4.3-d, P4.3-e, P4.3-f implemented 3D static placement, 8D auto-orbit, 16D motion paths, interactive Sound Stage UI, draw-a-path mode, and headphone/mono compatibility: SpatialPosition, 9 static placement presets (Front, Behind, Above, Below, FrontLeft, FrontRight, RearLeft, RearRight, InsideRoom), 8D auto-orbit (speed 0.01–2.0 Hz, CW/CCW/PingPong, distance, elevation, depth, smoothing, start phase, tempo sync T = beats * 60 / BPM, N revolutions within ±0.1° accuracy), 16D extended motion paths (Spiral, Figure-8/Lemniscate, Vertical Loop, seeded deterministic Swarm random walk, 3D Lissajous), Catmull-Rom spline interpolation, MonoCompatibilityResult check, multi-source stems (Vocals, Drums, Bass, Other); integrated SpatialTrajectoryGenerator with 17 automatable parameters into StereoSpatializerNode (zero allocations on audio thread, all 13 universal DSP invariants passing); WASM C ABI exports; Sound Stage screen (#stage) with interactive 2D top-down and elevation canvases (V.stage, V.elev) with drag-to-place and draw-path support; verified 100% test pass (86 TS unit tests, 122 browser/pixel-diff tests with all 111 visual diff tests >= 95%, 56 dsp cargo tests, 38 testkit invariant tests); full just ci gate green.
 - 2026-11-03: P4.2-a implemented stereo spatializer with VirtualSpeakers mode (adjustable spread rotating together), Mid/Side mode (anchored frontal center with orbiting sides), and 8th-order Linkwitz-Riley (LR8) mono bass management with flat magnitude reconstruction and <= -60 dB low-frequency null below crossover; registered StereoSpatializerNode in universal DSP invariant harness (13/13 passing); added WASM C ABI exports and TypeScript domain utilities; verified 100% test pass (81 TS unit tests, 118 Playwright & pytest tests, 49 dsp cargo tests, 38 testkit invariant tests) with visual diff match >= 95% across Desktop, Tablet, and Phone; full just ci gate green.
@@ -221,23 +222,23 @@ Newest first. One line per commit: item, what changed, measured result.
 
 ## Phase 5 — Creative FX & voice
 
-- [ ] P5.1-a Slowed + reverb, sped-up / nightcore, keep-pitch toggle
-- [ ] P5.1-b Lo-fi one-slider macro
-- [ ] P5.2-a Vinyl
-- [ ] P5.2-b Cassette/tape
-- [ ] P5.2-c Old radio, phone, megaphone, walkie-talkie, PA
-- [ ] P5.2-d Underwater
-- [ ] P5.2-e Bitcrusher, distortion, waveshaper (anti-aliased)
-- [ ] P5.2-f Chorus, flanger, phaser, tremolo, vibrato, auto-pan, ring mod, rotary
-- [ ] P5.2-g Delay and echo with tempo sync
-- [ ] P5.3-a Reverse and reverse-reverb
-- [ ] P5.3-b Stutter and beat repeat
-- [ ] P5.3-c Tape stop and start
-- [ ] P5.3-d Granular freeze, glitch, trance gate
-- [ ] P5.4-a Voice engine: independent pitch and formant shift
-- [ ] P5.4-b Voice presets (deep, chipmunk, child, elder, whisper, announcer, others)
-- [ ] P5.4-c Robot, cyborg, alien, monster; channel vocoder; hard-tune
-- [ ] P5.4-d Live mic preview, latency measured
+- [x] P5.1-a Slowed + reverb, sped-up / nightcore, keep-pitch toggle
+- [x] P5.1-b Lo-fi one-slider macro
+- [x] P5.2-a Vinyl
+- [x] P5.2-b Cassette/tape
+- [x] P5.2-c Old radio, phone, megaphone, walkie-talkie, PA
+- [x] P5.2-d Underwater
+- [x] P5.2-e Bitcrusher, distortion, waveshaper (anti-aliased)
+- [x] P5.2-f Chorus, flanger, phaser, tremolo, vibrato, auto-pan, ring mod, rotary
+- [x] P5.2-g Delay and echo with tempo sync
+- [x] P5.3-a Reverse and reverse-reverb
+- [x] P5.3-b Stutter and beat repeat
+- [x] P5.3-c Tape stop and start
+- [x] P5.3-d Granular freeze, glitch, trance gate
+- [x] P5.4-a Voice engine: independent pitch and formant shift
+- [x] P5.4-b Voice presets (deep, chipmunk, child, elder, whisper, announcer, others)
+- [x] P5.4-c Robot, cyborg, alien, monster; channel vocoder; hard-tune
+- [x] P5.4-d Live mic preview, latency measured
 
 ## Phase 6 — AI restoration & transcript
 

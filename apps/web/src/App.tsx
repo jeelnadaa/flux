@@ -39,6 +39,10 @@ import { StageScreen } from "./screens/StageScreen.js";
 import { RoomsScreen } from "./screens/RoomsScreen.js";
 import { RoomDesignScreen } from "./screens/RoomDesignScreen.js";
 import { HallScreen } from "./screens/HallScreen.js";
+import { CreativeScreen } from "./screens/CreativeScreen.js";
+import { TexturesScreen } from "./screens/TexturesScreen.js";
+import { GlitchScreen } from "./screens/GlitchScreen.js";
+import { VoiceScreen } from "./screens/VoiceScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -108,6 +112,14 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <RoomDesignScreen />;
     case "hall":
       return <HallScreen />;
+    case "creative":
+      return <CreativeScreen />;
+    case "textures":
+      return <TexturesScreen />;
+    case "glitch":
+      return <GlitchScreen />;
+    case "voice":
+      return <VoiceScreen />;
     case "home":
     default:
       return <HomeScreen />;

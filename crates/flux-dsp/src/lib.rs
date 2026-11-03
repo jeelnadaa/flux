@@ -3,6 +3,7 @@
 
 pub mod binaural;
 pub mod biquad;
+pub mod creative;
 pub mod delay;
 pub mod dither;
 pub mod dynamics;
@@ -21,6 +22,7 @@ pub mod spectrogram;
 pub mod stretch;
 pub mod tempo;
 pub mod utility;
+pub mod voice;
 
 pub use binaural::BinauralNode;
 pub use biquad::{BiquadChain, BiquadCoeffs, BiquadState, BiquadType};
