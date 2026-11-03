@@ -34,9 +34,14 @@ function buildStaticSite() {
   fs.writeFileSync(path.join(OUT_DIR, "index.html"), landingHtml);
   fs.writeFileSync(path.join(OUT_DIR, "landing.html"), landingHtml);
 
-  // 2. Copy download.html
+  // 2. Copy download.html and write download/index.html for clean Cloudflare Pages URLs
   const downloadHtml = fs.readFileSync(path.join(WEB_DIR, "download.html"), "utf8");
   fs.writeFileSync(path.join(OUT_DIR, "download.html"), downloadHtml);
+  const downloadDir = path.join(OUT_DIR, "download");
+  if (!fs.existsSync(downloadDir)) {
+    fs.mkdirSync(downloadDir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(downloadDir, "index.html"), downloadHtml);
 
   // 3. Copy scripts and styles
   const staticFiles = [
@@ -77,17 +82,16 @@ function buildStaticSite() {
 `;
   fs.writeFileSync(path.join(OUT_DIR, "_headers"), headersContent);
 
-  // 6. Add Cloudflare _redirects file for clean URL handling
-  const redirectsContent = `/download     /download.html    200
-/downloads    /download.html    200
-/tour         /landing.html     200
-/get          /download.html    302
+  // 6. Add Cloudflare _redirects file for clean URL handling (no circular .html rewrites)
+  const redirectsContent = `/downloads    /download    301
+/get          /download    302
+/tour         /#scenes     302
 `;
   fs.writeFileSync(path.join(OUT_DIR, "_redirects"), redirectsContent);
 
   console.log("[✓] Static site built successfully in dist-static/");
   console.log(`    - index.html (Showcase Landing)`);
-  console.log(`    - download.html (Windows / macOS / Linux downloads)`);
+  console.log(`    - download.html & download/index.html (Clean Cloudflare Pages routing)`);
   console.log(
     `    - Styles, Fonts, Icons, _headers, and _redirects (Zero web editor assets included)`,
   );
