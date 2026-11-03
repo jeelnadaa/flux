@@ -29,3 +29,5 @@ export * from "./engine/EngineController.js";
 export * from "./export/ExportManager.js";
 export * from "./timeline/TimelineModel.js";
 export * from "./timeline/SnappingEngine.js";
+export * from "./editing/FadeCurves.js";
+export * from "./editing/EditingModel.js";

@@ -8,6 +8,8 @@ import { HomeScreen } from "./screens/HomeScreen.js";
 import { WelcomeScreen } from "./screens/WelcomeScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
 import { SpectralScreen } from "./screens/SpectralScreen.js";
+import { AutomationScreen } from "./screens/AutomationScreen.js";
+import { MixScreen } from "./screens/MixScreen.js";
 
 export function getScreenComponent(route: string): React.ReactElement {
   switch (route) {
@@ -25,6 +27,10 @@ export function getScreenComponent(route: string): React.ReactElement {
       return <EditScreen />;
     case "spectral":
       return <SpectralScreen />;
+    case "automation":
+      return <AutomationScreen />;
+    case "mix":
+      return <MixScreen />;
     case "home":
     default:
       return <HomeScreen />;

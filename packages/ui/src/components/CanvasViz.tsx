@@ -278,6 +278,30 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         drawSpectrogram(ctx, rw, rh, seed);
       } else if (type === "spectrum") {
         drawSpectrum(ctx, rw, rh);
+      } else if (type === "gonio") {
+        ctx.clearRect(0, 0, rw, rh);
+        const c = Math.min(rw, rh) / 2 - 8;
+        const cx = rw / 2;
+        const cy = rh / 2;
+        ctx.strokeStyle = "var(--ln)";
+        ctx.beginPath();
+        ctx.moveTo(cx - c, cy);
+        ctx.lineTo(cx + c, cy);
+        ctx.moveTo(cx, cy - c);
+        ctx.lineTo(cx, cy + c);
+        ctx.stroke();
+
+        ctx.fillStyle = "var(--ac-t)";
+        ctx.globalAlpha = 0.55;
+        const r = prng(42);
+        for (let i = 0; i < 420; i++) {
+          const a = r() + r() + r() - 1.5;
+          const b = (r() + r() - 1) * 0.36;
+          const px = cx + b * c * 1.4;
+          const py = cy - a * c * 0.58;
+          ctx.fillRect(px, py, 1.5, 1.5);
+        }
+        ctx.globalAlpha = 1;
       } else if (type === "eq") {
         // Draw simplified interactive EQ curve
         ctx.clearRect(0, 0, rw, rh);

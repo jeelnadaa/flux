@@ -350,3 +350,145 @@ def test_timeline_scrub_and_snapping(browser_instance, test_server):
     assert 'on' not in (snap_chip.get_attribute('class') or '')
 
     context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_automation(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'automation', width, height, name)
+    print(f"\n[AUTOMATION {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Automation screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_mix(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'mix', width, height, name)
+    print(f"\n[MIX {name.upper()} {width}px] Match: {res['match_percentage']:.2f}%, Mean Delta: {res['mean_delta']:.2f}")
+    assert res['match_percentage'] >= 95.0, (
+        f"Mix screen on {name} ({width}px) fell below 95% match: {res['match_percentage']:.2f}%"
+    )
+
+
+def test_automation_screen_interaction(browser_instance, test_server):
+    """Verifies automation modes, curve modes, and lane addition/removal."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#automation')
+    page.wait_for_selector('#stage > *')
+
+    # Verify automation SVG path exists
+    autoline = page.locator('svg.autoline')
+    assert autoline.count() >= 1
+
+    # Toggle mode to 'Write'
+    write_btn = page.locator('.tlbar .seg button:has-text("Write")')
+    write_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in write_btn.get_attribute('class')
+
+    # Toggle curve interpolation to 'Smooth'
+    smooth_btn = page.locator('.tlbar .seg button:has-text("Smooth")')
+    smooth_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in smooth_btn.get_attribute('class')
+
+    # Test adding a lane
+    init_lanes = page.locator('.lst > div').count()
+    add_btn = page.locator('button:has-text("Add lane")')
+    add_btn.click()
+    page.wait_for_timeout(100)
+    assert page.locator('.lst > div').count() == init_lanes + 1
+
+    context.close()
+
+
+def test_mixer_controls_interaction(browser_instance, test_server):
+    """Verifies faders, mute, and solo buttons on mixer channels."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#mix')
+    page.wait_for_selector('#stage > *')
+
+    # Verify 8 channels are rendered
+    channels = page.locator('.mixer .ch')
+    assert channels.count() == 8
+
+    # Verify master channel exists
+    master = page.locator('.mixer .ch.mst')
+    assert master.count() == 1
+
+    # Test mute button on first channel
+    mute_btn = page.locator('.mixer .ch .m').first
+    assert 'on' not in (mute_btn.get_attribute('class') or '')
+    mute_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (mute_btn.get_attribute('class') or '')
+
+    # Test solo button on first channel
+    solo_btn = page.locator('.mixer .ch .s').first
+    assert 'on' not in (solo_btn.get_attribute('class') or '')
+    solo_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (solo_btn.get_attribute('class') or '')
+
+    context.close()
+
+
+def test_edit_screen_clip_and_track_interactions(browser_instance, test_server):
+    """Verifies splitting, deleting, reversing clips, and mute toggling on Edit screen."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#edit')
+    page.wait_for_selector('#stage > *')
+
+    # Initial clip count on Vocals track
+    vocal_clips = page.locator('.trk').first.locator('.clip')
+    assert vocal_clips.count() == 3
+
+    # Click Split at playhead
+    split_btn = page.locator('button[aria-label="Split at playhead"]')
+    split_btn.click()
+    page.wait_for_timeout(100)
+    # Selected clip split into 2 subclips -> 4 clips now
+    assert vocal_clips.count() == 4
+
+    # Click Reverse chip
+    rev_chip = page.locator('button.chip:has-text("Reverse")')
+    assert 'on' not in (rev_chip.get_attribute('class') or '')
+    rev_chip.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (rev_chip.get_attribute('class') or '')
+
+    # Click Delete button
+    del_btn = page.locator('button[aria-label="Delete"]')
+    del_btn.click()
+    page.wait_for_timeout(100)
+    # 4 - 1 = 3 clips
+    assert vocal_clips.count() == 3
+
+    # Toggle Mute on Vocals track
+    mute_btn = page.locator('.trk').first.locator('button.m')
+    assert 'on' not in (mute_btn.get_attribute('class') or '')
+    mute_btn.click()
+    page.wait_for_timeout(100)
+    assert 'on' in (mute_btn.get_attribute('class') or '')
+
+    context.close()

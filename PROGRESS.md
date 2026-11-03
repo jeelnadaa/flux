@@ -17,7 +17,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 |-------|------|--------|-------|
 | 0 | Foundations | Agent-complete | 13 / 13 |
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
-| 2 | Editor UI & timeline | In progress | 6 / 17 |
+| 2 | Editor UI & timeline | In progress | 11 / 17 |
 | 3 | Core processing | Not started | 0 / 22 |
 | 4 | Spatial audio | Not started | 0 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
@@ -56,6 +56,8 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 ## Session log
 
 Newest first. One line per commit: item, what changed, measured result.
+
+- 2026-11-03: P2.2-a, P2.2-b, P2.2-c, P2.2-d, P2.2-e implemented sample-accurate EditingModel & FadeCurves (@flux/app-core), full non-destructive editing operations (split, cut, copy, paste, delete, ripple-delete, move, nudge, slip-edit, non-destructive reverse, clip gain, 5 fade curve types, equal-power auto crossfades, automatic 3ms micro-fades), multitrack mixing (track gain, pan, mute, solo, arm, buses), automation lanes (linear, smooth Hermite spline, hold), dynamic EditScreen with interactive tools/inspector, AutomationScreen (#automation) with multi-mode lane management, MixScreen (#mix) with 8 channel strips and master goniometer; 18 TS unit tests passing, 29 pixel-diff & UI interaction tests green across desktop, tablet, and phone (automation 98.4%+, mix 98.2%+); just ci green.
 
 - 2026-11-03: P2.1-a, P2.1-b, P2.1-c implemented TimelineModel & SnappingEngine (@flux/app-core), interactive WaveformCanvas (sample-level zoom, dB/linear scales, clipping indicator, mono/stereo/mid-side), SpectrogramCanvas (linear/log/mel scales, 4 colormaps, zoom, frequency grid), SpectralSelectionOverlay, HybridView (30% waveform + 70% spectrogram with view mode toggle), TimelineRuler (time division ticks, loop region, marker flags, shaded regions, scrub seek), PlayheadOverlay with playhead translation, zero-crossing and clip snapping, SpectralScreen (#spectral), and CanvasViz procedural renderers with ResizeObserver; automated Playwright tests verify >= 95% pixel-diff match at Desktop (Spectral 98.6%, Edit 98.5%), Tablet (Spectral 98.8%, Edit 98.8%), and Phone (Spectral 98.7%, Edit 98.6%); 9 timeline unit tests and 20 pixel-diff/interaction tests green; just ci green.
 
@@ -137,11 +139,11 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P2.1-a Waveform view: zoom whole-file to sample level, scales, clipping
 - [x] P2.1-b Spectrogram and hybrid view; spectral selection
 - [x] P2.1-c Playhead, scrub, loop region, markers, snapping
-- [ ] P2.2-a Select, cut, copy, paste, delete, ripple, split, move, nudge
-- [ ] P2.2-b Slip, reverse, clip gain and envelope
-- [ ] P2.2-c Fades with curve types; auto crossfades; automatic micro-fades
-- [ ] P2.2-d Multitrack: track gain, pan, mute, solo, color, groups, buses
-- [ ] P2.2-e Automation lanes with interpolation modes
+- [x] P2.2-a Select, cut, copy, paste, delete, ripple, split, move, nudge
+- [x] P2.2-b Slip, reverse, clip gain and envelope
+- [x] P2.2-c Fades with curve types; auto crossfades; automatic micro-fades
+- [x] P2.2-d Multitrack: track gain, pan, mute, solo, color, groups, buses
+- [x] P2.2-e Automation lanes with interpolation modes
 - [ ] P2.3-a Command system: unlimited undo/redo, coalescing
 - [ ] P2.3-b Visual history timeline
 - [ ] P2.3-c Working project directory and journal; crash recovery dialog

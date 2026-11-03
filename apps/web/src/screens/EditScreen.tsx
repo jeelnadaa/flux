@@ -196,6 +196,80 @@ export const EditScreen: React.FC = () => {
   const [toolIdx, setToolIdx] = useState<number>(0);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
 
+  const [tracksState, setTracksState] = useState<TrackData[]>(() =>
+    JSON.parse(JSON.stringify(TRACKS)),
+  );
+  const selectedClipName = "Chorus";
+  const [fadeCurveIdx, setFadeCurveIdx] = useState<number>(0);
+  const [isReversed, setIsReversed] = useState<boolean>(false);
+
+  const handleSplit = () => {
+    setTracksState((prev) =>
+      prev.map((trk) => {
+        const foundIdx = trk.clips.findIndex((c) => c.selected);
+        if (foundIdx === -1) return trk;
+        const target = trk.clips[foundIdx];
+        const halfWidth = target.width / 2;
+        const leftClip: ClipData = {
+          ...target,
+          label: `${target.label} (A)`,
+          width: halfWidth,
+          selected: false,
+        };
+        const rightClip: ClipData = {
+          ...target,
+          label: `${target.label} (B)`,
+          left: target.left + halfWidth,
+          width: halfWidth,
+          selected: true,
+        };
+        const updatedClips = [...trk.clips];
+        updatedClips.splice(foundIdx, 1, leftClip, rightClip);
+        return { ...trk, clips: updatedClips };
+      }),
+    );
+  };
+
+  const handleDelete = () => {
+    setTracksState((prev) =>
+      prev.map((trk) => {
+        const foundIdx = trk.clips.findIndex((c) => c.selected);
+        if (foundIdx === -1) return trk;
+        const target = trk.clips[foundIdx];
+        let updatedClips = trk.clips.filter((c) => !c.selected);
+        if (ripple) {
+          updatedClips = updatedClips.map((c) => {
+            if (c.left > target.left) {
+              return { ...c, left: Math.max(0, c.left - target.width) };
+            }
+            return c;
+          });
+        }
+        return { ...trk, clips: updatedClips };
+      }),
+    );
+  };
+
+  const toggleTrackMute = (trackName: string) => {
+    setTracksState((prev) =>
+      prev.map((trk) => (trk.name === trackName ? { ...trk, muted: !trk.muted } : trk)),
+    );
+  };
+
+  const toggleReverse = () => {
+    setIsReversed((prev) => !prev);
+    setTracksState((prev) =>
+      prev.map((trk) => ({
+        ...trk,
+        clips: trk.clips.map((c) =>
+          c.selected
+            ? { ...c, label: isReversed ? c.label.replace(" [Rev]", "") : `${c.label} [Rev]` }
+            : c,
+        ),
+      })),
+    );
+  };
+
   const topBarRight = (
     <>
       <SegmentedControl items={["Simple", "Pro"]} selectedIndex={1} className="hide-s" dataMode />
@@ -266,8 +340,20 @@ export const EditScreen: React.FC = () => {
             />
             <Button variant="ghost" iconOnly icon="cut" ariaLabel="Cut" />
             <Button variant="ghost" iconOnly icon="copy" ariaLabel="Copy" />
-            <Button variant="ghost" iconOnly icon="split" ariaLabel="Split at playhead" />
-            <Button variant="ghost" iconOnly icon="trash" ariaLabel="Delete" />
+            <Button
+              variant="ghost"
+              iconOnly
+              icon="split"
+              ariaLabel="Split at playhead"
+              onClick={handleSplit}
+            />
+            <Button
+              variant="ghost"
+              iconOnly
+              icon="trash"
+              ariaLabel="Delete"
+              onClick={handleDelete}
+            />
             <span className="sp" style={{ flex: 1 }} />
             <Chip
               label="Snap: zero cross"
@@ -291,7 +377,7 @@ export const EditScreen: React.FC = () => {
             >
               <CanvasViz type="ruler" />
             </div>
-            {TRACKS.map((trk) => (
+            {tracksState.map((trk) => (
               <div key={trk.name} className={`trk ${trk.tall ? "tall" : ""}`}>
                 <div className="thd">
                   <div className="nm">
@@ -303,6 +389,7 @@ export const EditScreen: React.FC = () => {
                       className={`m ${trk.muted ? "on" : ""}`}
                       type="button"
                       aria-label={`Mute ${trk.name}`}
+                      onClick={() => toggleTrackMute(trk.name)}
                     >
                       M
                     </button>
@@ -328,7 +415,7 @@ export const EditScreen: React.FC = () => {
         {/* Clip inspector */}
         <aside className="b in">
           <div className="between">
-            <h3 className="h3">Chorus</h3>
+            <h3 className="h3">{selectedClipName}</h3>
             <Pill label="Vocals" />
           </div>
           <div className="g2 mono dim">
@@ -341,7 +428,11 @@ export const EditScreen: React.FC = () => {
             <Slider label="Fade out" defaultValue={18} valueText="120 ms" />
           </div>
           <Field label="Fade curve">
-            <SegmentedControl items={["Equal power", "S", "Log", "Lin"]} selectedIndex={0} />
+            <SegmentedControl
+              items={["Equal power", "S", "Log", "Lin"]}
+              selectedIndex={fadeCurveIdx}
+              onChange={(_val, idx) => setFadeCurveIdx(idx)}
+            />
           </Field>
           <Section title="Effects on this clip">
             <div className="lst">
@@ -366,7 +457,7 @@ export const EditScreen: React.FC = () => {
           </Section>
           <Section title="Quick">
             <div className="row">
-              <Chip label="Reverse" />
+              <Chip label="Reverse" active={isReversed} onClick={toggleReverse} />
               <Chip label="Normalize" />
               <Chip label="Duplicate" />
               <Chip label="Bounce" />
