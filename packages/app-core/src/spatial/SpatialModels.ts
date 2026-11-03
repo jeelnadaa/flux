@@ -336,3 +336,255 @@ export const DEFAULT_STEREO_SPATIAL_CONFIG: StereoSpatialConfig = {
   headWidthCm: DEFAULT_HEAD_WIDTH_CM,
   profile: "C",
 };
+
+export type SpatialPresetName =
+  | "Front"
+  | "Behind"
+  | "Above"
+  | "Below"
+  | "FrontLeft"
+  | "FrontRight"
+  | "RearLeft"
+  | "RearRight"
+  | "InsideRoom";
+
+export interface SpatialPresetInfo {
+  name: SpatialPresetName;
+  label: string;
+  azimuthDeg: number;
+  elevationDeg: number;
+  distanceM: number;
+}
+
+export const SPATIAL_PRESETS: Record<SpatialPresetName, SpatialPresetInfo> = {
+  Front: { name: "Front", label: "Front center", azimuthDeg: 0, elevationDeg: 0, distanceM: 1.5 },
+  Behind: {
+    name: "Behind",
+    label: "Directly behind",
+    azimuthDeg: 180,
+    elevationDeg: 0,
+    distanceM: 1.5,
+  },
+  Above: { name: "Above", label: "Above head", azimuthDeg: 0, elevationDeg: 60, distanceM: 1.5 },
+  Below: { name: "Below", label: "Below head", azimuthDeg: 0, elevationDeg: -60, distanceM: 1.5 },
+  FrontLeft: {
+    name: "FrontLeft",
+    label: "Front left",
+    azimuthDeg: 315,
+    elevationDeg: 0,
+    distanceM: 1.8,
+  },
+  FrontRight: {
+    name: "FrontRight",
+    label: "Front right",
+    azimuthDeg: 45,
+    elevationDeg: 0,
+    distanceM: 1.8,
+  },
+  RearLeft: {
+    name: "RearLeft",
+    label: "Rear left",
+    azimuthDeg: 225,
+    elevationDeg: 0,
+    distanceM: 1.8,
+  },
+  RearRight: {
+    name: "RearRight",
+    label: "Rear right",
+    azimuthDeg: 135,
+    elevationDeg: 0,
+    distanceM: 1.8,
+  },
+  InsideRoom: {
+    name: "InsideRoom",
+    label: "Inside a room",
+    azimuthDeg: 30,
+    elevationDeg: 15,
+    distanceM: 2.5,
+  },
+};
+
+/**
+ * Generates continuous 3D coordinate on a Vertical Loop trajectory.
+ */
+export function generateVerticalLoopPosition(
+  tSec: number,
+  speedHz: number,
+  distanceM: number,
+): SphericalCoord {
+  const phase = (tSec * speedHz) % 1.0;
+  const omega = phase * 2.0 * Math.PI;
+  const el = 85.0 * Math.sin(omega);
+  const az = (Math.cos(omega) * 15.0 + 360.0) % 360.0;
+  return { azimuthDeg: az, elevationDeg: el, distanceM };
+}
+
+/**
+ * Generates continuous 3D coordinate on a deterministic seeded random walk / Swarm trajectory.
+ */
+export function generateSwarmPosition(
+  tSec: number,
+  speedHz: number,
+  distanceM: number,
+  seed = 42,
+): CartesianCoord {
+  const seedOff = (seed % 1000) * 0.1;
+  const b = tSec * 1.3 * speedHz + seedOff;
+  const r = distanceM;
+  const x = r * (0.7 * Math.sin(b) + 0.2 * Math.sin(2.9 * b));
+  const y = r * (0.7 * Math.cos(1.7 * b));
+  const z = r * (0.4 * Math.sin(0.8 * b));
+  return { x, y, z };
+}
+
+/**
+ * Generates continuous 3D coordinate on a 3D Lissajous trajectory knot.
+ */
+export function generateLissajousPosition(
+  tSec: number,
+  speedHz: number,
+  distanceM: number,
+): CartesianCoord {
+  const phase = (tSec * speedHz) % 1.0;
+  const omega = phase * 2.0 * Math.PI;
+  const r = distanceM;
+  const x = r * Math.sin(3.0 * omega);
+  const y = r * Math.cos(2.0 * omega);
+  const z = r * Math.sin(4.0 * omega) * 0.5;
+  return { x, y, z };
+}
+
+/**
+ * Evaluates Catmull-Rom spline interpolation along a sequence of 2D control points.
+ */
+export function interpolateCatmullRomSpline(
+  points: [number, number][],
+  t: number,
+): [number, number] {
+  if (points.length === 0) return [0, 0];
+  if (points.length === 1) return points[0];
+
+  const n = points.length;
+  const u = Math.max(0, Math.min(n - 1, Math.max(0, Math.min(1, t)) * (n - 1)));
+  const idx = Math.floor(u);
+  const s = u - idx;
+
+  const i0 = Math.max(0, idx - 1);
+  const i1 = idx;
+  const i2 = Math.min(n - 1, idx + 1);
+  const i3 = Math.min(n - 1, idx + 2);
+
+  const p0 = points[i0];
+  const p1 = points[i1];
+  const p2 = points[i2];
+  const p3 = points[i3];
+
+  const s2 = s * s;
+  const s3 = s2 * s;
+
+  const x =
+    0.5 *
+    (2.0 * p1[0] +
+      (-p0[0] + p2[0]) * s +
+      (2.0 * p0[0] - 5.0 * p1[0] + 4.0 * p2[0] - p3[0]) * s2 +
+      (-p0[0] + 3.0 * p1[0] - 3.0 * p2[0] + p3[0]) * s3);
+
+  const y =
+    0.5 *
+    (2.0 * p1[1] +
+      (-p0[1] + p2[1]) * s +
+      (2.0 * p0[1] - 5.0 * p1[1] + 4.0 * p2[1] - p3[1]) * s2 +
+      (-p0[1] + 3.0 * p1[1] - 3.0 * p2[1] + p3[1]) * s3);
+
+  return [x, y];
+}
+
+export interface MonoCompatibilityResult {
+  correlation: number;
+  monoLossDb: number;
+  isCompatible: boolean;
+}
+
+/**
+ * Evaluates mono compatibility (phase correlation and level drop) of stereo buffers.
+ */
+export function checkMonoCompatibility(
+  left: Float32Array | number[],
+  right: Float32Array | number[],
+): MonoCompatibilityResult {
+  const n = Math.min(left.length, right.length);
+  if (n === 0) {
+    return { correlation: 1.0, monoLossDb: 0.0, isCompatible: true };
+  }
+  let sumL2 = 0;
+  let sumR2 = 0;
+  let sumLR = 0;
+  let sumM2 = 0;
+  for (let i = 0; i < n; i++) {
+    const l = left[i];
+    const r = right[i];
+    const m = 0.5 * (l + r);
+    sumL2 += l * l;
+    sumR2 += r * r;
+    sumLR += l * r;
+    sumM2 += m * m;
+  }
+  const denom = Math.sqrt(sumL2 * sumR2);
+  const correlation = denom > 1e-12 ? Math.max(-1.0, Math.min(1.0, sumLR / denom)) : 1.0;
+  const stereoPwr = Math.max(1e-12, (0.5 * (sumL2 + sumR2)) / n);
+  const monoPwr = Math.max(1e-12, sumM2 / n);
+  const ratio = monoPwr / stereoPwr;
+  const monoLossDb = -10.0 * Math.log10(ratio);
+  const isCompatible = correlation >= 0.0 && monoLossDb <= 6.0;
+
+  return { correlation, monoLossDb, isCompatible };
+}
+
+export interface StageStemSource {
+  id: string;
+  name: string;
+  colorVar: string;
+  azimuthDeg: number;
+  distanceRatio: number;
+  mode: "fixed" | "orbit" | "reverse";
+  fixed: boolean;
+}
+
+export const DEFAULT_STAGE_STEMS: StageStemSource[] = [
+  {
+    id: "vocals",
+    name: "Vocals",
+    colorVar: "--t4",
+    azimuthDeg: 0,
+    distanceRatio: 0.72,
+    mode: "fixed",
+    fixed: true,
+  },
+  {
+    id: "drums",
+    name: "Drums",
+    colorVar: "--t3",
+    azimuthDeg: 126,
+    distanceRatio: 0.85,
+    mode: "orbit",
+    fixed: false,
+  },
+  {
+    id: "bass",
+    name: "Bass",
+    colorVar: "--t2",
+    azimuthDeg: 235,
+    distanceRatio: 0.55,
+    mode: "fixed",
+    fixed: true,
+  },
+  {
+    id: "other",
+    name: "Other",
+    colorVar: "--t5",
+    azimuthDeg: 309,
+    distanceRatio: 0.9,
+    mode: "reverse",
+    fixed: false,
+  },
+];

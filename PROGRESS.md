@@ -7,7 +7,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 ## Current focus
 
 - **Phase:** 4 — Spatial audio
-- **Next item:** P4.3 (P4.3-a 3D static placement and presets)
+- **Next item:** P4.4 (P4.4-a Convolution reverb with IR tools)
 - **Design:** confirmed 2026-11-03. Follow [DESIGN.md](DESIGN.md); UI must be a 1:1 replica of `design/`
 - **Last updated:** 2026-11-03
 
@@ -19,7 +19,7 @@ Single source of truth for what is done and what is next. Rules are in [AGENTS.m
 | 1 | Core engine & I/O | Agent-complete | 18 / 18 |
 | 2 | Editor UI & timeline | Agent-complete | 17 / 17 |
 | 3 | Core processing | Agent-complete | 22 / 22 |
-| 4 | Spatial audio | In progress | 7 / 18 |
+| 4 | Spatial audio | In progress | 13 / 18 |
 | 5 | Creative FX & voice | Not started | 0 / 17 |
 | 6 | AI restoration & transcript | Not started | 0 / 14 |
 | 7 | Advanced AI | Not started | 0 / 11 |
@@ -57,6 +57,7 @@ Short pointers only; full reasoning goes in `docs/adr/`.
 
 Newest first. One line per commit: item, what changed, measured result.
 
+- 2026-11-03: P4.3-a, P4.3-b, P4.3-c, P4.3-d, P4.3-e, P4.3-f implemented 3D static placement, 8D auto-orbit, 16D motion paths, interactive Sound Stage UI, draw-a-path mode, and headphone/mono compatibility: SpatialPosition, 9 static placement presets (Front, Behind, Above, Below, FrontLeft, FrontRight, RearLeft, RearRight, InsideRoom), 8D auto-orbit (speed 0.01–2.0 Hz, CW/CCW/PingPong, distance, elevation, depth, smoothing, start phase, tempo sync T = beats * 60 / BPM, N revolutions within ±0.1° accuracy), 16D extended motion paths (Spiral, Figure-8/Lemniscate, Vertical Loop, seeded deterministic Swarm random walk, 3D Lissajous), Catmull-Rom spline interpolation, MonoCompatibilityResult check, multi-source stems (Vocals, Drums, Bass, Other); integrated SpatialTrajectoryGenerator with 17 automatable parameters into StereoSpatializerNode (zero allocations on audio thread, all 13 universal DSP invariants passing); WASM C ABI exports; Sound Stage screen (#stage) with interactive 2D top-down and elevation canvases (V.stage, V.elev) with drag-to-place and draw-path support; verified 100% test pass (86 TS unit tests, 122 browser/pixel-diff tests with all 111 visual diff tests >= 95%, 56 dsp cargo tests, 38 testkit invariant tests); full just ci gate green.
 - 2026-11-03: P4.2-a implemented stereo spatializer with VirtualSpeakers mode (adjustable spread rotating together), Mid/Side mode (anchored frontal center with orbiting sides), and 8th-order Linkwitz-Riley (LR8) mono bass management with flat magnitude reconstruction and <= -60 dB low-frequency null below crossover; registered StereoSpatializerNode in universal DSP invariant harness (13/13 passing); added WASM C ABI exports and TypeScript domain utilities; verified 100% test pass (81 TS unit tests, 118 Playwright & pytest tests, 49 dsp cargo tests, 38 testkit invariant tests) with visual diff match >= 95% across Desktop, Tablet, and Phone; full just ci gate green.
 - 2026-11-03: P4.1-a, P4.1-b, P4.1-c, P4.1-d, P4.1-e, P4.1-f implemented binaural spatial rendering core: HrtfDataset with 6 profiles (A through F) decomposed into minimum-phase IRs and Woodworth fractional ITDs (600-700 µs at 90° azimuth); PartitionedConvolver with zero latency and cosine crossfading; DirectHrtfRenderer (Renderer A); AmbisonicRenderer (Renderer B) with 3rd-order Higher-Order Ambisonics (16 channels) spherical harmonic encoding and MagLS binaural decoding; DistanceCues with 1/r law, air absorption filtering, near-field ILD boost, and Doppler; MonoBassFilter 120 Hz crossover; Headphone Check screen (#hpcheck) and HRTF Profile screen (#hrtf); verified 100% test pass (77 TS unit tests, 116 Playwright/pytest tests green, 45 dsp cargo tests, 37 testkit invariant tests) with >= 95% pixel-diff match against prototype at 1440, 820, and 390 px; full just ci gate green.
 
@@ -205,12 +206,12 @@ Newest first. One line per commit: item, what changed, measured result.
 - [x] P4.1-e Distance cues, Doppler, level stability, headphone compensation
 - [x] P4.1-f Head-width control and "pick your HRTF" test
 - [x] P4.2-a Stereo inputs (virtual speakers, mid/side), mono bass
-- [ ] P4.3-a 3D static placement and presets
-- [ ] P4.3-b 8D auto-orbit with all controls, tempo sync
-- [ ] P4.3-c 16D paths: spiral, figure-eight, vertical loop, swarm, Lissajous
-- [ ] P4.3-d Sound stage UI: top and side views, drag to place
-- [ ] P4.3-e Draw-a-path, record dragging to automation, multiple sources
-- [ ] P4.3-f Headphone check wizard; speaker warning and mono-compatibility check
+- [x] P4.3-a 3D static placement and presets
+- [x] P4.3-b 8D auto-orbit with all controls, tempo sync
+- [x] P4.3-c 16D paths: spiral, figure-eight, vertical loop, swarm, Lissajous
+- [x] P4.3-d Sound stage UI: top and side views, drag to place
+- [x] P4.3-e Draw-a-path, record dragging to automation, multiple sources
+- [x] P4.3-f Headphone check wizard; speaker warning and mono-compatibility check
 - [ ] P4.4-a Convolution reverb with IR tools
 - [ ] P4.4-b Algorithmic reverb (FDN, plate, hall)
 - [ ] P4.4-c Room presets; custom room designer; binaural early reflections

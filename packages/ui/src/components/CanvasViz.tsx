@@ -28,6 +28,8 @@ export interface CanvasVizProps {
   on?: boolean;
   th?: number;
   ratio?: number;
+  mode?: string;
+  tool?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -288,6 +290,8 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
   on = false,
   th,
   ratio,
+  mode,
+  tool,
   className = "",
   style,
 }) => {
@@ -637,6 +641,257 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
           ctx.fillStyle = getCss("--sig");
           ctx.fillRect(i * 3, 0, 2, gr * rh * 0.34);
         }
+      } else if (type === "stage") {
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        interface StageSource {
+          az: number;
+          r: number;
+          c: string;
+          n: string;
+          fix?: number;
+          _x?: number;
+          _y?: number;
+          tr?: [number, number][];
+        }
+
+        interface StageState {
+          mode: string;
+          a: number;
+          src: StageSource[];
+          path: [number, number][] | null;
+          trail: [number, number][];
+          c?: number;
+          cx?: number;
+          cy?: number;
+        }
+
+        const cvExt = cv as unknown as { _st?: StageState; _dr?: boolean };
+        const st =
+          cvExt._st ||
+          (cvExt._st = {
+            mode: mode || "orbit",
+            a: 0,
+            src: [
+              { az: 0, r: 0.72, c: "--t4", n: "Vocals", fix: 1 },
+              { az: 2.2, r: 0.85, c: "--t3", n: "Drums" },
+              { az: 4.1, r: 0.55, c: "--t2", n: "Bass", fix: 1 },
+              { az: 5.4, r: 0.9, c: "--t5", n: "Other" },
+            ],
+            path: null,
+            trail: [],
+          });
+
+        const m = cv.dataset.mode || mode || st.mode;
+        ctx.clearRect(0, 0, rw, rh);
+        const c = Math.min(rw, rh) / 2 - 22;
+        const cx = rw / 2;
+        const cy = rh / 2;
+        st.c = c;
+        st.cx = cx;
+        st.cy = cy;
+
+        ctx.strokeStyle = getCss("--ln2");
+        ctx.lineWidth = 1;
+        [0.33, 0.66, 1].forEach((r) => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, c * r, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        for (let d = 0; d < 360; d += 30) {
+          const a = (d * Math.PI) / 180;
+          const l = d % 90 === 0 ? 12 : 6;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.sin(a) * c, cy - Math.cos(a) * c);
+          ctx.lineTo(cx + Math.sin(a) * (c - l), cy - Math.cos(a) * (c - l));
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = getCss("--tx3");
+        ctx.font = '500 10.5px "Geist Mono",monospace';
+        ctx.textAlign = "center";
+        ctx.fillText("Front", cx, cy - c - 7);
+        ctx.fillText("Back", cx, cy + c + 15);
+        ctx.textAlign = "left";
+        ctx.fillText("L", cx - c - 14, cy + 4);
+        ctx.fillText("R", cx + c + 6, cy + 4);
+
+        const pos = (s: StageSource, i: number): [number, number] => {
+          if (s.fix || m === "place") return [s.az, s.r];
+          const a = st.a * (i === 1 ? 1 : -0.65) + s.az;
+          if (st.path && st.path.length > 4 && i === 1) {
+            const k = Math.floor(((((st.a * 0.13) % 1) + 1) % 1) * st.path.length);
+            const p = st.path[k];
+            return [Math.atan2(p[0], -p[1]), Math.hypot(p[0], p[1])];
+          }
+          if (m === "spiral") return [a, s.r * (0.55 + 0.45 * Math.sin(st.a * 0.6 + i))];
+          if (m === "eight")
+            return [
+              Math.atan2(Math.sin(a), -Math.sin(a * 2) * 0.6),
+              Math.hypot(Math.sin(a), Math.sin(a * 2) * 0.6) * 0.9,
+            ];
+          if (m === "swarm") {
+            const b = st.a * 1.3 + s.az * 3;
+            return [
+              Math.atan2(Math.sin(b) * 0.7 + Math.sin(b * 2.9) * 0.2, Math.cos(b * 1.7) * 0.7),
+              0.3 + 0.6 * Math.abs(Math.sin(b * 0.8)),
+            ];
+          }
+          return [a, s.r];
+        };
+
+        if (st.path && st.path.length > 1) {
+          ctx.beginPath();
+          st.path.forEach((p, i) => {
+            const px = cx + p[0] * c;
+            const py = cy + p[1] * c;
+            if (i) ctx.lineTo(px, py);
+            else ctx.moveTo(px, py);
+          });
+          ctx.strokeStyle = getCss("--sig");
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        st.src.forEach((s, i) => {
+          const [az, r] = pos(s, i);
+          const px = cx + Math.sin(az) * r * c;
+          const py = cy - Math.cos(az) * r * c;
+          const col = getCss(s.c);
+          s._x = px;
+          s._y = py;
+          if (!s.fix && m !== "place") {
+            const tr = s.tr || (s.tr = []);
+            tr.push([px, py]);
+            if (tr.length > 46) tr.shift();
+            tr.forEach((q, k) => {
+              ctx.globalAlpha = (k / tr.length) * 0.5;
+              ctx.fillStyle = col;
+              ctx.beginPath();
+              ctx.arc(q[0], q[1], 1.5 + (k / tr.length) * 6, 0, Math.PI * 2);
+              ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+          }
+          ctx.beginPath();
+          ctx.arc(px, py, 14, 0, Math.PI * 2);
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.fillStyle = getCss(`${s.c}-on`);
+          ctx.font = `800 11px ${getCss("--sans")}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(s.n[0], px, py + 0.5);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+        });
+
+        // Center head
+        const hr = c * 0.12;
+        ctx.beginPath();
+        ctx.arc(cx, cy, hr, 0, Math.PI * 2);
+        ctx.fillStyle = getCss("--s3");
+        ctx.fill();
+        ctx.strokeStyle = getCss("--tx");
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Nose
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - hr - 9);
+        ctx.lineTo(cx - 7, cy - hr + 1);
+        ctx.lineTo(cx + 7, cy - hr + 1);
+        ctx.closePath();
+        ctx.fillStyle = getCss("--tx");
+        ctx.fill();
+
+        // Ears
+        ctx.fillRect(cx - hr - 4, cy - 6, 4, 12);
+        ctx.fillRect(cx + hr, cy - 6, 4, 12);
+
+        if (!cvExt._dr) {
+          cvExt._dr = true;
+          cv.style.touchAction = "none";
+          let drag: StageSource | null = null;
+          let draw = false;
+          cv.addEventListener("pointerdown", (e: PointerEvent) => {
+            const r = cv.getBoundingClientRect();
+            const mx = e.clientX - r.left;
+            const my = e.clientY - r.top;
+            if (cv.dataset.tool === "draw") {
+              draw = true;
+              st.path = [[(mx - (st.cx ?? cx)) / (st.c ?? c), (my - (st.cy ?? cy)) / (st.c ?? c)]];
+              st.src[1].fix = 0;
+              cv.setPointerCapture(e.pointerId);
+              return;
+            }
+            drag = st.src.find((s) => Math.hypot((s._x ?? 0) - mx, (s._y ?? 0) - my) < 24) || null;
+            if (drag) {
+              drag.fix = 1;
+              cv.setPointerCapture(e.pointerId);
+            }
+          });
+          cv.addEventListener("pointermove", (e: PointerEvent) => {
+            const r = cv.getBoundingClientRect();
+            const mx = e.clientX - r.left - (st.cx ?? cx);
+            const my = e.clientY - r.top - (st.cy ?? cy);
+            if (draw) {
+              const q: [number, number] = [mx / (st.c ?? c), my / (st.c ?? c)];
+              const l = st.path ? st.path[st.path.length - 1] : null;
+              if (!l || Math.hypot(q[0] - l[0], q[1] - l[1]) > 0.025) {
+                if (!st.path) st.path = [];
+                st.path.push(q);
+              }
+              render();
+              return;
+            }
+            if (drag) {
+              drag.az = Math.atan2(mx, -my);
+              drag.r = Math.min(1, Math.max(0.16, Math.hypot(mx, my) / (st.c ?? c)));
+              render();
+            }
+          });
+          window.addEventListener("pointerup", () => {
+            drag = null;
+            draw = false;
+          });
+        }
+      } else if (type === "elev") {
+        const docStyle =
+          typeof document !== "undefined" ? getComputedStyle(document.documentElement) : null;
+        const getCss = (v: string) => docStyle?.getPropertyValue(v).trim() || v;
+
+        ctx.clearRect(0, 0, rw, rh);
+        ctx.strokeStyle = getCss("--ln2");
+        ctx.beginPath();
+        ctx.moveTo(0, rh / 2);
+        ctx.lineTo(rw, rh / 2);
+        ctx.stroke();
+
+        ctx.fillStyle = getCss("--tx3");
+        ctx.font = '500 10.5px "Geist Mono",monospace';
+        ctx.fillText("Above", 6, 13);
+        ctx.fillText("Below", 6, rh - 5);
+
+        const cx = rw / 2;
+        ctx.beginPath();
+        ctx.arc(cx, rh / 2, 11, 0, Math.PI * 2);
+        ctx.strokeStyle = getCss("--tx");
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        const t = (cv as unknown as { _t?: number })._t || 0;
+        const y = rh / 2 - Math.sin(t * 0.5) * rh * 0.32;
+        const px = cx + Math.cos(t * 0.75) * rw * 0.3;
+        ctx.beginPath();
+        ctx.arc(px, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = getCss("--t3");
+        ctx.fill();
       }
     };
 
@@ -655,7 +910,7 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
         ro.disconnect();
       }
     };
-  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height, on, th, ratio]);
+  }, [type, seed, stereo, step, kind, color, gain, until, ceil, height, on, th, ratio, mode, tool]);
 
   const canvasEl = (
     <canvas
@@ -671,6 +926,8 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
       data-ceil={ceil}
       data-th={th}
       data-ratio={ratio}
+      data-mode={mode}
+      data-tool={tool}
       aria-hidden={!roleLabel}
       style={{ width: "100%", height: height ? `${height}px` : "100%", ...style }}
     />

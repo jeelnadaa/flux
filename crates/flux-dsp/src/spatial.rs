@@ -931,6 +931,547 @@ impl MonoBassFilter {
     }
 }
 
+/// A 3D spatial coordinate in spherical (azimuth, elevation, distance) and Cartesian coordinates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpatialPosition {
+    /// Azimuth in degrees (0..360, where 0 is front, 90 is right, 180 is back, 270 is left).
+    pub azimuth_deg: f32,
+    /// Elevation in degrees (-90..90, where 0 is horizon, +90 is zenith/above, -90 is nadir/below).
+    pub elevation_deg: f32,
+    /// Distance from listener in meters (0.1..10.0).
+    pub distance_m: f32,
+    /// Cartesian X (right) in meters.
+    pub x: f32,
+    /// Cartesian Y (front) in meters.
+    pub y: f32,
+    /// Cartesian Z (up) in meters.
+    pub z: f32,
+}
+
+impl Default for SpatialPosition {
+    fn default() -> Self {
+        Self::from_spherical(0.0, 0.0, 1.0)
+    }
+}
+
+impl SpatialPosition {
+    /// Creates a 3D position from spherical coordinates.
+    pub fn from_spherical(azimuth_deg: f32, elevation_deg: f32, distance_m: f32) -> Self {
+        let az = azimuth_deg.rem_euclid(360.0);
+        let el = elevation_deg.clamp(-90.0, 90.0);
+        let dist = distance_m.clamp(0.1, 10.0);
+
+        let az_rad = az * PI / 180.0;
+        let el_rad = el * PI / 180.0;
+        let cos_el = el_rad.cos();
+
+        let x = dist * cos_el * az_rad.sin();
+        let y = dist * cos_el * az_rad.cos();
+        let z = dist * el_rad.sin();
+
+        Self {
+            azimuth_deg: az,
+            elevation_deg: el,
+            distance_m: dist,
+            x,
+            y,
+            z,
+        }
+    }
+
+    /// Creates a 3D position from Cartesian coordinates.
+    pub fn from_cartesian(x: f32, y: f32, z: f32) -> Self {
+        let dist = (x * x + y * y + z * z).sqrt().clamp(0.1, 10.0);
+        let el_rad = (z / dist).clamp(-1.0, 1.0).asin();
+        let el_deg = el_rad * 180.0 / PI;
+
+        let az_rad = x.atan2(y);
+        let az_deg = (az_rad * 180.0 / PI).rem_euclid(360.0);
+
+        Self {
+            azimuth_deg: az_deg,
+            elevation_deg: el_deg,
+            distance_m: dist,
+            x,
+            y,
+            z,
+        }
+    }
+}
+
+/// Static 3D sound placement presets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SpatialPreset {
+    /// Front center (0°, 0°, 1.5m).
+    #[default]
+    Front,
+    /// Directly behind listener (180°, 0°, 1.5m).
+    Behind,
+    /// Above listener (0°, 60°, 1.5m).
+    Above,
+    /// Below listener (0°, -60°, 1.5m).
+    Below,
+    /// Front-left (315° / -45°, 0°, 1.8m).
+    FrontLeft,
+    /// Front-right (45°, 0°, 1.8m).
+    FrontRight,
+    /// Rear-left (225° / -135°, 0°, 1.8m).
+    RearLeft,
+    /// Rear-right (135°, 0°, 1.8m).
+    RearRight,
+    /// Inside a room (30°, 15°, 2.5m).
+    InsideRoom,
+}
+
+impl SpatialPreset {
+    /// Returns the 3D position corresponding to the static preset.
+    pub fn position(&self) -> SpatialPosition {
+        match self {
+            SpatialPreset::Front => SpatialPosition::from_spherical(0.0, 0.0, 1.5),
+            SpatialPreset::Behind => SpatialPosition::from_spherical(180.0, 0.0, 1.5),
+            SpatialPreset::Above => SpatialPosition::from_spherical(0.0, 60.0, 1.5),
+            SpatialPreset::Below => SpatialPosition::from_spherical(0.0, -60.0, 1.5),
+            SpatialPreset::FrontLeft => SpatialPosition::from_spherical(315.0, 0.0, 1.8),
+            SpatialPreset::FrontRight => SpatialPosition::from_spherical(45.0, 0.0, 1.8),
+            SpatialPreset::RearLeft => SpatialPosition::from_spherical(225.0, 0.0, 1.8),
+            SpatialPreset::RearRight => SpatialPosition::from_spherical(135.0, 0.0, 1.8),
+            SpatialPreset::InsideRoom => SpatialPosition::from_spherical(30.0, 15.0, 2.5),
+        }
+    }
+}
+
+/// Motion trajectory mode for 8D and 16D spatialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrajectoryMode {
+    /// Static placement at base azimuth/elevation/distance.
+    #[default]
+    Place,
+    /// 8D auto-orbit around the head.
+    Orbit,
+    /// Spiral: expands and contracts in distance and elevation.
+    Spiral,
+    /// Figure-8 (Gerono lemniscate) path in front of/around the head.
+    FigureEight,
+    /// Vertical loop: circular vertical motion through elevation.
+    VerticalLoop,
+    /// Deterministic seeded 3D Brownian random walk (Swarm).
+    Swarm,
+    /// 3D Lissajous knot with harmonic frequencies.
+    Lissajous,
+    /// Custom user-drawn 2D/3D path.
+    CustomPath,
+}
+
+/// Direction of trajectory movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrajectoryDirection {
+    /// Clockwise / forward.
+    #[default]
+    Clockwise,
+    /// Counter-clockwise / reverse.
+    CounterClockwise,
+    /// Ping-pong back and forth.
+    PingPong,
+}
+
+/// Result of a mono compatibility analysis on a stereo or binaural render.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MonoCompatibilityResult {
+    /// Phase correlation coefficient in [-1.0, 1.0].
+    pub correlation: f32,
+    /// Level drop in dB when summed to mono.
+    pub mono_loss_db: f32,
+    /// Whether the render is mono-compatible (correlation >= 0.0 and loss <= 6.0 dB).
+    pub is_compatible: bool,
+}
+
+/// Evaluates the mono compatibility of a stereo or binaural signal.
+pub fn check_mono_compatibility(left: &[f32], right: &[f32]) -> MonoCompatibilityResult {
+    let n = left.len().min(right.len());
+    if n == 0 {
+        return MonoCompatibilityResult {
+            correlation: 1.0,
+            mono_loss_db: 0.0,
+            is_compatible: true,
+        };
+    }
+
+    let mut sum_l2 = 0.0f64;
+    let mut sum_r2 = 0.0f64;
+    let mut sum_lr = 0.0f64;
+    let mut sum_m2 = 0.0f64;
+
+    for i in 0..n {
+        let l = left[i] as f64;
+        let r = right[i] as f64;
+        let m = 0.5 * (l + r);
+        sum_l2 += l * l;
+        sum_r2 += r * r;
+        sum_lr += l * r;
+        sum_m2 += m * m;
+    }
+
+    let denom = (sum_l2 * sum_r2).sqrt();
+    let correlation = if denom > 1e-12 {
+        (sum_lr / denom).clamp(-1.0, 1.0) as f32
+    } else {
+        1.0
+    };
+
+    let stereo_pwr = (0.5 * (sum_l2 + sum_r2) / n as f64).max(1e-12);
+    let mono_pwr = (sum_m2 / n as f64).max(1e-12);
+    let ratio = mono_pwr / stereo_pwr;
+    let mono_loss_db = (-10.0 * ratio.log10()) as f32;
+
+    let is_compatible = correlation >= 0.0 && mono_loss_db <= 6.0;
+
+    MonoCompatibilityResult {
+        correlation,
+        mono_loss_db,
+        is_compatible,
+    }
+}
+
+/// Evaluates Catmull-Rom spline interpolation along a sequence of 2D control points.
+pub fn interpolate_catmull_rom(points: &[[f32; 2]], t: f32) -> [f32; 2] {
+    if points.is_empty() {
+        return [0.0, 0.0];
+    }
+    if points.len() == 1 {
+        return points[0];
+    }
+
+    let n = points.len();
+    let u = (t.clamp(0.0, 1.0) * (n - 1) as f32).clamp(0.0, (n - 1) as f32);
+    let idx = u.floor() as usize;
+    let s = u - idx as f32;
+
+    let i0 = idx.saturating_sub(1);
+    let i1 = idx;
+    let i2 = (idx + 1).min(n - 1);
+    let i3 = (idx + 2).min(n - 1);
+
+    let p0 = points[i0];
+    let p1 = points[i1];
+    let p2 = points[i2];
+    let p3 = points[i3];
+
+    let s2 = s * s;
+    let s3 = s2 * s;
+
+    let x = 0.5
+        * ((2.0 * p1[0])
+            + (-p0[0] + p2[0]) * s
+            + (2.0 * p0[0] - 5.0 * p1[0] + 4.0 * p2[0] - p3[0]) * s2
+            + (-p0[0] + 3.0 * p1[0] - 3.0 * p2[0] + p3[0]) * s3);
+
+    let y = 0.5
+        * ((2.0 * p1[1])
+            + (-p0[1] + p2[1]) * s
+            + (2.0 * p0[1] - 5.0 * p1[1] + 4.0 * p2[1] - p3[1]) * s2
+            + (-p0[1] + 3.0 * p1[1] - 3.0 * p2[1] + p3[1]) * s3);
+
+    [x, y]
+}
+
+/// Configurable 3D spatial trajectory generator supporting static placement,
+/// 8D auto-orbit, tempo synchronization, and extended 16D motion paths.
+#[derive(Debug, Clone)]
+pub struct SpatialTrajectoryGenerator {
+    mode: TrajectoryMode,
+    direction: TrajectoryDirection,
+    speed_hz: f32,
+    base_azimuth_deg: f32,
+    base_elevation_deg: f32,
+    base_distance_m: f32,
+    depth: f32,
+    smoothing: f32,
+    tempo_sync_enabled: bool,
+    tempo_bpm: f32,
+    tempo_beats_per_rev: f32,
+    swarm_seed: u64,
+    custom_path: Vec<[f32; 2]>,
+    current_time_sec: f64,
+    current_pos: SpatialPosition,
+}
+
+impl Default for SpatialTrajectoryGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SpatialTrajectoryGenerator {
+    /// Creates a new `SpatialTrajectoryGenerator` with 8D orbit defaults (0.10 Hz, clockwise, 1.8m).
+    pub fn new() -> Self {
+        let initial_pos = SpatialPosition::from_spherical(0.0, 0.0, 1.8);
+        Self {
+            mode: TrajectoryMode::Orbit,
+            direction: TrajectoryDirection::Clockwise,
+            speed_hz: 0.10,
+            base_azimuth_deg: 0.0,
+            base_elevation_deg: 0.0,
+            base_distance_m: 1.8,
+            depth: 0.80,
+            smoothing: 0.60,
+            tempo_sync_enabled: false,
+            tempo_bpm: 120.0,
+            tempo_beats_per_rev: 8.0,
+            swarm_seed: 42,
+            custom_path: Vec::new(),
+            current_time_sec: 0.0,
+            current_pos: initial_pos,
+        }
+    }
+
+    /// Sets trajectory mode.
+    pub fn set_mode(&mut self, mode: TrajectoryMode) {
+        self.mode = mode;
+    }
+
+    /// Returns trajectory mode.
+    pub fn mode(&self) -> TrajectoryMode {
+        self.mode
+    }
+
+    /// Sets trajectory direction.
+    pub fn set_direction(&mut self, direction: TrajectoryDirection) {
+        self.direction = direction;
+    }
+
+    /// Returns trajectory direction.
+    pub fn direction(&self) -> TrajectoryDirection {
+        self.direction
+    }
+
+    /// Sets orbit speed in Hz (0.01..2.0).
+    pub fn set_speed_hz(&mut self, speed_hz: f32) {
+        self.speed_hz = speed_hz.clamp(0.01, 2.0);
+    }
+
+    /// Returns orbit speed in Hz.
+    pub fn speed_hz(&self) -> f32 {
+        self.speed_hz
+    }
+
+    /// Sets base spherical coordinates.
+    pub fn set_base_coordinates(&mut self, azimuth_deg: f32, elevation_deg: f32, distance_m: f32) {
+        self.base_azimuth_deg = azimuth_deg.rem_euclid(360.0);
+        self.base_elevation_deg = elevation_deg.clamp(-90.0, 90.0);
+        self.base_distance_m = distance_m.clamp(0.1, 10.0);
+        if self.mode == TrajectoryMode::Place {
+            self.current_pos = SpatialPosition::from_spherical(
+                self.base_azimuth_deg,
+                self.base_elevation_deg,
+                self.base_distance_m,
+            );
+        }
+    }
+
+    /// Sets depth factor (0.0..1.0).
+    pub fn set_depth(&mut self, depth: f32) {
+        self.depth = depth.clamp(0.0, 1.0);
+    }
+
+    /// Returns depth factor.
+    pub fn depth(&self) -> f32 {
+        self.depth
+    }
+
+    /// Sets smoothing factor (0.0..1.0).
+    pub fn set_smoothing(&mut self, smoothing: f32) {
+        self.smoothing = smoothing.clamp(0.0, 1.0);
+    }
+
+    /// Returns smoothing factor.
+    pub fn smoothing(&self) -> f32 {
+        self.smoothing
+    }
+
+    /// Configures tempo synchronization.
+    pub fn set_tempo_sync(&mut self, enabled: bool, bpm: f32, beats_per_rev: f32) {
+        self.tempo_sync_enabled = enabled;
+        self.tempo_bpm = bpm.clamp(30.0, 300.0);
+        self.tempo_beats_per_rev = beats_per_rev.clamp(1.0, 32.0);
+    }
+
+    /// Returns whether tempo sync is enabled.
+    pub fn is_tempo_sync_enabled(&self) -> bool {
+        self.tempo_sync_enabled
+    }
+
+    /// Returns current tempo BPM.
+    pub fn tempo_bpm(&self) -> f32 {
+        self.tempo_bpm
+    }
+
+    /// Returns beats per revolution for tempo sync.
+    pub fn tempo_beats_per_rev(&self) -> f32 {
+        self.tempo_beats_per_rev
+    }
+
+    /// Sets custom drawn path control points.
+    pub fn set_custom_path(&mut self, points: Vec<[f32; 2]>) {
+        self.custom_path = points;
+    }
+
+    /// Returns custom path points.
+    pub fn custom_path(&self) -> &[[f32; 2]] {
+        &self.custom_path
+    }
+
+    /// Sets seed for swarm random walk.
+    pub fn set_swarm_seed(&mut self, seed: u64) {
+        self.swarm_seed = seed;
+    }
+
+    /// Computes effective revolution frequency in Hz.
+    pub fn effective_speed_hz(&self) -> f32 {
+        if self.tempo_sync_enabled && self.tempo_bpm > 0.0 && self.tempo_beats_per_rev > 0.0 {
+            let sec_per_rev = (self.tempo_beats_per_rev * 60.0) / self.tempo_bpm;
+            1.0 / sec_per_rev.max(0.05)
+        } else {
+            self.speed_hz.clamp(0.01, 2.0)
+        }
+    }
+
+    /// Evaluates 3D spatial position at timestamp `t_sec`.
+    pub fn evaluate_at(&self, t_sec: f64) -> SpatialPosition {
+        if self.mode == TrajectoryMode::Place {
+            return SpatialPosition::from_spherical(
+                self.base_azimuth_deg,
+                self.base_elevation_deg,
+                self.base_distance_m,
+            );
+        }
+
+        let speed = self.effective_speed_hz();
+        let raw_phase = (t_sec * speed as f64).rem_euclid(1.0) as f32;
+
+        let phase = match self.direction {
+            TrajectoryDirection::Clockwise => raw_phase,
+            TrajectoryDirection::CounterClockwise => (1.0 - raw_phase).rem_euclid(1.0),
+            TrajectoryDirection::PingPong => {
+                let pp = (t_sec * speed as f64 * 2.0).rem_euclid(2.0) as f32;
+                if pp > 1.0 {
+                    2.0 - pp
+                } else {
+                    pp
+                }
+            }
+        };
+
+        match self.mode {
+            TrajectoryMode::Place => SpatialPosition::from_spherical(
+                self.base_azimuth_deg,
+                self.base_elevation_deg,
+                self.base_distance_m,
+            ),
+            TrajectoryMode::Orbit => {
+                let az = (self.base_azimuth_deg + phase * 360.0).rem_euclid(360.0);
+                let dist_mod = 1.0 + (self.depth - 0.5) * 0.3 * (phase * 2.0 * PI).sin();
+                let dist = (self.base_distance_m * dist_mod).clamp(0.1, 10.0);
+                SpatialPosition::from_spherical(az, self.base_elevation_deg, dist)
+            }
+            TrajectoryMode::Spiral => {
+                let az = (self.base_azimuth_deg + phase * 720.0).rem_euclid(360.0);
+                let cycle = 0.5 + 0.5 * (phase * 2.0 * PI).sin();
+                let dist = self.base_distance_m * (0.6 + 0.4 * cycle * self.depth);
+                let el = self.base_elevation_deg + 30.0 * self.depth * (phase * 4.0 * PI).cos();
+                SpatialPosition::from_spherical(az, el, dist)
+            }
+            TrajectoryMode::FigureEight => {
+                let omega = phase * 2.0 * PI;
+                let r = self.base_distance_m;
+                let x = r * omega.sin();
+                let y = r * 0.5 * (2.0 * omega).sin();
+                let z = r * (self.base_elevation_deg / 90.0) * omega.sin();
+                SpatialPosition::from_cartesian(x, y, z)
+            }
+            TrajectoryMode::VerticalLoop => {
+                let omega = phase * 2.0 * PI;
+                let el = 85.0 * omega.sin();
+                let az = (self.base_azimuth_deg + omega.cos() * 15.0).rem_euclid(360.0);
+                SpatialPosition::from_spherical(az, el, self.base_distance_m)
+            }
+            TrajectoryMode::Swarm => {
+                let seed_off = ((self.swarm_seed % 1000) as f64) * 0.1;
+                let b = (t_sec * 1.3 * speed as f64 + seed_off) as f32;
+                let r = self.base_distance_m;
+                let x = r * (0.7 * b.sin() + 0.2 * (2.9 * b).sin());
+                let y = r * (0.7 * (1.7 * b).cos());
+                let z = r * (0.4 * (0.8 * b).sin());
+                SpatialPosition::from_cartesian(x, y, z)
+            }
+            TrajectoryMode::Lissajous => {
+                let omega = phase * 2.0 * PI;
+                let r = self.base_distance_m;
+                let x = r * (3.0 * omega).sin();
+                let y = r * (2.0 * omega).cos();
+                let z = r * (4.0 * omega).sin() * 0.5;
+                SpatialPosition::from_cartesian(x, y, z)
+            }
+            TrajectoryMode::CustomPath => {
+                if self.custom_path.is_empty() {
+                    SpatialPosition::from_spherical(
+                        self.base_azimuth_deg,
+                        self.base_elevation_deg,
+                        self.base_distance_m,
+                    )
+                } else {
+                    let pt = interpolate_catmull_rom(&self.custom_path, phase);
+                    let x = pt[0] * self.base_distance_m;
+                    let y = -pt[1] * self.base_distance_m;
+                    SpatialPosition::from_cartesian(x, y, 0.0)
+                }
+            }
+        }
+    }
+
+    /// Advances trajectory by `dt_sec` seconds and returns the smoothed position.
+    pub fn advance(&mut self, dt_sec: f64) -> SpatialPosition {
+        self.current_time_sec += dt_sec;
+        let target = self.evaluate_at(self.current_time_sec);
+
+        if self.smoothing <= 0.001 {
+            self.current_pos = target;
+            return self.current_pos;
+        }
+
+        // Exponential smoothing towards target coordinates
+        let alpha = (-dt_sec as f32 * (1.0 - self.smoothing * 0.9) * 25.0).exp();
+        self.current_pos.x = target.x * (1.0 - alpha) + self.current_pos.x * alpha;
+        self.current_pos.y = target.y * (1.0 - alpha) + self.current_pos.y * alpha;
+        self.current_pos.z = target.z * (1.0 - alpha) + self.current_pos.z * alpha;
+
+        let dist = (self.current_pos.x * self.current_pos.x
+            + self.current_pos.y * self.current_pos.y
+            + self.current_pos.z * self.current_pos.z)
+            .sqrt()
+            .clamp(0.1, 10.0);
+        self.current_pos.distance_m = dist;
+
+        let el_rad = (self.current_pos.z / dist).clamp(-1.0, 1.0).asin();
+        self.current_pos.elevation_deg = el_rad * 180.0 / PI;
+
+        let az_rad = self.current_pos.x.atan2(self.current_pos.y);
+        self.current_pos.azimuth_deg = (az_rad * 180.0 / PI).rem_euclid(360.0);
+
+        self.current_pos
+    }
+
+    /// Resets internal time and state to start phase.
+    pub fn reset(&mut self) {
+        self.current_time_sec = 0.0;
+        self.current_pos = self.evaluate_at(0.0);
+    }
+
+    /// Returns the current spatial position.
+    pub fn current_pos(&self) -> SpatialPosition {
+        self.current_pos
+    }
+}
+
 /// Stereo input handling mode for spatialization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum StereoInputMode {
@@ -943,7 +1484,7 @@ pub enum StereoInputMode {
 }
 
 /// Production-grade stereo spatializer supporting Virtual Speakers, Mid/Side orbiting,
-/// and Linkwitz-Riley mono bass management.
+/// 8D and 16D trajectory motions, and Linkwitz-Riley mono bass management.
 #[derive(Debug, Clone)]
 pub struct StereoSpatializerNode {
     mode: StereoInputMode,
@@ -953,6 +1494,7 @@ pub struct StereoSpatializerNode {
     spread_deg: f32,
     head_width_m: f32,
     profile: HrtfProfile,
+    trajectory: SpatialTrajectoryGenerator,
     bypassed: bool,
     sample_rate: f32,
     channels: usize,
@@ -984,6 +1526,10 @@ impl Default for StereoSpatializerNode {
 impl StereoSpatializerNode {
     /// Creates a new `StereoSpatializerNode` with default settings (VirtualSpeakers, 60° spread, 120 Hz mono bass).
     pub fn new() -> Self {
+        let mut trajectory = SpatialTrajectoryGenerator::new();
+        trajectory.set_mode(TrajectoryMode::Place);
+        trajectory.set_base_coordinates(0.0, 0.0, 1.0);
+
         Self {
             mode: StereoInputMode::VirtualSpeakers,
             azimuth_deg: 0.0,
@@ -992,6 +1538,7 @@ impl StereoSpatializerNode {
             spread_deg: 60.0,
             head_width_m: DEFAULT_HEAD_RADIUS * 2.0,
             profile: HrtfProfile::ProfileC,
+            trajectory,
             bypassed: false,
             sample_rate: 48000.0,
             channels: 2,
@@ -1024,6 +1571,8 @@ impl StereoSpatializerNode {
     /// Sets the center azimuth in degrees (0..360).
     pub fn set_azimuth(&mut self, azimuth_deg: f32) {
         self.azimuth_deg = azimuth_deg.rem_euclid(360.0);
+        self.trajectory
+            .set_base_coordinates(self.azimuth_deg, self.elevation_deg, self.distance_m);
     }
 
     /// Returns center azimuth in degrees.
@@ -1034,6 +1583,8 @@ impl StereoSpatializerNode {
     /// Sets elevation in degrees (-90..90).
     pub fn set_elevation(&mut self, elevation_deg: f32) {
         self.elevation_deg = elevation_deg.clamp(-90.0, 90.0);
+        self.trajectory
+            .set_base_coordinates(self.azimuth_deg, self.elevation_deg, self.distance_m);
     }
 
     /// Returns elevation in degrees.
@@ -1044,6 +1595,8 @@ impl StereoSpatializerNode {
     /// Sets listener distance in meters (0.1..10.0).
     pub fn set_distance(&mut self, distance_m: f32) {
         self.distance_m = distance_m.clamp(0.1, 10.0);
+        self.trajectory
+            .set_base_coordinates(self.azimuth_deg, self.elevation_deg, self.distance_m);
     }
 
     /// Returns listener distance in meters.
@@ -1059,6 +1612,102 @@ impl StereoSpatializerNode {
     /// Returns stereo angular spread in degrees.
     pub fn spread(&self) -> f32 {
         self.spread_deg
+    }
+
+    /// Returns a reference to the spatial trajectory generator.
+    pub fn trajectory(&self) -> &SpatialTrajectoryGenerator {
+        &self.trajectory
+    }
+
+    /// Returns a mutable reference to the spatial trajectory generator.
+    pub fn trajectory_mut(&mut self) -> &mut SpatialTrajectoryGenerator {
+        &mut self.trajectory
+    }
+
+    /// Sets trajectory motion mode.
+    pub fn set_trajectory_mode(&mut self, mode: TrajectoryMode) {
+        self.trajectory.set_mode(mode);
+    }
+
+    /// Returns current trajectory motion mode.
+    pub fn trajectory_mode(&self) -> TrajectoryMode {
+        self.trajectory.mode()
+    }
+
+    /// Sets trajectory direction.
+    pub fn set_trajectory_direction(&mut self, direction: TrajectoryDirection) {
+        self.trajectory.set_direction(direction);
+    }
+
+    /// Returns trajectory direction.
+    pub fn trajectory_direction(&self) -> TrajectoryDirection {
+        self.trajectory.direction()
+    }
+
+    /// Sets orbit rotation speed in Hz.
+    pub fn set_orbit_speed_hz(&mut self, speed_hz: f32) {
+        self.trajectory.set_speed_hz(speed_hz);
+    }
+
+    /// Returns orbit rotation speed in Hz.
+    pub fn orbit_speed_hz(&self) -> f32 {
+        self.trajectory.speed_hz()
+    }
+
+    /// Sets trajectory depth factor (0.0..1.0).
+    pub fn set_trajectory_depth(&mut self, depth: f32) {
+        self.trajectory.set_depth(depth);
+    }
+
+    /// Returns trajectory depth factor.
+    pub fn trajectory_depth(&self) -> f32 {
+        self.trajectory.depth()
+    }
+
+    /// Sets trajectory smoothing factor (0.0..1.0).
+    pub fn set_trajectory_smoothing(&mut self, smoothing: f32) {
+        self.trajectory.set_smoothing(smoothing);
+    }
+
+    /// Returns trajectory smoothing factor.
+    pub fn trajectory_smoothing(&self) -> f32 {
+        self.trajectory.smoothing()
+    }
+
+    /// Configures tempo synchronization.
+    pub fn set_tempo_sync(&mut self, enabled: bool, bpm: f32, beats_per_rev: f32) {
+        self.trajectory.set_tempo_sync(enabled, bpm, beats_per_rev);
+    }
+
+    /// Returns whether tempo sync is enabled.
+    pub fn is_tempo_sync_enabled(&self) -> bool {
+        self.trajectory.is_tempo_sync_enabled()
+    }
+
+    /// Returns tempo BPM for trajectory synchronization.
+    pub fn tempo_bpm(&self) -> f32 {
+        self.trajectory.tempo_bpm()
+    }
+
+    /// Returns beats per revolution for tempo synchronization.
+    pub fn tempo_beats_per_rev(&self) -> f32 {
+        self.trajectory.tempo_beats_per_rev()
+    }
+
+    /// Applies a 3D static placement preset.
+    pub fn apply_preset(&mut self, preset: SpatialPreset) {
+        let pos = preset.position();
+        self.set_trajectory_mode(TrajectoryMode::Place);
+        self.set_azimuth(pos.azimuth_deg);
+        self.set_elevation(pos.elevation_deg);
+        self.set_distance(pos.distance_m);
+        self.trajectory
+            .set_base_coordinates(pos.azimuth_deg, pos.elevation_deg, pos.distance_m);
+    }
+
+    /// Sets custom drawn path control points.
+    pub fn set_custom_path(&mut self, points: Vec<[f32; 2]>) {
+        self.trajectory.set_custom_path(points);
     }
 
     /// Enables or disables mono bass management.
@@ -1137,6 +1786,7 @@ impl DspNode for StereoSpatializerNode {
     }
 
     fn reset(&mut self) {
+        self.trajectory.reset();
         let az_left = (self.azimuth_deg - self.spread_deg * 0.5).rem_euclid(360.0);
         let az_right = (self.azimuth_deg + self.spread_deg * 0.5).rem_euclid(360.0);
         self.renderer_l.set_azimuth(az_left);
@@ -1149,7 +1799,7 @@ impl DspNode for StereoSpatializerNode {
     }
 
     fn parameter_count(&self) -> usize {
-        9
+        17
     }
 
     fn set_parameter(&mut self, index: usize, value: f32) {
@@ -1179,6 +1829,45 @@ impl DspNode for StereoSpatializerNode {
                 };
                 self.set_profile(p);
             }
+            9 => {
+                let m = match value.round() as usize {
+                    0 => TrajectoryMode::Place,
+                    1 => TrajectoryMode::Orbit,
+                    2 => TrajectoryMode::Spiral,
+                    3 => TrajectoryMode::FigureEight,
+                    4 => TrajectoryMode::VerticalLoop,
+                    5 => TrajectoryMode::Swarm,
+                    6 => TrajectoryMode::Lissajous,
+                    _ => TrajectoryMode::CustomPath,
+                };
+                self.set_trajectory_mode(m);
+            }
+            10 => {
+                let d = match value.round() as usize {
+                    0 => TrajectoryDirection::Clockwise,
+                    1 => TrajectoryDirection::CounterClockwise,
+                    _ => TrajectoryDirection::PingPong,
+                };
+                self.set_trajectory_direction(d);
+            }
+            11 => self.set_orbit_speed_hz(value),
+            12 => self.set_trajectory_depth(value),
+            13 => self.set_trajectory_smoothing(value),
+            14 => self.trajectory.set_tempo_sync(
+                value >= 0.5,
+                self.tempo_bpm(),
+                self.tempo_beats_per_rev(),
+            ),
+            15 => self.trajectory.set_tempo_sync(
+                self.is_tempo_sync_enabled(),
+                value,
+                self.tempo_beats_per_rev(),
+            ),
+            16 => self.trajectory.set_tempo_sync(
+                self.is_tempo_sync_enabled(),
+                self.tempo_bpm(),
+                value,
+            ),
             _ => {}
         }
     }
@@ -1210,6 +1899,33 @@ impl DspNode for StereoSpatializerNode {
                 HrtfProfile::ProfileE => 4.0,
                 HrtfProfile::ProfileF => 5.0,
             },
+            9 => match self.trajectory.mode() {
+                TrajectoryMode::Place => 0.0,
+                TrajectoryMode::Orbit => 1.0,
+                TrajectoryMode::Spiral => 2.0,
+                TrajectoryMode::FigureEight => 3.0,
+                TrajectoryMode::VerticalLoop => 4.0,
+                TrajectoryMode::Swarm => 5.0,
+                TrajectoryMode::Lissajous => 6.0,
+                TrajectoryMode::CustomPath => 7.0,
+            },
+            10 => match self.trajectory.direction() {
+                TrajectoryDirection::Clockwise => 0.0,
+                TrajectoryDirection::CounterClockwise => 1.0,
+                TrajectoryDirection::PingPong => 2.0,
+            },
+            11 => self.trajectory.speed_hz(),
+            12 => self.trajectory.depth(),
+            13 => self.trajectory.smoothing(),
+            14 => {
+                if self.trajectory.is_tempo_sync_enabled() {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            15 => self.trajectory.tempo_bpm(),
+            16 => self.trajectory.tempo_beats_per_rev(),
             _ => 0.0,
         }
     }
@@ -1261,6 +1977,15 @@ impl DspNode for StereoSpatializerNode {
             self.scratch_out_r2.resize(n_samples, 0.0);
             self.scratch_out_lm.resize(n_samples, 0.0);
             self.scratch_out_rm.resize(n_samples, 0.0);
+        }
+
+        // Advance trajectory if dynamic motion is active
+        if self.trajectory.mode() != TrajectoryMode::Place {
+            let dt = n_samples as f64 / self.sample_rate.max(1.0) as f64;
+            let pos = self.trajectory.advance(dt);
+            self.azimuth_deg = pos.azimuth_deg;
+            self.elevation_deg = pos.elevation_deg;
+            self.distance_m = pos.distance_m;
         }
 
         let az_left = (self.azimuth_deg - self.spread_deg * 0.5).rem_euclid(360.0);
@@ -1570,5 +2295,243 @@ mod tests {
 
         assert_eq!(out_l, in_l);
         assert_eq!(out_r, in_r);
+    }
+
+    #[test]
+    fn test_static_placement_presets() {
+        let presets = [
+            (SpatialPreset::Front, 0.0, 0.0, 1.5),
+            (SpatialPreset::Behind, 180.0, 0.0, 1.5),
+            (SpatialPreset::Above, 0.0, 60.0, 1.5),
+            (SpatialPreset::Below, 0.0, -60.0, 1.5),
+            (SpatialPreset::FrontLeft, 315.0, 0.0, 1.8),
+            (SpatialPreset::FrontRight, 45.0, 0.0, 1.8),
+            (SpatialPreset::RearLeft, 225.0, 0.0, 1.8),
+            (SpatialPreset::RearRight, 135.0, 0.0, 1.8),
+            (SpatialPreset::InsideRoom, 30.0, 15.0, 2.5),
+        ];
+
+        let mut node = StereoSpatializerNode::new();
+        for (preset, exp_az, exp_el, exp_dist) in presets {
+            node.apply_preset(preset);
+            assert_eq!(node.trajectory_mode(), TrajectoryMode::Place);
+            assert!(
+                (node.azimuth() - exp_az).abs() < 1e-3,
+                "Azimuth mismatch for {:?}",
+                preset
+            );
+            assert!(
+                (node.elevation() - exp_el).abs() < 1e-3,
+                "Elevation mismatch for {:?}",
+                preset
+            );
+            assert!(
+                (node.distance() - exp_dist).abs() < 1e-3,
+                "Distance mismatch for {:?}",
+                preset
+            );
+        }
+    }
+
+    #[test]
+    fn test_orbit_timing_exact() {
+        let mut traj = SpatialTrajectoryGenerator::new();
+        traj.set_mode(TrajectoryMode::Orbit);
+        traj.set_speed_hz(0.10); // 10s per rev
+        traj.set_smoothing(0.0);
+        traj.set_direction(TrajectoryDirection::Clockwise);
+
+        let p0 = traj.evaluate_at(0.0);
+        assert!(
+            (p0.azimuth_deg - 0.0).abs() < 0.1,
+            "t=0 must be 0 deg, got {}",
+            p0.azimuth_deg
+        );
+
+        let p_quarter = traj.evaluate_at(2.5);
+        assert!(
+            (p_quarter.azimuth_deg - 90.0).abs() < 0.1,
+            "t=2.5 must be 90 deg, got {}",
+            p_quarter.azimuth_deg
+        );
+
+        let p_half = traj.evaluate_at(5.0);
+        assert!(
+            (p_half.azimuth_deg - 180.0).abs() < 0.1,
+            "t=5.0 must be 180 deg, got {}",
+            p_half.azimuth_deg
+        );
+
+        let p_three_quarters = traj.evaluate_at(7.5);
+        assert!(
+            (p_three_quarters.azimuth_deg - 270.0).abs() < 0.1,
+            "t=7.5 must be 270 deg, got {}",
+            p_three_quarters.azimuth_deg
+        );
+
+        // N revolutions timing check (N=5 revolutions at t = 5 * 10s = 50s)
+        let p_n = traj.evaluate_at(50.0);
+        assert!(
+            (p_n.azimuth_deg - 0.0).abs() < 0.1,
+            "t=50s must complete 5 revolutions, got {}",
+            p_n.azimuth_deg
+        );
+
+        // Counter-clockwise check
+        traj.set_direction(TrajectoryDirection::CounterClockwise);
+        let p_ccw = traj.evaluate_at(2.5);
+        assert!(
+            (p_ccw.azimuth_deg - 270.0).abs() < 0.1,
+            "CCW t=2.5 must be 270 deg, got {}",
+            p_ccw.azimuth_deg
+        );
+
+        // Ping-pong check
+        traj.set_direction(TrajectoryDirection::PingPong);
+        let p_pp_mid = traj.evaluate_at(2.5);
+        let p_pp_end = traj.evaluate_at(5.0);
+        let p_pp_back = traj.evaluate_at(7.5);
+        assert!((p_pp_mid.azimuth_deg - 180.0).abs() < 0.1);
+        assert!((p_pp_end.azimuth_deg - 360.0).abs() < 0.1 || p_pp_end.azimuth_deg.abs() < 0.1);
+        assert!((p_pp_back.azimuth_deg - 180.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_tempo_sync_orbit() {
+        let mut traj = SpatialTrajectoryGenerator::new();
+        traj.set_mode(TrajectoryMode::Orbit);
+        traj.set_smoothing(0.0);
+        traj.set_tempo_sync(true, 120.0, 8.0); // 120 BPM, 8 beats/rev = 4.0s period
+
+        assert!((traj.effective_speed_hz() - 0.25).abs() < 1e-4);
+
+        let p0 = traj.evaluate_at(0.0);
+        assert!((p0.azimuth_deg - 0.0).abs() < 0.1);
+
+        let p1 = traj.evaluate_at(1.0); // 2 beats: 90 deg
+        assert!((p1.azimuth_deg - 90.0).abs() < 0.1);
+
+        let p2 = traj.evaluate_at(2.0); // 4 beats: 180 deg
+        assert!((p2.azimuth_deg - 180.0).abs() < 0.1);
+
+        let p4 = traj.evaluate_at(4.0); // 8 beats: 360/0 deg
+        assert!((p4.azimuth_deg - 0.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_16d_trajectories() {
+        let mut traj = SpatialTrajectoryGenerator::new();
+        traj.set_speed_hz(0.2);
+        traj.set_smoothing(0.0);
+
+        // Spiral
+        traj.set_mode(TrajectoryMode::Spiral);
+        let p_spiral = traj.evaluate_at(1.25);
+        assert!(p_spiral.distance_m > 0.0 && p_spiral.distance_m <= 10.0);
+
+        // Figure-eight
+        traj.set_mode(TrajectoryMode::FigureEight);
+        let p_fig8 = traj.evaluate_at(1.25);
+        assert!(p_fig8.distance_m > 0.0 && p_fig8.distance_m <= 10.0);
+
+        // Vertical loop
+        traj.set_mode(TrajectoryMode::VerticalLoop);
+        let p_vloop = traj.evaluate_at(1.25);
+        assert!(p_vloop.elevation_deg.abs() <= 90.0);
+
+        // Swarm: deterministic seed
+        traj.set_mode(TrajectoryMode::Swarm);
+        traj.set_swarm_seed(999);
+        let p_swarm1 = traj.evaluate_at(3.7);
+        let p_swarm2 = traj.evaluate_at(3.7);
+        assert_eq!(p_swarm1.x, p_swarm2.x);
+        assert_eq!(p_swarm1.y, p_swarm2.y);
+        assert_eq!(p_swarm1.z, p_swarm2.z);
+
+        // Lissajous
+        traj.set_mode(TrajectoryMode::Lissajous);
+        let p_liss = traj.evaluate_at(2.0);
+        assert!(p_liss.distance_m > 0.0 && p_liss.distance_m <= 10.0);
+    }
+
+    #[test]
+    fn test_custom_path_catmull_rom_spline() {
+        let points = vec![[0.0, 1.0], [1.0, 0.0], [0.0, -1.0], [-1.0, 0.0]];
+
+        let start = interpolate_catmull_rom(&points, 0.0);
+        assert!((start[0] - 0.0).abs() < 1e-4);
+        assert!((start[1] - 1.0).abs() < 1e-4);
+
+        let end = interpolate_catmull_rom(&points, 1.0);
+        assert!((end[0] - (-1.0)).abs() < 1e-4);
+        assert!((end[1] - 0.0).abs() < 1e-4);
+
+        let mid = interpolate_catmull_rom(&points, 0.5);
+        assert!(mid[0] > -1.5 && mid[0] < 1.5);
+        assert!(mid[1] > -1.5 && mid[1] < 1.5);
+    }
+
+    #[test]
+    fn test_mono_compatibility_check() {
+        let n = 1024;
+        let mono_sig: Vec<f32> = (0..n).map(|i| (i as f32 * 0.05).sin()).collect();
+
+        // 1. Identical Mono signals: correlation == 1.0, loss == 0.0 dB
+        let res_mono = check_mono_compatibility(&mono_sig, &mono_sig);
+        assert!((res_mono.correlation - 1.0).abs() < 1e-4);
+        assert!(res_mono.mono_loss_db.abs() < 0.1);
+        assert!(res_mono.is_compatible);
+
+        // 2. Anti-phase signals: correlation == -1.0, loss is huge, is_compatible == false
+        let anti_sig: Vec<f32> = mono_sig.iter().map(|&x| -x).collect();
+        let res_anti = check_mono_compatibility(&mono_sig, &anti_sig);
+        assert!((res_anti.correlation - (-1.0)).abs() < 1e-4);
+        assert!(res_anti.mono_loss_db > 50.0);
+        assert!(!res_anti.is_compatible);
+
+        // 3. Orthogonal (uncorrelated): correlation == 0.0, loss == 3.01 dB
+        let ortho_sig: Vec<f32> = (0..n).map(|i| (i as f32 * 0.05).cos()).collect();
+        let res_ortho = check_mono_compatibility(&mono_sig, &ortho_sig);
+        assert!(res_ortho.correlation.abs() < 0.05);
+        assert!((res_ortho.mono_loss_db - 3.01).abs() < 0.5);
+        assert!(res_ortho.is_compatible);
+    }
+
+    #[test]
+    fn test_stereospatializer_orbit_advance_in_process() {
+        let mut spatializer = StereoSpatializerNode::new();
+        spatializer.set_trajectory_mode(TrajectoryMode::Orbit);
+        spatializer.set_orbit_speed_hz(1.0); // 1.0 Hz = 1 sec per revolution
+        spatializer.set_trajectory_smoothing(0.0);
+
+        let sample_rate = 48000.0;
+        spatializer.prepare(sample_rate, 2);
+
+        let block_size = 256;
+        let in_l = vec![0.1f32; block_size];
+        let in_r = vec![0.1f32; block_size];
+        let mut out_l = vec![0.0f32; block_size];
+        let mut out_r = vec![0.0f32; block_size];
+
+        let num_blocks = (sample_rate as usize) / block_size; // exactly 1 second
+        let mut min_az = 360.0f32;
+        let mut max_az = 0.0f32;
+
+        for _ in 0..num_blocks {
+            let inputs = [&in_l[..], &in_r[..]];
+            let mut outputs = [&mut out_l[..], &mut out_r[..]];
+            spatializer.process(&inputs, &mut outputs);
+
+            let az = spatializer.azimuth();
+            min_az = min_az.min(az);
+            max_az = max_az.max(az);
+        }
+
+        // Over 1 full revolution, azimuth should span across [0, 360)
+        assert!(min_az < 10.0, "Orbit must start near 0 deg, min={min_az}");
+        assert!(
+            max_az > 340.0,
+            "Orbit must sweep past 340 deg, max={max_az}"
+        );
     }
 }

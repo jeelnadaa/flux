@@ -8,6 +8,13 @@ import {
   generateOrbitPosition,
   generateFigureEightPosition,
   generateSpiralPosition,
+  generateVerticalLoopPosition,
+  generateSwarmPosition,
+  generateLissajousPosition,
+  interpolateCatmullRomSpline,
+  checkMonoCompatibility,
+  SPATIAL_PRESETS,
+  DEFAULT_STAGE_STEMS,
   calculateVirtualSpeakerPositions,
   calculateMidSideSignals,
   reconstructFromMidSide,
@@ -155,5 +162,78 @@ describe("Spatial Domain Models and Coordinates", () => {
     assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.monoBassEnabled, true);
     assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.monoBassCrossoverHz, 120);
     assert.equal(DEFAULT_STEREO_SPATIAL_CONFIG.profile, "C");
+  });
+
+  it("validates all 9 static spatial presets", () => {
+    const keys = Object.keys(SPATIAL_PRESETS);
+    assert.equal(keys.length, 9);
+    assert.equal(SPATIAL_PRESETS.Front.azimuthDeg, 0);
+    assert.equal(SPATIAL_PRESETS.Behind.azimuthDeg, 180);
+    assert.equal(SPATIAL_PRESETS.Above.elevationDeg, 60);
+    assert.equal(SPATIAL_PRESETS.Below.elevationDeg, -60);
+    assert.equal(SPATIAL_PRESETS.FrontLeft.azimuthDeg, 315);
+    assert.equal(SPATIAL_PRESETS.FrontRight.azimuthDeg, 45);
+    assert.equal(SPATIAL_PRESETS.RearLeft.azimuthDeg, 225);
+    assert.equal(SPATIAL_PRESETS.RearRight.azimuthDeg, 135);
+    assert.equal(SPATIAL_PRESETS.InsideRoom.azimuthDeg, 30);
+  });
+
+  it("evaluates 16D extended trajectories: Vertical Loop, Swarm, Lissajous", () => {
+    // Vertical loop
+    const vloop = generateVerticalLoopPosition(0.25, 1.0, 1.8);
+    assert.ok(Math.abs(vloop.elevationDeg - 85.0) < 1e-3);
+
+    // Swarm deterministic seed
+    const swarm1 = generateSwarmPosition(1.5, 0.2, 2.0, 42);
+    const swarm2 = generateSwarmPosition(1.5, 0.2, 2.0, 42);
+    assert.equal(swarm1.x, swarm2.x);
+    assert.equal(swarm1.y, swarm2.y);
+    assert.equal(swarm1.z, swarm2.z);
+
+    // Lissajous
+    const liss = generateLissajousPosition(0.5, 0.1, 1.8);
+    assert.ok(Math.abs(liss.x) <= 1.81);
+    assert.ok(Math.abs(liss.y) <= 1.81);
+  });
+
+  it("interpolates Catmull-Rom spline control points smoothly", () => {
+    const pts: [number, number][] = [
+      [0, 1],
+      [1, 0],
+      [0, -1],
+      [-1, 0],
+    ];
+    const pStart = interpolateCatmullRomSpline(pts, 0);
+    assert.ok(Math.abs(pStart[0] - 0) < 1e-4);
+    assert.ok(Math.abs(pStart[1] - 1) < 1e-4);
+
+    const pEnd = interpolateCatmullRomSpline(pts, 1);
+    assert.ok(Math.abs(pEnd[0] - -1) < 1e-4);
+    assert.ok(Math.abs(pEnd[1] - 0) < 1e-4);
+
+    const pMid = interpolateCatmullRomSpline(pts, 0.5);
+    assert.ok(pMid[0] > -1.5 && pMid[0] < 1.5);
+    assert.ok(pMid[1] > -1.5 && pMid[1] < 1.5);
+  });
+
+  it("checks mono compatibility accurately for mono, anti-phase, and stereo audio", () => {
+    const mono = new Float32Array([0.5, -0.5, 0.8, -0.2, 0.1]);
+    const resMono = checkMonoCompatibility(mono, mono);
+    assert.ok(Math.abs(resMono.correlation - 1.0) < 1e-4);
+    assert.ok(resMono.monoLossDb < 0.1);
+    assert.equal(resMono.isCompatible, true);
+
+    const anti = new Float32Array([-0.5, 0.5, -0.8, 0.2, -0.1]);
+    const resAnti = checkMonoCompatibility(mono, anti);
+    assert.ok(Math.abs(resAnti.correlation - -1.0) < 1e-4);
+    assert.equal(resAnti.isCompatible, false);
+  });
+
+  it("defines default stage stems for 4-stem spatial mixing", () => {
+    assert.equal(DEFAULT_STAGE_STEMS.length, 4);
+    assert.equal(DEFAULT_STAGE_STEMS[0].name, "Vocals");
+    assert.equal(DEFAULT_STAGE_STEMS[1].name, "Drums");
+    assert.equal(DEFAULT_STAGE_STEMS[2].name, "Bass");
+    assert.equal(DEFAULT_STAGE_STEMS[3].name, "Other");
   });
 });

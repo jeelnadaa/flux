@@ -53,7 +53,7 @@ export const HpCheckScreen: React.FC = () => {
           </button>
         ))}
       </div>
-      <div className="callout info">
+      <div className="callout">
         <Icon name="info" />
         <div>
           Browsers can't detect headphones, so this only checks what you hear. If it sounds flat,

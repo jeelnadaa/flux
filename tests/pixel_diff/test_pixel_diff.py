@@ -76,7 +76,7 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
             await document.fonts.ready;
         }
     }""")
-    page_proto.wait_for_timeout(500)
+    page_proto.wait_for_timeout(750)
     proto_img = ARTIFACTS_DIR / f'proto_{screen}_{name}_{width}.png'
     page_proto.locator('#stage').screenshot(path=str(proto_img))
     ctx_proto.close()
@@ -96,7 +96,7 @@ def capture_and_compare(browser, port: int, screen: str, width: int, height: int
             await document.fonts.ready;
         }
     }""")
-    page_prod.wait_for_timeout(500)
+    page_prod.wait_for_timeout(750)
     prod_img = ARTIFACTS_DIR / f'prod_{screen}_{name}_{width}.png'
     page_prod.locator('#stage').screenshot(path=str(prod_img))
     ctx_prod.close()
@@ -1495,6 +1495,64 @@ def test_hpcheck_interactive(browser_instance, test_server):
     assert 'on' in (chips.nth(1).get_attribute('class') or '')
 
     context.close()
+
+
+@pytest.mark.parametrize(
+    'width,height,name',
+    [
+        (1440, 900, 'desktop'),
+        (820, 1024, 'tablet'),
+        (390, 844, 'phone'),
+    ],
+)
+def test_pixel_diff_stage(browser_instance, test_server, width, height, name):
+    res = capture_and_compare(browser_instance, test_server, 'stage', width, height, name)
+    print(f"Stage [{name}] match: {res['match_percentage']:.2f}% (mismatched: {res['mismatched_pixels']})")
+    assert res['match_percentage'] >= 95.0, (
+        f"Stage [{name}] visual match {res['match_percentage']:.2f}% below 95% threshold"
+    )
+
+
+def test_stage_interactive(browser_instance, test_server):
+    """Verifies interactivity on the Sound Stage screen: mode selection, tool selection, canvas existence."""
+    context = browser_instance.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+
+    page.goto(f'http://127.0.0.1:{test_server}/apps/web/index.html#stage')
+    page.wait_for_selector('[data-stage]')
+
+    # Verify canvases exist
+    stage_canvas = page.locator('canvas[data-v="stage"]')
+    elev_canvas = page.locator('canvas[data-v="elev"]')
+    assert stage_canvas.count() == 1
+    assert elev_canvas.count() == 1
+
+    # Verify mode buttons
+    mode_btns = page.locator('[data-stagemode] button')
+    assert mode_btns.count() == 5
+    assert 'on' in (mode_btns.nth(0).get_attribute('class') or '')
+
+    # Switch to Spiral
+    mode_btns.nth(1).click()
+    page.wait_for_timeout(100)
+    assert 'on' in (mode_btns.nth(1).get_attribute('class') or '')
+
+    # Tool selection
+    tool_btns = page.locator('[data-stagetool] button')
+    assert tool_btns.count() == 2
+    assert 'on' in (tool_btns.nth(0).get_attribute('class') or '')
+
+    # Switch to Draw path
+    tool_btns.nth(1).click()
+    page.wait_for_timeout(100)
+    assert 'on' in (tool_btns.nth(1).get_attribute('class') or '')
+
+    # Check Headphone check link
+    hp_link = page.locator('a[data-go="hpcheck"]')
+    assert hp_link.count() >= 1
+
+    context.close()
+
 
 
 

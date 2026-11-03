@@ -7,6 +7,8 @@ export interface SegmentedControlProps {
   onChange?: (item: string, index: number) => void;
   ariaLabel?: string;
   dataMode?: boolean;
+  dataStageMode?: boolean;
+  dataStageTool?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -18,6 +20,8 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   onChange,
   ariaLabel,
   dataMode,
+  dataStageMode,
+  dataStageTool,
   className = "",
   style,
 }) => {
@@ -59,6 +63,8 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
       role="group"
       aria-label={ariaLabel}
       data-mode={dataMode ? "" : undefined}
+      data-stagemode={dataStageMode ? "" : undefined}
+      data-stagetool={dataStageTool ? "" : undefined}
       style={style}
     >
       <span ref={indRef} className="ind" />

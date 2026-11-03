@@ -8,7 +8,10 @@ use flux_dsp::loudness::LoudnessMeter;
 use flux_dsp::node::DspNode;
 use flux_dsp::pyramid::PeakPyramid;
 use flux_dsp::resampler::{Resampler, ResamplerQuality};
-use flux_dsp::spatial::{StereoInputMode, StereoSpatializerNode};
+use flux_dsp::spatial::{
+    check_mono_compatibility, SpatialPreset, StereoInputMode, StereoSpatializerNode,
+    TrajectoryDirection, TrajectoryMode,
+};
 use flux_dsp::spatial_analysis::StereoAnalyzer;
 use flux_dsp::spectrogram::{
     ColorMap, FrequencyScale, SpectrogramConfig, SpectrogramTileGenerator,
@@ -363,6 +366,168 @@ pub unsafe extern "C" fn stereo_spatializer_process(
         let out_r = std::slice::from_raw_parts_mut(out_r_ptr, frames);
         node.process(&[in_l, in_r], &mut [out_l, out_r]);
     }
+}
+
+/// Sets trajectory motion mode on a `StereoSpatializerNode`.
+/// 0 = Place, 1 = Orbit, 2 = Spiral, 3 = FigureEight, 4 = VerticalLoop, 5 = Swarm, 6 = Lissajous, 7 = CustomPath
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_trajectory_mode(
+    ptr: *mut StereoSpatializerNode,
+    mode: u32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let m = match mode {
+            0 => TrajectoryMode::Place,
+            1 => TrajectoryMode::Orbit,
+            2 => TrajectoryMode::Spiral,
+            3 => TrajectoryMode::FigureEight,
+            4 => TrajectoryMode::VerticalLoop,
+            5 => TrajectoryMode::Swarm,
+            6 => TrajectoryMode::Lissajous,
+            _ => TrajectoryMode::CustomPath,
+        };
+        node.set_trajectory_mode(m);
+    }
+}
+
+/// Sets trajectory direction on a `StereoSpatializerNode`.
+/// 0 = Clockwise, 1 = CounterClockwise, 2 = PingPong
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_trajectory_direction(
+    ptr: *mut StereoSpatializerNode,
+    direction: u32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let d = match direction {
+            0 => TrajectoryDirection::Clockwise,
+            1 => TrajectoryDirection::CounterClockwise,
+            _ => TrajectoryDirection::PingPong,
+        };
+        node.set_trajectory_direction(d);
+    }
+}
+
+/// Sets orbit rotation speed in Hz (0.01..2.0).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_orbit_speed(
+    ptr: *mut StereoSpatializerNode,
+    speed_hz: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_orbit_speed_hz(speed_hz);
+    }
+}
+
+/// Sets trajectory depth factor (0.0..1.0).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_trajectory_depth(
+    ptr: *mut StereoSpatializerNode,
+    depth: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_trajectory_depth(depth);
+    }
+}
+
+/// Sets trajectory smoothing factor (0.0..1.0).
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_trajectory_smoothing(
+    ptr: *mut StereoSpatializerNode,
+    smoothing: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_trajectory_smoothing(smoothing);
+    }
+}
+
+/// Configures tempo synchronization on a `StereoSpatializerNode`.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_set_tempo_sync(
+    ptr: *mut StereoSpatializerNode,
+    enabled: bool,
+    bpm: f32,
+    beats_per_rev: f32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        node.set_tempo_sync(enabled, bpm, beats_per_rev);
+    }
+}
+
+/// Applies a 3D static placement preset to a `StereoSpatializerNode`.
+/// 0 = Front, 1 = Behind, 2 = Above, 3 = Below, 4 = FrontLeft, 5 = FrontRight, 6 = RearLeft, 7 = RearRight, 8 = InsideRoom
+///
+/// # Safety
+/// `ptr` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_spatializer_apply_preset(
+    ptr: *mut StereoSpatializerNode,
+    preset_id: u32,
+) {
+    if let Some(node) = ptr.as_mut() {
+        let preset = match preset_id {
+            0 => SpatialPreset::Front,
+            1 => SpatialPreset::Behind,
+            2 => SpatialPreset::Above,
+            3 => SpatialPreset::Below,
+            4 => SpatialPreset::FrontLeft,
+            5 => SpatialPreset::FrontRight,
+            6 => SpatialPreset::RearLeft,
+            7 => SpatialPreset::RearRight,
+            _ => SpatialPreset::InsideRoom,
+        };
+        node.apply_preset(preset);
+    }
+}
+
+/// Checks mono compatibility of stereo audio buffers.
+///
+/// # Safety
+/// Buffer pointers must point to valid arrays of `frames` length.
+#[no_mangle]
+pub unsafe extern "C" fn stereo_check_mono_compatibility(
+    left_ptr: *const f32,
+    right_ptr: *const f32,
+    frames: usize,
+    out_correlation: *mut f32,
+    out_loss_db: *mut f32,
+) -> bool {
+    if left_ptr.is_null() || right_ptr.is_null() || frames == 0 {
+        if !out_correlation.is_null() {
+            *out_correlation = 1.0;
+        }
+        if !out_loss_db.is_null() {
+            *out_loss_db = 0.0;
+        }
+        return true;
+    }
+    let left = std::slice::from_raw_parts(left_ptr, frames);
+    let right = std::slice::from_raw_parts(right_ptr, frames);
+    let res = check_mono_compatibility(left, right);
+    if !out_correlation.is_null() {
+        *out_correlation = res.correlation;
+    }
+    if !out_loss_db.is_null() {
+        *out_loss_db = res.mono_loss_db;
+    }
+    res.is_compatible
 }
 
 /// Renders a synthesized test tone through the biquad chain.
@@ -1699,6 +1864,26 @@ mod tests {
             stereo_spatializer_process(node, in_l, in_r, out_l, out_r, 128);
             assert!(!(*out_l.add(127)).is_nan());
             assert!(!(*out_r.add(127)).is_nan());
+
+            // Test trajectory controls
+            stereo_spatializer_set_trajectory_mode(node, 1); // Orbit
+            stereo_spatializer_set_trajectory_direction(node, 0); // Clockwise
+            stereo_spatializer_set_orbit_speed(node, 0.2);
+            stereo_spatializer_set_trajectory_depth(node, 0.8);
+            stereo_spatializer_set_trajectory_smoothing(node, 0.5);
+            stereo_spatializer_set_tempo_sync(node, true, 120.0, 8.0);
+            stereo_spatializer_process(node, in_l, in_r, out_l, out_r, 128);
+
+            // Test presets
+            stereo_spatializer_apply_preset(node, 0); // Front
+            stereo_spatializer_apply_preset(node, 8); // InsideRoom
+
+            // Test mono compatibility check
+            let mut corr = 0.0f32;
+            let mut loss = 0.0f32;
+            let ok = stereo_check_mono_compatibility(in_l, in_r, 128, &mut corr, &mut loss);
+            assert!(!ok); // Anti-phase input should fail mono check
+            assert!((corr - (-1.0)).abs() < 1e-3);
 
             biquad_free_buffer(in_l, 128);
             biquad_free_buffer(in_r, 128);
