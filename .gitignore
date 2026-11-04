@@ -2,6 +2,8 @@
 target/
 dist/
 dist-static/
+Flux-*/
+Flux-*.zip*
 *.wasm
 brag-output*/
 build/
