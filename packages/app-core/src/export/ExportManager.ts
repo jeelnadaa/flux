@@ -169,12 +169,7 @@ export class ExportManager {
 
     // 1. Fast-path: Native Rust SIMD export when running on desktop
     try {
-      const nativeBytes = await NativeBridge.exportAudio(
-        samples,
-        numChannels,
-        sampleRate,
-        options,
-      );
+      const nativeBytes = await NativeBridge.exportAudio(samples, numChannels, sampleRate, options);
       if (nativeBytes && nativeBytes.byteLength > 0) {
         onProgress?.({
           fraction: 1.0,

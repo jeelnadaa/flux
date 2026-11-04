@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ProjectLayout,
   SegmentedControl,
@@ -11,7 +11,7 @@ import {
   Icon,
   CanvasViz,
 } from "@flux/ui";
-import { SnappingEngine, ProjectStore, FluxProjectState, TransportState } from "@flux/app-core";
+import { ProjectStore, FluxProjectState, TransportState } from "@flux/app-core";
 
 interface ClipData {
   left: number;
@@ -53,140 +53,6 @@ const ClipView: React.FC<ClipData> = ({
     <span className="cl">{label}</span>
   </div>
 );
-
-interface TrackData {
-  name: string;
-  colorVar: string;
-  tall?: boolean;
-  muted?: boolean;
-  clips: ClipData[];
-}
-
-const TRACKS: TrackData[] = [
-  {
-    name: "Vocals",
-    colorVar: "--t4",
-    tall: true,
-    clips: [
-      {
-        left: 4,
-        width: 28,
-        colorVar: "--t4",
-        seed: 7,
-        kind: "voice",
-        label: "Verse 1",
-        fadeIn: 18,
-      },
-      {
-        left: 32.4,
-        width: 22,
-        colorVar: "--t4",
-        seed: 8,
-        kind: "voice",
-        label: "Chorus",
-        selected: true,
-        fadeIn: 14,
-        fadeOut: 14,
-      },
-      {
-        left: 58,
-        width: 34,
-        colorVar: "--t4",
-        seed: 9,
-        kind: "voice",
-        label: "Verse 2",
-        fadeOut: 24,
-      },
-    ],
-  },
-  {
-    name: "Drums",
-    colorVar: "--t3",
-    clips: [
-      {
-        left: 0,
-        width: 96,
-        colorVar: "--t3",
-        seed: 3,
-        kind: "drums",
-        label: "Drum stem",
-      },
-    ],
-  },
-  {
-    name: "Bass",
-    colorVar: "--t2",
-    clips: [
-      {
-        left: 8,
-        width: 88,
-        colorVar: "--t2",
-        seed: 4,
-        kind: "bass",
-        label: "Bass stem",
-      },
-    ],
-  },
-  {
-    name: "Keys",
-    colorVar: "--t1",
-    muted: true,
-    clips: [
-      {
-        left: 0,
-        width: 44,
-        colorVar: "--t1",
-        seed: 5,
-        kind: "pad",
-        label: "Rhodes",
-      },
-      {
-        left: 48,
-        width: 48,
-        colorVar: "--t1",
-        seed: 6,
-        kind: "pad",
-        label: "Rhodes 2",
-      },
-    ],
-  },
-  {
-    name: "Guitars",
-    colorVar: "--t5",
-    clips: [
-      {
-        left: 20,
-        width: 36,
-        colorVar: "--t5",
-        seed: 10,
-        kind: "mix",
-        label: "Lead take 3",
-      },
-      {
-        left: 62,
-        width: 26,
-        colorVar: "--t5",
-        seed: 11,
-        kind: "mix",
-        label: "Solo",
-      },
-    ],
-  },
-  {
-    name: "Room tone",
-    colorVar: "--t6",
-    clips: [
-      {
-        left: 0,
-        width: 100,
-        colorVar: "--t6",
-        seed: 12,
-        kind: "pad",
-        label: "Ambience",
-      },
-    ],
-  },
-];
 
 export const EditScreen: React.FC = () => {
   const store = ProjectStore.get();
@@ -508,8 +374,7 @@ export const EditScreen: React.FC = () => {
                 </div>
                 <div className="lane">
                   {trk.clips.map((c) => {
-                    const leftPct =
-                      (c.startFrame / Math.max(1, projectState.totalFrames)) * 100;
+                    const leftPct = (c.startFrame / Math.max(1, projectState.totalFrames)) * 100;
                     const widthPct =
                       (c.durationFrames / Math.max(1, projectState.totalFrames)) * 100;
                     return (

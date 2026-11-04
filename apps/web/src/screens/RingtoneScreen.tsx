@@ -26,13 +26,11 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
 
   const handleFindCatchiest = () => {
     const mixdown = store.renderMixdown();
-    const section = RingtoneMaker.findCatchiestPart(
-      mixdown.interleaved,
-      mixdown.sampleRate,
-      30.0,
-    );
+    const section = RingtoneMaker.findCatchiestPart(mixdown.interleaved, mixdown.sampleRate, 30.0);
     setSelectionStartSec(section.startTimeSec);
-    setStatusMessage(`Found chorus peak energy at ${section.startTimeSec.toFixed(1)}s (score ${section.score.toFixed(0)})`);
+    setStatusMessage(
+      `Found chorus peak energy at ${section.startTimeSec.toFixed(1)}s (score ${section.score.toFixed(0)})`,
+    );
   };
 
   const handlePlaySelection = () => {
@@ -55,7 +53,6 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
       finalSamples = RingtoneMaker.applySpeakerLeveling(finalSamples);
     }
 
-    const ext = phoneIndex === 0 ? "m4a" : "wav";
     const exportMgr = new ExportManager();
     const outBytes = await exportMgr.exportAudio(finalSamples, mix.numChannels, sr, {
       format: "wav_16",

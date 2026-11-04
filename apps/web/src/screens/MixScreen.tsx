@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Button, CanvasViz, ProjectLayout, Section } from "@flux/ui";
-import { ProjectStore, TransportState, type FluxProjectState, type AudioTrack } from "@flux/app-core";
+import {
+  ProjectStore,
+  TransportState,
+  type FluxProjectState,
+  type AudioTrack,
+} from "@flux/app-core";
 
 export const MixScreen: React.FC = () => {
   const store = ProjectStore.getInstance();

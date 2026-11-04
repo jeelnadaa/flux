@@ -162,11 +162,7 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
                   </span>
                 </div>
                 {exportedUrl && (
-                  <a
-                    className="btn p"
-                    href={exportedUrl}
-                    download={exportedFilename}
-                  >
+                  <a className="btn p" href={exportedUrl} download={exportedFilename}>
                     <Icon name="dload" /> Download
                   </a>
                 )}
@@ -202,11 +198,7 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
                 onClick={() => setInternalMode("export")}
               />
               {exportedUrl ? (
-                <a
-                  className="btn p"
-                  href={exportedUrl}
-                  download={exportedFilename}
-                >
+                <a className="btn p" href={exportedUrl} download={exportedFilename}>
                   <Icon name="dload" /> Save {exportedFilename}
                 </a>
               ) : (

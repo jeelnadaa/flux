@@ -68,9 +68,7 @@ export const FormatConverterScreen: React.FC = () => {
         continue;
       }
 
-      setConvertItems((prev) =>
-        prev.map((it, idx) => (idx === i ? { ...it, progress: 20 } : it)),
-      );
+      setConvertItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, progress: 20 } : it)));
 
       try {
         const arrayBuf = await item.file.arrayBuffer();
@@ -82,7 +80,10 @@ export const FormatConverterScreen: React.FC = () => {
           channels = nativeDecoded.channels;
           sr = nativeDecoded.sampleRate;
         } else {
-          const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+          )();
           const decodedBuf = await ctx.decodeAudioData(arrayBuf);
           sr = decodedBuf.sampleRate;
           for (let c = 0; c < decodedBuf.numberOfChannels; c++) {

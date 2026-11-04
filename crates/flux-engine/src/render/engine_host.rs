@@ -76,7 +76,8 @@ impl CommandQueue {
             return None; // Queue empty
         }
         let cmd = self.buffer[read].take();
-        self.read_idx.store((read + 1) % self.capacity, Ordering::Release);
+        self.read_idx
+            .store((read + 1) % self.capacity, Ordering::Release);
         cmd
     }
 }

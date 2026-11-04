@@ -41,7 +41,10 @@ describe("ProjectStore", () => {
     store.splitSelectedClip();
 
     assert.equal(track.clips.length, initialClips + 1);
-    assert.equal(track.clips[0].durationFrames + track.clips[1].durationFrames, clip.durationFrames);
+    assert.equal(
+      track.clips[0].durationFrames + track.clips[1].durationFrames,
+      clip.durationFrames,
+    );
   });
 
   it("renders offline mixdown correctly into interleaved float buffer", () => {

@@ -34,9 +34,7 @@ export const NewProjectScreen: React.FC<NewProjectScreenProps> = ({ onNavigate }
     store.pushUndo();
     const st = store.getState();
     st.name =
-      name === "Untitled project" && templateTitle !== "Blank"
-        ? `${templateTitle} Project`
-        : name;
+      name === "Untitled project" && templateTitle !== "Blank" ? `${templateTitle} Project` : name;
     const sr =
       sampleRate === "44.1 kHz"
         ? 44100

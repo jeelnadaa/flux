@@ -241,30 +241,31 @@ impl AudioGraph {
             // Prepare inputs for this node
             if let Some(parents) = self.predecessors.get(&node_id).filter(|p| !p.is_empty()) {
                 // Sum outputs from all parent nodes
-                for ch in 0..in_channels {
-                    self.input_scratch[ch][..num_frames].fill(0.0);
+                for scratch_ch in self.input_scratch.iter_mut().take(in_channels) {
+                    scratch_ch[..num_frames].fill(0.0);
                 }
 
                 for &parent_id in parents {
                     let parent_buf = self.node_buffers.get(&parent_id).unwrap();
                     let p_chs = parent_buf.len().min(in_channels);
-                    for ch in 0..p_chs {
-                        for i in 0..num_frames {
-                            self.input_scratch[ch][i] += parent_buf[ch][i];
+                    for (ch, parent_ch) in parent_buf.iter().enumerate().take(p_chs) {
+                        for (i, &sample) in parent_ch.iter().enumerate().take(num_frames) {
+                            self.input_scratch[ch][i] += sample;
                         }
                     }
                 }
             } else {
                 // Root node takes external graph input
-                for ch in 0..in_channels {
+                for (ch, scratch_ch) in self.input_scratch.iter_mut().enumerate().take(in_channels)
+                {
                     if ch < input.len() {
                         let frames = input[ch].len().min(num_frames);
-                        self.input_scratch[ch][..frames].copy_from_slice(&input[ch][..frames]);
+                        scratch_ch[..frames].copy_from_slice(&input[ch][..frames]);
                         if frames < num_frames {
-                            self.input_scratch[ch][frames..num_frames].fill(0.0);
+                            scratch_ch[frames..num_frames].fill(0.0);
                         }
                     } else {
-                        self.input_scratch[ch][..num_frames].fill(0.0);
+                        scratch_ch[..num_frames].fill(0.0);
                     }
                 }
             }
@@ -274,12 +275,17 @@ impl AudioGraph {
                 let node = self.nodes.get_mut(&node_id).unwrap();
 
                 let mut in_refs: [&[f32]; 8] = [&[]; 8];
-                for ch in 0..in_channels {
-                    in_refs[ch] = &self.input_scratch[ch][..num_frames];
+                for (ch, in_ref) in in_refs.iter_mut().enumerate().take(in_channels) {
+                    *in_ref = &self.input_scratch[ch][..num_frames];
                 }
 
                 let mut out_refs: [&mut [f32]; 8] = Default::default();
-                for (ch, buf) in self.output_scratch.iter_mut().take(out_channels).enumerate() {
+                for (ch, buf) in self
+                    .output_scratch
+                    .iter_mut()
+                    .take(out_channels)
+                    .enumerate()
+                {
                     buf[..num_frames].fill(0.0);
                     out_refs[ch] = &mut buf[..num_frames];
                 }
@@ -289,9 +295,8 @@ impl AudioGraph {
 
                 // Copy to node's output buffer and apply PDC delay if present
                 let node_buf = self.node_buffers.get_mut(&node_id).unwrap();
-                for ch in 0..out_channels {
-                    node_buf[ch][..num_frames]
-                        .copy_from_slice(&self.output_scratch[ch][..num_frames]);
+                for (ch, n_buf) in node_buf.iter_mut().enumerate().take(out_channels) {
+                    n_buf[..num_frames].copy_from_slice(&self.output_scratch[ch][..num_frames]);
                 }
 
                 if let Some(delay) = self.pdc_delays.get_mut(&node_id) {

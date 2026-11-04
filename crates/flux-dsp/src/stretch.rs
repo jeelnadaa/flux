@@ -181,12 +181,16 @@ impl DspNode for StretchNode {
 
         if is_neutral {
             for (ch, out_ch) in output.iter_mut().enumerate().take(num_ch) {
-                let in_ch = if ch < input.len() { input[ch] } else { input[0] };
+                let in_ch = if ch < input.len() {
+                    input[ch]
+                } else {
+                    input[0]
+                };
                 let len = frames.min(in_ch.len());
                 out_ch[..len].copy_from_slice(&in_ch[..len]);
-                for j in 0..len {
+                for (j, &sample) in in_ch.iter().enumerate().take(len) {
                     let w_idx = (self.in_write_pos + j) % BUFFER_SAMPLES;
-                    self.in_buffer[ch][w_idx] = in_ch[j];
+                    self.in_buffer[ch][w_idx] = sample;
                 }
             }
             self.in_write_pos = (self.in_write_pos + frames) % BUFFER_SAMPLES;
@@ -215,13 +219,17 @@ impl DspNode for StretchNode {
             if self.grain0_pos >= GRAIN_SIZE as f32 {
                 self.grain0_pos = 0.0;
                 let offset = (GRAIN_SIZE as f32 * stretch) as f64;
-                self.grain0_read_start = (self.in_write_pos as f64 + BUFFER_SAMPLES as f64 - offset) % (BUFFER_SAMPLES as f64);
+                self.grain0_read_start = (self.in_write_pos as f64 + BUFFER_SAMPLES as f64
+                    - offset)
+                    % (BUFFER_SAMPLES as f64);
             }
 
             if self.grain1_pos >= GRAIN_SIZE as f32 {
                 self.grain1_pos = 0.0;
                 let offset = (GRAIN_SIZE as f32 * stretch) as f64;
-                self.grain1_read_start = (self.in_write_pos as f64 + BUFFER_SAMPLES as f64 - offset) % (BUFFER_SAMPLES as f64);
+                self.grain1_read_start = (self.in_write_pos as f64 + BUFFER_SAMPLES as f64
+                    - offset)
+                    % (BUFFER_SAMPLES as f64);
             }
 
             // Hann window weights: 0.5 * (1 - cos(2 * PI * pos / N))
@@ -232,15 +240,21 @@ impl DspNode for StretchNode {
             let w1 = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * phase1).cos());
 
             let norm_weight = w0 + w1;
-            let inv_w = if norm_weight > 1e-6 { 1.0 / norm_weight } else { 1.0 };
+            let inv_w = if norm_weight > 1e-6 {
+                1.0 / norm_weight
+            } else {
+                1.0
+            };
 
             // Sample indices
-            let r0_pos = (self.grain0_read_start + (self.grain0_pos as f64 * pitch_factor as f64)) % (BUFFER_SAMPLES as f64);
+            let r0_pos = (self.grain0_read_start + (self.grain0_pos as f64 * pitch_factor as f64))
+                % (BUFFER_SAMPLES as f64);
             let r0_int = r0_pos.floor() as usize;
             let r0_frac = (r0_pos - r0_pos.floor()) as f32;
             let r0_next = (r0_int + 1) % BUFFER_SAMPLES;
 
-            let r1_pos = (self.grain1_read_start + (self.grain1_pos as f64 * pitch_factor as f64)) % (BUFFER_SAMPLES as f64);
+            let r1_pos = (self.grain1_read_start + (self.grain1_pos as f64 * pitch_factor as f64))
+                % (BUFFER_SAMPLES as f64);
             let r1_int = r1_pos.floor() as usize;
             let r1_frac = (r1_pos - r1_pos.floor()) as f32;
             let r1_next = (r1_int + 1) % BUFFER_SAMPLES;

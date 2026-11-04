@@ -20,10 +20,7 @@ export const AudioSettingsScreen: React.FC<AudioSettingsScreenProps> = ({ onNavi
     "Studio Headphones",
     "Laptop speakers",
   ]);
-  const [micOptions, setMicOptions] = useState<string[]>([
-    "Studio Mic USB",
-    "Laptop mic",
-  ]);
+  const [micOptions, setMicOptions] = useState<string[]>(["Studio Mic USB", "Laptop mic"]);
   const [outputDevice, setOutputDevice] = useState("System default");
   const [micDevice, setMicDevice] = useState("Studio Mic USB");
   const [qualityIndex, setQualityIndex] = useState(0); // Best
@@ -70,18 +67,10 @@ export const AudioSettingsScreen: React.FC<AudioSettingsScreenProps> = ({ onNavi
     <SettingsLayout currentTab="audio" title="Audio">
       <div className="box col">
         <Field label="Output">
-          <Select
-            options={outputOptions}
-            value={outputDevice}
-            onChange={setOutputDevice}
-          />
+          <Select options={outputOptions} value={outputDevice} onChange={setOutputDevice} />
         </Field>
         <Field label="Microphone">
-          <Select
-            options={micOptions}
-            value={micDevice}
-            onChange={setMicDevice}
-          />
+          <Select options={micOptions} value={micDevice} onChange={setMicDevice} />
         </Field>
         <div className="between">
           <span className="dim">Device runs at 44.1 kHz, project at 48 kHz.</span>

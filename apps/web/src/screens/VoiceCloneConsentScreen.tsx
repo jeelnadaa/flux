@@ -68,7 +68,11 @@ export const VoiceCloneConsentScreen: React.FC<VoiceCloneConsentScreenProps> = (
             onClick={handleRecordConsent}
           >
             <Icon name="mic" size={14} />
-            {isRecording ? "Recording consent..." : recordedConsent ? "Consent recorded" : "Record consent"}
+            {isRecording
+              ? "Recording consent..."
+              : recordedConsent
+                ? "Consent recorded"
+                : "Record consent"}
           </button>
           <span className="dim">
             We check that the words match and that it's the same voice as your samples.

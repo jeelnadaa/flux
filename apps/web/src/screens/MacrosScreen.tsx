@@ -65,7 +65,10 @@ export const MacrosScreen: React.FC = () => {
               key={a.name}
               style={{
                 cursor: "pointer",
-                background: a.name === activeAction ? "var(--bg-card-hover, rgba(255,255,255,0.04))" : undefined,
+                background:
+                  a.name === activeAction
+                    ? "var(--bg-card-hover, rgba(255,255,255,0.04))"
+                    : undefined,
               }}
               onClick={() => setActiveAction(a.name)}
             >

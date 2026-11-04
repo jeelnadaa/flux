@@ -21,7 +21,13 @@ interface PauseData {
 const INITIAL_PAUSES: PauseData[] = [
   { time: "0:42.1", duration: "1.9 s", action: "Shorten to 300 ms", enabled: true, startSec: 42.1 },
   { time: "1:18.4", duration: "0.8 s", action: "Shorten to 300 ms", enabled: true, startSec: 78.4 },
-  { time: "2:06.7", duration: "3.4 s", action: "Shorten to 300 ms", enabled: true, startSec: 126.7 },
+  {
+    time: "2:06.7",
+    duration: "3.4 s",
+    action: "Shorten to 300 ms",
+    enabled: true,
+    startSec: 126.7,
+  },
   { time: "2:44.0", duration: "1.1 s", action: "Keep", enabled: false, startSec: 164.0 },
 ];
 

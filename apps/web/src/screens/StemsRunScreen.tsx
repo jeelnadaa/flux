@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { StemsScreen } from "./StemsScreen.js";
 import { Dialog, Callout } from "@flux/ui";
-import { ProjectStore } from "@flux/app-core";
 
 interface StemsRunScreenProps {
   onNavigate?: (route: string) => void;
@@ -28,10 +27,26 @@ export const StemsRunScreen: React.FC<StemsRunScreenProps> = ({ onNavigate }) =>
   }, [onNavigate]);
 
   const stems = [
-    { name: "Vocals", progress: Math.min(100, Math.round(overallProgress * 1.2)), colorToken: "--t4" },
-    { name: "Drums", progress: Math.min(100, Math.round(overallProgress * 1.1)), colorToken: "--t3" },
-    { name: "Bass", progress: Math.min(100, Math.round(overallProgress * 0.95)), colorToken: "--t2" },
-    { name: "Other", progress: Math.min(100, Math.round(overallProgress * 0.8)), colorToken: "--t5" },
+    {
+      name: "Vocals",
+      progress: Math.min(100, Math.round(overallProgress * 1.2)),
+      colorToken: "--t4",
+    },
+    {
+      name: "Drums",
+      progress: Math.min(100, Math.round(overallProgress * 1.1)),
+      colorToken: "--t3",
+    },
+    {
+      name: "Bass",
+      progress: Math.min(100, Math.round(overallProgress * 0.95)),
+      colorToken: "--t2",
+    },
+    {
+      name: "Other",
+      progress: Math.min(100, Math.round(overallProgress * 0.8)),
+      colorToken: "--t5",
+    },
   ];
 
   return (

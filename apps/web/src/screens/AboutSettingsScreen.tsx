@@ -47,10 +47,7 @@ export const AboutSettingsScreen: React.FC<AboutSettingsScreenProps> = ({ onNavi
           <span className="mono">0.1.0 build 1</span>
         </div>
         <div className="row">
-          <Button
-            label={updateStatus || "Check for updates"}
-            onClick={handleCheckUpdates}
-          />
+          <Button label={updateStatus || "Check for updates"} onClick={handleCheckUpdates} />
           <Button
             label={copyStatus || "Copy version info"}
             variant="ghost"

@@ -56,10 +56,31 @@ export const MetersScreen: React.FC = () => {
   const timecode = store.formatTimecode(project.playheadFrame);
 
   const stats = [
-    [isReset ? "−inf" : isPlaying ? (project.meterLevels.leftRms - 6).toFixed(1) : `${loudness.integratedLufs >= 0 ? "+" : ""}${loudness.integratedLufs}`, "Integrated LUFS"],
-    [isReset ? "−inf" : isPlaying ? project.meterLevels.leftPeak.toFixed(1) : `${loudness.shortTermMaxLufs >= 0 ? "+" : ""}${loudness.shortTermMaxLufs}`, "Short-term LUFS"],
+    [
+      isReset
+        ? "−inf"
+        : isPlaying
+          ? (project.meterLevels.leftRms - 6).toFixed(1)
+          : `${loudness.integratedLufs >= 0 ? "+" : ""}${loudness.integratedLufs}`,
+      "Integrated LUFS",
+    ],
+    [
+      isReset
+        ? "−inf"
+        : isPlaying
+          ? project.meterLevels.leftPeak.toFixed(1)
+          : `${loudness.shortTermMaxLufs >= 0 ? "+" : ""}${loudness.shortTermMaxLufs}`,
+      "Short-term LUFS",
+    ],
     [isReset ? "0.0" : `${loudness.loudnessRangeLu}`, "Loudness range LU"],
-    [isReset ? "−inf" : isPlaying ? project.meterLevels.leftPeak.toFixed(1) : `${loudness.maxTruePeakDbtp >= 0 ? "+" : ""}${loudness.maxTruePeakDbtp}`, "True peak dBTP"],
+    [
+      isReset
+        ? "−inf"
+        : isPlaying
+          ? project.meterLevels.leftPeak.toFixed(1)
+          : `${loudness.maxTruePeakDbtp >= 0 ? "+" : ""}${loudness.maxTruePeakDbtp}`,
+      "True peak dBTP",
+    ],
   ];
 
   const handleReset = () => {

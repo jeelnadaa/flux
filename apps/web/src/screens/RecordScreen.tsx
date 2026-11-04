@@ -34,15 +34,18 @@ export const RecordScreen: React.FC<RecordScreenProps> = ({ onNavigate }) => {
   // Enumerate input devices
   useEffect(() => {
     if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
-      navigator.mediaDevices.enumerateDevices().then((devices) => {
-        const audioInputs = devices
-          .filter((d) => d.kind === "audioinput")
-          .map((d, i) => d.label || `Microphone ${i + 1}`);
-        if (audioInputs.length > 0) {
-          setMicrophones(audioInputs);
-          setMicrophone(audioInputs[0]);
-        }
-      }).catch(() => {});
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          const audioInputs = devices
+            .filter((d) => d.kind === "audioinput")
+            .map((d, i) => d.label || `Microphone ${i + 1}`);
+          if (audioInputs.length > 0) {
+            setMicrophones(audioInputs);
+            setMicrophone(audioInputs[0]);
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -71,7 +74,10 @@ export const RecordScreen: React.FC<RecordScreenProps> = ({ onNavigate }) => {
         }
 
         streamRef.current = stream;
-        const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        )();
         audioCtxRef.current = ctx;
 
         const source = ctx.createMediaStreamSource(stream);
@@ -216,11 +222,7 @@ export const RecordScreen: React.FC<RecordScreenProps> = ({ onNavigate }) => {
 
         <div className="g2">
           <Field label="Microphone">
-            <Select
-              options={microphones}
-              value={microphone}
-              onChange={setMicrophone}
-            />
+            <Select options={microphones} value={microphone} onChange={setMicrophone} />
           </Field>
           <Field label="Record to">
             <Select
@@ -272,12 +274,7 @@ export const RecordScreen: React.FC<RecordScreenProps> = ({ onNavigate }) => {
               }
             }}
           />
-          <Button
-            label="Discard take"
-            variant="danger"
-            large={true}
-            onClick={handleDiscard}
-          />
+          <Button label="Discard take" variant="danger" large={true} onClick={handleDiscard} />
         </div>
       </div>
     </ProjectLayout>

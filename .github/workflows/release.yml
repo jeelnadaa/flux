@@ -95,8 +95,6 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin, aarch64-apple-darwin
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -108,11 +106,9 @@ jobs:
           npm ci || npm install
           npm run build
 
-      - name: Build native release binaries
+      - name: Build native release binary
         run: |
-          cargo build --release --workspace --bins
-          cargo build --release --target aarch64-apple-darwin --bin flux || true
-          cargo build --release --target x86_64-apple-darwin --bin flux || true
+          cargo build --release --bin flux
 
       - name: Prepare macOS standalone package
         run: |

@@ -107,9 +107,12 @@ export class ByokAiManager {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed.keys)) {
-            pool.keys = parsed.keys.filter((k: unknown) => typeof k === "string" && k.trim().length > 0);
+            pool.keys = parsed.keys.filter(
+              (k: unknown) => typeof k === "string" && k.trim().length > 0,
+            );
           }
-          pool.activeKeyIndex = typeof parsed.activeKeyIndex === "number" ? parsed.activeKeyIndex : 0;
+          pool.activeKeyIndex =
+            typeof parsed.activeKeyIndex === "number" ? parsed.activeKeyIndex : 0;
           if (pool.activeKeyIndex >= pool.keys.length) {
             pool.activeKeyIndex = 0;
           }
@@ -201,10 +204,7 @@ export class ByokAiManager {
   // Audio Transcription with Multi-Provider Failover
   // ==========================================
 
-  public async transcribeAudio(
-    audioBlob: Blob,
-    language = "en",
-  ): Promise<TranscriptionResult> {
+  public async transcribeAudio(audioBlob: Blob, language = "en"): Promise<TranscriptionResult> {
     const cascade: AiProvider[] = ["groq", "openai", "deepgram"];
 
     for (const provider of cascade) {
@@ -284,12 +284,14 @@ export class ByokAiManager {
     }
 
     const data = await res.json();
-    const words: TranscriptionWord[] = (data.words || []).map((w: { word: string; start: number; end: number }) => ({
-      word: w.word,
-      start: w.start,
-      end: w.end,
-      confidence: 0.95,
-    }));
+    const words: TranscriptionWord[] = (data.words || []).map(
+      (w: { word: string; start: number; end: number }) => ({
+        word: w.word,
+        start: w.start,
+        end: w.end,
+        confidence: 0.95,
+      }),
+    );
 
     return { text: data.text || "", words };
   }
@@ -317,12 +319,14 @@ export class ByokAiManager {
     }
 
     const data = await res.json();
-    const words: TranscriptionWord[] = (data.words || []).map((w: { word: string; start: number; end: number }) => ({
-      word: w.word,
-      start: w.start,
-      end: w.end,
-      confidence: 0.98,
-    }));
+    const words: TranscriptionWord[] = (data.words || []).map(
+      (w: { word: string; start: number; end: number }) => ({
+        word: w.word,
+        start: w.start,
+        end: w.end,
+        confidence: 0.98,
+      }),
+    );
 
     return { text: data.text || "", words };
   }
@@ -388,10 +392,7 @@ export class ByokAiManager {
   // Text to Speech with Multi-Provider Failover
   // ==========================================
 
-  public async synthesizeSpeech(
-    text: string,
-    options: TtsOptions = {},
-  ): Promise<TtsResult> {
+  public async synthesizeSpeech(text: string, options: TtsOptions = {}): Promise<TtsResult> {
     const cascade: AiProvider[] = ["elevenlabs", "openai"];
 
     for (const provider of cascade) {
@@ -423,7 +424,9 @@ export class ByokAiManager {
             });
 
             if (!res.ok) {
-              throw Object.assign(new Error(`ElevenLabs HTTP ${res.status}`), { status: res.status });
+              throw Object.assign(new Error(`ElevenLabs HTTP ${res.status}`), {
+                status: res.status,
+              });
             }
 
             const buf = await res.arrayBuffer();

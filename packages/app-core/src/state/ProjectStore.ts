@@ -488,11 +488,7 @@ export class ProjectStore {
     this.state.loopEnabled = enabled;
     if (startFrame !== undefined) this.state.loopStartFrame = startFrame;
     if (endFrame !== undefined) this.state.loopEndFrame = endFrame;
-    this.engineController.setLoop(
-      enabled,
-      this.state.loopStartFrame,
-      this.state.loopEndFrame,
-    );
+    this.engineController.setLoop(enabled, this.state.loopStartFrame, this.state.loopEndFrame);
     this.notify();
   }
 
@@ -516,7 +512,7 @@ export class ProjectStore {
 
       if (this.audioCtx) {
         const elapsed = this.audioCtx.currentTime - this.playbackStartTime;
-        let currentFrame = this.playbackStartFrame + Math.floor(elapsed * this.state.sampleRate);
+        const currentFrame = this.playbackStartFrame + Math.floor(elapsed * this.state.sampleRate);
 
         if (this.state.loopEnabled && currentFrame >= this.state.loopEndFrame) {
           this.seek(this.state.loopStartFrame);
@@ -801,7 +797,8 @@ export class ProjectStore {
 
     const tColors = ["--t1", "--t2", "--t3", "--t4"];
     const chosenColor = tColors[this.state.tracks.length % tColors.length];
-    const name = trackName || (file as File).name || `Imported Track ${this.state.tracks.length + 1}`;
+    const name =
+      trackName || (file as File).name || `Imported Track ${this.state.tracks.length + 1}`;
 
     const newClip: AudioClip = {
       id: `clip-${Date.now()}`,

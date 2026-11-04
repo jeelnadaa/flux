@@ -185,12 +185,7 @@ export const Transport: React.FC<TransportProps> = ({
         >
           <Icon name={isPlaying ? "pause" : "play"} />
         </button>
-        <button
-          className="tbtn hide-s"
-          type="button"
-          aria-label="Stop"
-          onClick={onStop}
-        >
+        <button className="tbtn hide-s" type="button" aria-label="Stop" onClick={onStop}>
           <Icon name="stop" />
         </button>
         <button
@@ -280,23 +275,6 @@ export interface ProjectLayoutProps {
   className?: string;
 }
 
-const defaultProjectRightActions = (
-  <>
-    <SegmentedControl items={["Simple", "Pro"]} selectedIndex={1} className="hide-s" dataMode />
-    <button className="tbtn" type="button" aria-label="Undo">
-      <Icon name="undo" />
-    </button>
-    <button className="tbtn hide-s" type="button" aria-label="Redo">
-      <Icon name="redo" />
-    </button>
-    <a className="btn g lbl-s hide-s" href="#history" data-go="history" aria-label="History">
-      <Icon name="hist" />
-    </a>
-    <Button variant="magic" className="lbl-s" icon="mag" label="Magic" dataGo="magic" />
-    <Button variant="primary" className="lbl-s" icon="exp" label="Export" dataGo="export" />
-  </>
-);
-
 export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
   currentTab = "edit",
   projectName = "Harbor Lights",
@@ -380,12 +358,10 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
         projectState.loopStartFrame,
         projectState.loopEndFrame,
       ));
-  const resolvedLeftMeter =
-    leftMeter !== undefined ? leftMeter : projectState.meterLevels.leftPeak;
+  const resolvedLeftMeter = leftMeter !== undefined ? leftMeter : projectState.meterLevels.leftPeak;
   const resolvedRightMeter =
     rightMeter !== undefined ? rightMeter : projectState.meterLevels.rightPeak;
-  const resolvedLufs =
-    lufs || `${(projectState.meterLevels.leftRms || -14.2).toFixed(1)} LUFS`;
+  const resolvedLufs = lufs || `${(projectState.meterLevels.leftRms || -14.2).toFixed(1)} LUFS`;
 
   const effectiveRightActions = rightActions || (
     <>

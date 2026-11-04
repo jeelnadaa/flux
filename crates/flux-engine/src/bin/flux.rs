@@ -5,8 +5,8 @@
 use flux_dsp::loudness::LoudnessMeter;
 use flux_engine::decoder::{open_decoder, AudioBuffer};
 use flux_engine::export::{
-    ExportJob, ExportOptions, ExportTargetFormat, FlacCompressionLevel, Mp3Bitrate, NormalizationMode,
-    OpusApplication, VorbisQuality, WavBitsPerSample,
+    ExportJob, ExportOptions, ExportTargetFormat, FlacCompressionLevel, Mp3Bitrate,
+    NormalizationMode, OpusApplication, VorbisQuality, WavBitsPerSample,
 };
 use flux_engine::flux_dsp::biquad::{BiquadChain, BiquadType};
 use flux_engine::flux_dsp::node::DspNode;
@@ -275,16 +275,10 @@ fn api_headers(content_type: &str) -> Vec<tiny_http::Header> {
         )
         .unwrap(),
         tiny_http::Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"*"[..]).unwrap(),
-        tiny_http::Header::from_bytes(
-            &b"Cross-Origin-Opener-Policy"[..],
-            &b"same-origin"[..],
-        )
-        .unwrap(),
-        tiny_http::Header::from_bytes(
-            &b"Cross-Origin-Embedder-Policy"[..],
-            &b"require-corp"[..],
-        )
-        .unwrap(),
+        tiny_http::Header::from_bytes(&b"Cross-Origin-Opener-Policy"[..], &b"same-origin"[..])
+            .unwrap(),
+        tiny_http::Header::from_bytes(&b"Cross-Origin-Embedder-Policy"[..], &b"require-corp"[..])
+            .unwrap(),
         tiny_http::Header::from_bytes(&b"Cache-Control"[..], &b"no-cache"[..]).unwrap(),
     ]
 }
@@ -338,7 +332,8 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
                     tiny_http::StatusCode(400),
                     api_headers("application/json"),
                     std::io::Cursor::new(
-                        format!(r#"{{"error": "Failed to read request body: {}"}}"#, e).into_bytes(),
+                        format!(r#"{{"error": "Failed to read request body: {}"}}"#, e)
+                            .into_bytes(),
                     ),
                     None,
                     None,
@@ -361,7 +356,7 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
                         // [8..16] num_frames (u64 LE)
                         // [16..] ch0 f32s, ch1 f32s...
                         let mut out = Vec::with_capacity(16 + num_channels * num_frames * 4);
-                        out.extend_from_slice(&(sample_rate as u32).to_le_bytes());
+                        out.extend_from_slice(&sample_rate.to_le_bytes());
                         out.extend_from_slice(&(num_channels as u32).to_le_bytes());
                         out.extend_from_slice(&(num_frames as u64).to_le_bytes());
                         for ch in 0..num_channels {
@@ -385,7 +380,8 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
                             tiny_http::StatusCode(422),
                             api_headers("application/json"),
                             std::io::Cursor::new(
-                                format!(r#"{{"error": "Decode stream error: {}"}}"#, e).into_bytes(),
+                                format!(r#"{{"error": "Decode stream error: {}"}}"#, e)
+                                    .into_bytes(),
                             ),
                             None,
                             None,
@@ -399,7 +395,8 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
                         tiny_http::StatusCode(400),
                         api_headers("application/json"),
                         std::io::Cursor::new(
-                            format!(r#"{{"error": "Unsupported container or format: {}"}}"#, e).into_bytes(),
+                            format!(r#"{{"error": "Unsupported container or format: {}"}}"#, e)
+                                .into_bytes(),
                         ),
                         None,
                         None,
@@ -444,30 +441,36 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
 
             let float_len = raw_bytes.len() / 4;
             let mut samples = Vec::with_capacity(float_len);
-            for chunk in raw_bytes.chunks_exact(4) {
-                samples.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+            for &chunk in raw_bytes.as_chunks::<4>().0 {
+                samples.push(f32::from_le_bytes(chunk));
             }
 
             let buffer = AudioBuffer::from_interleaved(&samples, ch, sr);
             let target_format = parse_export_format(fmt_str);
             let mime = export_mime_type(target_format);
 
-            let mut opts = ExportOptions::default();
-            opts.format = target_format;
-            opts.sample_rate = Some(sr);
-            opts.dither = match dither_str {
+            let dither = match dither_str {
                 "tpdf" => flux_dsp::dither::DitherType::Tpdf,
                 "noise_shaped" => flux_dsp::dither::DitherType::NoiseShaped,
                 _ => flux_dsp::dither::DitherType::None,
             };
-            if norm_str.starts_with("peak") {
-                opts.normalization = NormalizationMode::Peak { target_dbfs: -0.3 };
+            let normalization = if norm_str.starts_with("peak") {
+                NormalizationMode::Peak { target_dbfs: -0.3 }
             } else if norm_str.starts_with("lufs") {
-                opts.normalization = NormalizationMode::Lufs {
+                NormalizationMode::Lufs {
                     target_lufs: -14.0,
                     true_peak_ceiling_dbtp: -1.0,
-                };
-            }
+                }
+            } else {
+                NormalizationMode::Off
+            };
+            let opts = ExportOptions {
+                format: target_format,
+                sample_rate: Some(sr),
+                dither,
+                normalization,
+                ..Default::default()
+            };
 
             match ExportJob::run(&buffer, &opts, None, |_| {}) {
                 Ok(encoded_bytes) => {
@@ -523,8 +526,8 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
             let _ = request.as_reader().read_to_end(&mut raw_bytes);
             let float_len = raw_bytes.len() / 4;
             let mut samples = Vec::with_capacity(float_len);
-            for chunk in raw_bytes.chunks_exact(4) {
-                samples.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+            for &chunk in raw_bytes.as_chunks::<4>().0 {
+                samples.push(f32::from_le_bytes(chunk));
             }
 
             let buffer = AudioBuffer::from_interleaved(&samples, ch, sr);
@@ -584,11 +587,7 @@ fn serve_assets(server: tiny_http::Server, web_root: PathBuf) {
         }
 
         // 7. Static file delivery
-        let clean_path = if path == "/" {
-            "/index.html"
-        } else {
-            &path
-        };
+        let clean_path = if path == "/" { "/index.html" } else { &path };
 
         let rel_path = clean_path.trim_start_matches('/');
         let target_file = web_root.join(rel_path);

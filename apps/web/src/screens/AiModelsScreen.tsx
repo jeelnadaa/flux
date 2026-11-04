@@ -88,7 +88,9 @@ export const AiModelsScreen: React.FC<AiModelsScreenProps> = () => {
   return (
     <SettingsLayout currentTab="models" title="AI models & Cloud BYOK">
       <div className="between">
-        <span className="dim">100% Local by default. Bring Your Own Key for cloud AI models with auto-failover.</span>
+        <span className="dim">
+          100% Local by default. Bring Your Own Key for cloud AI models with auto-failover.
+        </span>
         <b className="mono">1.2 GB used</b>
       </div>
 
@@ -118,9 +120,9 @@ export const AiModelsScreen: React.FC<AiModelsScreenProps> = () => {
 
       <Section title="Bring Your Own Key (BYOK) — Cloud AI Providers">
         <p className="dim" style={{ marginBottom: "16px" }}>
-          Flux never routes your audio through any cloud server. API calls are sent directly from your
-          machine to the provider. Add multiple keys per provider for automatic rate-limit (429/401)
-          rotation, with automatic fallback across providers.
+          Flux never routes your audio through any cloud server. API calls are sent directly from
+          your machine to the provider. Add multiple keys per provider for automatic rate-limit
+          (429/401) rotation, with automatic fallback across providers.
         </p>
 
         <div className="lst box">

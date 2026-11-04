@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { ProjectLayout, SegmentedControl, Slider, Pill, Icon, CanvasViz } from "@flux/ui";
-import { ProjectStore, TransportState, type FluxProjectState, type AudioTrack } from "@flux/app-core";
+import {
+  ProjectStore,
+  TransportState,
+  type FluxProjectState,
+  type AudioTrack,
+} from "@flux/app-core";
 
 interface StemsScreenProps {
   onNavigate?: (route: string) => void;
@@ -31,13 +36,9 @@ export const StemsScreen: React.FC<StemsScreenProps> = ({ onNavigate }) => {
   const [muteOther, setMuteOther] = useState<boolean>(false);
   const [soloOther, setSoloOther] = useState<boolean>(false);
 
-  const applyTrackStemMuteSolo = (
-    stemName: string,
-    isMute: boolean,
-    isSolo: boolean,
-  ) => {
-    const trk = project.tracks.find(
-      (t: AudioTrack) => t.name.toLowerCase().includes(stemName.toLowerCase()),
+  const applyTrackStemMuteSolo = (stemName: string, isMute: boolean, isSolo: boolean) => {
+    const trk = project.tracks.find((t: AudioTrack) =>
+      t.name.toLowerCase().includes(stemName.toLowerCase()),
     );
     if (trk) {
       if (trk.muted !== isMute) store.toggleTrackMute(trk.id);

@@ -19,7 +19,11 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }
   const [selectedWord, setSelectedWord] = useState<string>('"the the" · 00:12:33.1 · 0.42 s');
 
   const handleWordClick = (word: string, timeSec: number) => {
-    setSelectedWord(`"${word}" · 00:${Math.floor(timeSec / 60).toString().padStart(2, "0")}:${(timeSec % 60).toFixed(1)}`);
+    setSelectedWord(
+      `"${word}" · 00:${Math.floor(timeSec / 60)
+        .toString()
+        .padStart(2, "0")}:${(timeSec % 60).toFixed(1)}`,
+    );
     store.seek(Math.floor(timeSec * store.getState().sampleRate));
   };
 
