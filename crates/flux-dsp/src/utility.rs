@@ -31,7 +31,23 @@ pub enum WaveformType {
     Sawtooth,
 }
 
-/// Periodic signal generator generating clean tones.
+#[inline]
+fn poly_blep(mut t: f32, dt: f32) -> f32 {
+    if dt <= 0.0 {
+        return 0.0;
+    }
+    if t < dt {
+        t /= dt;
+        2.0 * t - t * t - 1.0
+    } else if t > 1.0 - dt {
+        t = (t - 1.0) / dt;
+        t * t + 2.0 * t + 1.0
+    } else {
+        0.0
+    }
+}
+
+/// Periodic signal generator generating clean tones with PolyBLEP anti-aliasing.
 pub struct ToneGenerator {
     bypassed: bool,
     sample_rate: f32,
@@ -111,13 +127,14 @@ impl DspNode for ToneGenerator {
         }
 
         let phase_step = (2.0 * PI * self.frequency) / self.sample_rate;
+        let dt = (self.frequency / self.sample_rate).clamp(0.0, 0.5);
 
         for i in 0..num_samples {
-            let sample_val = match self.waveform {
+            let norm = self.phase / (2.0 * PI);
+            let raw_sample = match self.waveform {
                 WaveformType::Sine => self.phase.sin(),
                 WaveformType::Triangle => {
                     // Normalize phase to 0..1
-                    let norm = self.phase / (2.0 * PI);
                     if norm < 0.25 {
                         4.0 * norm
                     } else if norm < 0.75 {
@@ -127,17 +144,18 @@ impl DspNode for ToneGenerator {
                     }
                 }
                 WaveformType::Square => {
-                    if self.phase < PI {
-                        1.0
-                    } else {
-                        -1.0
-                    }
+                    let mut val = if norm < 0.5 { 1.0 } else { -1.0 };
+                    val += poly_blep(norm, dt);
+                    val -= poly_blep((norm + 0.5) % 1.0, dt);
+                    val
                 }
                 WaveformType::Sawtooth => {
-                    let norm = self.phase / (2.0 * PI);
-                    2.0 * norm - 1.0
+                    let mut val = 2.0 * norm - 1.0;
+                    val -= poly_blep(norm, dt);
+                    val
                 }
-            } * self.gain;
+            };
+            let sample_val = raw_sample * self.gain;
 
             for ch in output.iter_mut().take(num_channels) {
                 ch[i] = sample_val;

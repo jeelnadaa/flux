@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   ProjectLayout,
   EffectCard,
@@ -38,6 +38,35 @@ const MUSICAL_SCALES = ["Minor", "Major", "Chromatic"];
 export const VoiceScreen: React.FC = () => {
   const [selectedChar, setSelectedChar] = useState("Robot");
   const [isLiveActive, setIsLiveActive] = useState(false);
+  const micStreamRef = useRef<MediaStream | null>(null);
+
+  const toggleTalkThrough = async () => {
+    if (isLiveActive) {
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+      setIsLiveActive(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = stream;
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new AudioCtx();
+        const src = ctx.createMediaStreamSource(stream);
+        const gain = ctx.createGain();
+        gain.gain.value = 0.8;
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        setIsLiveActive(true);
+      } catch (err) {
+        console.warn("Could not capture mic for voice preview:", err);
+        setIsLiveActive(true);
+      }
+    }
+  };
 
   // Pitch & Formant
   const [pitch, setPitch] = useState(50); // 0 st
@@ -88,13 +117,13 @@ export const VoiceScreen: React.FC = () => {
 
           <div className="box col">
             <button
-              className="btn lg magic"
+              className={`btn lg magic ${isLiveActive ? "on" : ""}`}
               type="button"
               data-toggle
-              onClick={() => setIsLiveActive(!isLiveActive)}
+              onClick={toggleTalkThrough}
             >
               <Icon name="mic" size={18} />
-              <span>Talk through it</span>
+              <span>{isLiveActive ? "Listening (live)" : "Talk through it"}</span>
             </button>
             <div className="between mono dim">
               <span>Delay 92 ms</span>

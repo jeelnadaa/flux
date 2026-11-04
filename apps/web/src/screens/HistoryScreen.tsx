@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ProjectLayout, CanvasViz, Icon } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 interface HistoryEntry {
   id: string;
   name: string;
   timeAgo: string;
+  snapshot?: FluxProjectState;
 }
 
 const INITIAL_HISTORY: HistoryEntry[] = [
@@ -17,13 +19,27 @@ const INITIAL_HISTORY: HistoryEntry[] = [
 ];
 
 export const HistoryScreen: React.FC = () => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
   const [historyList, setHistoryList] = useState<HistoryEntry[]>(INITIAL_HISTORY);
   const [currentIdx, setCurrentIdx] = useState(0);
 
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
+
   const handleSaveSnapshot = () => {
     const snapName = `Snapshot: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const curState = store.getState();
     setHistoryList((prev) => [
-      { id: `snap_${Date.now()}`, name: snapName, timeAgo: "Just now" },
+      {
+        id: `snap_${Date.now()}`,
+        name: snapName,
+        timeAgo: "Just now",
+        snapshot: JSON.parse(JSON.stringify(curState)),
+      },
       ...prev,
     ]);
     setCurrentIdx(0);
@@ -31,10 +47,31 @@ export const HistoryScreen: React.FC = () => {
 
   const handleGoTo = (idx: number) => {
     setCurrentIdx(idx);
+    const entry = historyList[idx];
+    if (entry?.snapshot) {
+      // Restore tracks from snapshot
+      store.getState().tracks = entry.snapshot.tracks;
+      store.seek(entry.snapshot.playheadFrame);
+    }
   };
 
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
+
   return (
-    <ProjectLayout currentTab="edit">
+    <ProjectLayout
+      currentTab="edit"
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="pg in">
         <div className="pgh">
           <div>

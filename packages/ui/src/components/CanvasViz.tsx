@@ -86,6 +86,33 @@ function getEnvelope(seed: number, n: number, kind: string): Float32Array {
   return arr;
 }
 
+const canvasRenderMap = new WeakMap<HTMLCanvasElement, () => void>();
+let sharedResizeObserver: ResizeObserver | null = null;
+const pendingResizeTasks = new Set<() => void>();
+let resizeRafId: number | null = null;
+
+function getSharedResizeObserver(): ResizeObserver | null {
+  if (typeof ResizeObserver === "undefined") return null;
+  if (!sharedResizeObserver) {
+    sharedResizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const fn = canvasRenderMap.get(entry.target as HTMLCanvasElement);
+        if (fn) {
+          pendingResizeTasks.add(fn);
+        }
+      }
+      if (resizeRafId === null && pendingResizeTasks.size > 0) {
+        resizeRafId = requestAnimationFrame(() => {
+          resizeRafId = null;
+          pendingResizeTasks.forEach((fn) => fn());
+          pendingResizeTasks.clear();
+        });
+      }
+    });
+  }
+  return sharedResizeObserver;
+}
+
 export function drawWaveform(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1042,17 +1069,15 @@ export const CanvasViz: React.FC<CanvasVizProps> = ({
 
     render();
 
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => {
-        render();
-      });
-      ro.observe(canvas);
+    const observer = getSharedResizeObserver();
+    if (observer && canvas) {
+      canvasRenderMap.set(canvas, render);
+      observer.observe(canvas);
     }
 
     return () => {
-      if (ro) {
-        ro.disconnect();
+      if (observer && canvas) {
+        observer.unobserve(canvas);
       }
     };
   }, [

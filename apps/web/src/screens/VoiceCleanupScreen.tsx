@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ProjectLayout,
   SegmentedControl,
@@ -9,12 +9,22 @@ import {
   Icon,
   CanvasViz,
 } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 interface VoiceCleanupScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const VoiceCleanupScreen: React.FC<VoiceCleanupScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
+
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
+
   const [isSimple, setIsSimple] = useState<boolean>(true);
   const [compareSlotIdx, setCompareSlotIdx] = useState<number>(0);
   const [isBypassed, setIsBypassed] = useState<boolean>(false);
@@ -34,8 +44,23 @@ export const VoiceCleanupScreen: React.FC<VoiceCleanupScreenProps> = ({ onNaviga
   const [evenOutLevel, setEvenOutLevel] = useState<boolean>(true);
   const [keepRoomTone, setKeepRoomTone] = useState<number>(30);
 
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
+
   return (
-    <ProjectLayout currentTab="aitools">
+    <ProjectLayout
+      currentTab="aitools"
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="split">
         <div className="a">
           <div className="tlbar">

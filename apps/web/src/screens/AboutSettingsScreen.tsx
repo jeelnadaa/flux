@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { SettingsLayout, Button, Icon } from "@flux/ui";
 
 const ABOUT_LINKS = [
@@ -13,12 +13,30 @@ interface AboutSettingsScreenProps {
 }
 
 export const AboutSettingsScreen: React.FC<AboutSettingsScreenProps> = ({ onNavigate }) => {
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
   const navigate = (r: string) => {
     if (onNavigate) {
       onNavigate(r);
     } else {
       window.location.hash = r;
     }
+  };
+
+  const handleCheckUpdates = () => {
+    setUpdateStatus("Checking...");
+    setTimeout(() => {
+      setUpdateStatus("You are on the latest release (0.1.0)");
+      setTimeout(() => setUpdateStatus(null), 3000);
+    }, 800);
+  };
+
+  const handleCopyVersion = () => {
+    const info = `Flux 0.1.0 build 1 (${typeof navigator !== "undefined" ? navigator.platform : "Desktop"})`;
+    navigator.clipboard?.writeText(info);
+    setCopyStatus("Copied version info!");
+    setTimeout(() => setCopyStatus(null), 2500);
   };
 
   return (
@@ -29,8 +47,15 @@ export const AboutSettingsScreen: React.FC<AboutSettingsScreenProps> = ({ onNavi
           <span className="mono">0.1.0 build 1</span>
         </div>
         <div className="row">
-          <Button label="Check for updates" />
-          <Button label="Copy version info" variant="ghost" />
+          <Button
+            label={updateStatus || "Check for updates"}
+            onClick={handleCheckUpdates}
+          />
+          <Button
+            label={copyStatus || "Copy version info"}
+            variant="ghost"
+            onClick={handleCopyVersion}
+          />
         </div>
       </div>
 

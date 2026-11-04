@@ -1,13 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ProjectLayout, Pill, CanvasViz } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 interface TempoKeyScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const TempoKeyScreen: React.FC<TempoKeyScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
   const [bpm, setBpm] = useState<number>(84.0);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
+
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
 
   const handleDouble = () => setBpm((prev) => +(prev * 2).toFixed(1));
   const handleHalf = () => setBpm((prev) => +(prev / 2).toFixed(1));
@@ -34,8 +43,24 @@ export const TempoKeyScreen: React.FC<TempoKeyScreenProps> = ({ onNavigate }) =>
     { key: "D min", width: "22%", color: "--t1" },
   ];
 
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
+
   return (
-    <ProjectLayout currentTab="aitools" onNavigate={onNavigate}>
+    <ProjectLayout
+      currentTab="aitools"
+      onNavigate={onNavigate}
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="pg in">
         <h1 className="h1">Tempo and key</h1>
 

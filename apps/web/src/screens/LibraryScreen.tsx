@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { PageLayout, Icon, SegmentedControl, Pill } from "@flux/ui";
+import { ProjectStore } from "@flux/app-core";
 
 interface ProjectRow {
   name: string;
@@ -57,6 +58,7 @@ export const LibraryScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [activeChip, setActiveChip] = useState("My Audio");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = PROJECTS.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -64,15 +66,74 @@ export const LibraryScreen: React.FC = () => {
     return matchesSearch && matchesCategory;
   });
 
+  const handleOpenFluxFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (file: File) => {
+    try {
+      await ProjectStore.get().importAudioFile(file);
+      window.location.hash = "#edit";
+    } catch {
+      window.location.hash = "#edit";
+    }
+  };
+
+  const handleBackupProjects = () => {
+    try {
+      const state = ProjectStore.get().getState();
+      const exportable = {
+        name: state.name,
+        sampleRate: state.sampleRate,
+        totalFrames: state.totalFrames,
+        tracks: state.tracks.map((t) => ({
+          name: t.name,
+          volume: t.volume,
+          pan: t.pan,
+          muted: t.muted,
+          solo: t.solo,
+        })),
+        createdAt: new Date().toISOString(),
+      };
+      const blob = new Blob([JSON.stringify(exportable, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${state.name.toLowerCase().replace(/\s+/g, "-")}.flux`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Backup download
+    }
+  };
+
+  const openProject = (projectName: string) => {
+    ProjectStore.get().getState().name = projectName;
+    window.location.hash = "#edit";
+  };
+
   return (
     <PageLayout
       currentTab="library"
       title="Projects"
       actions={
-        <button className="btn" type="button">
-          <Icon name="folder" />
-          <span>Open .flux file</span>
-        </button>
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".flux,audio/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                void handleFileSelected(e.target.files[0]);
+              }
+            }}
+          />
+          <button className="btn" type="button" onClick={handleOpenFluxFile}>
+            <Icon name="folder" />
+            <span>Open .flux file</span>
+          </button>
+        </>
       }
     >
       <div className="row">
@@ -121,7 +182,16 @@ export const LibraryScreen: React.FC = () => {
             {filtered.map((r) => (
               <tr key={r.name}>
                 <td>
-                  <a className="b7" href="#edit" data-go="edit" style={{ textDecoration: "none" }}>
+                  <a
+                    className="b7"
+                    href="#edit"
+                    data-go="edit"
+                    style={{ textDecoration: "none", cursor: "pointer" }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openProject(r.name);
+                    }}
+                  >
                     {r.name}
                   </a>
                 </td>
@@ -147,7 +217,16 @@ export const LibraryScreen: React.FC = () => {
         <Icon name="warn" />
         <div>
           <b>2 projects are only in this browser.</b> Browsers may clear storage when space is low.{" "}
-          <a className="act" href="#export-project" data-go="export-project">
+          <a
+            className="act"
+            href="#export-project"
+            data-go="export-project"
+            style={{ cursor: "pointer" }}
+            onClick={(e) => {
+              e.preventDefault();
+              handleBackupProjects();
+            }}
+          >
             Back them up as .flux files
           </a>{" "}
           or move them to a folder.

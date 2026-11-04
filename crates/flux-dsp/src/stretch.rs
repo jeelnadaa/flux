@@ -6,7 +6,9 @@
 
 use crate::node::DspNode;
 
-const BUFFER_SAMPLES: usize = 4096;
+const BUFFER_SAMPLES: usize = 8192;
+const GRAIN_SIZE: usize = 1024;
+const HALF_GRAIN: usize = GRAIN_SIZE / 2;
 const MAX_STRETCH_CHANNELS: usize = 2;
 
 /// Processing mode for time-stretch and pitch-shift engine.
@@ -21,7 +23,7 @@ pub enum StretchMode {
     Varispeed,
 }
 
-/// Time-stretch and pitch-shift DSP node.
+/// Time-stretch and pitch-shift DSP node using windowed overlap-add granular synthesis.
 #[derive(Debug, Clone)]
 pub struct StretchNode {
     sample_rate: f32,
@@ -39,8 +41,11 @@ pub struct StretchNode {
     in_buffer: Vec<Vec<f32>>,
     in_write_pos: usize,
 
-    // Fractional playback read phase
-    read_phase: f64,
+    // Overlap-add grain state
+    grain0_pos: f32,
+    grain0_read_start: f64,
+    grain1_pos: f32,
+    grain1_read_start: f64,
 }
 
 impl Default for StretchNode {
@@ -63,7 +68,10 @@ impl StretchNode {
             mode: StretchMode::Music,
             in_buffer: vec![vec![0.0; BUFFER_SAMPLES]; MAX_STRETCH_CHANNELS],
             in_write_pos: 0,
-            read_phase: 0.0,
+            grain0_pos: 0.0,
+            grain0_read_start: 0.0,
+            grain1_pos: HALF_GRAIN as f32,
+            grain1_read_start: (BUFFER_SAMPLES - HALF_GRAIN) as f64,
         }
     }
 
@@ -131,7 +139,10 @@ impl DspNode for StretchNode {
         let num_ch = channels.clamp(1, MAX_STRETCH_CHANNELS);
         self.in_buffer = vec![vec![0.0; BUFFER_SAMPLES]; num_ch];
         self.in_write_pos = 0;
-        self.read_phase = 0.0;
+        self.grain0_pos = 0.0;
+        self.grain0_read_start = 0.0;
+        self.grain1_pos = HALF_GRAIN as f32;
+        self.grain1_read_start = (BUFFER_SAMPLES - HALF_GRAIN) as f64;
         self.current_stretch = self.time_stretch;
         self.current_pitch = self.pitch_shift_semitones;
     }
@@ -163,13 +174,32 @@ impl DspNode for StretchNode {
         let num_ch = output.len().min(self.in_buffer.len());
         let smooth_coeff = 0.01f32;
 
+        let is_neutral = (self.time_stretch - 1.0).abs() < 1e-4
+            && self.pitch_shift_semitones.abs() < 1e-4
+            && (self.current_stretch - 1.0).abs() < 1e-4
+            && self.current_pitch.abs() < 1e-4;
+
+        if is_neutral {
+            for (ch, out_ch) in output.iter_mut().enumerate().take(num_ch) {
+                let in_ch = if ch < input.len() { input[ch] } else { input[0] };
+                let len = frames.min(in_ch.len());
+                out_ch[..len].copy_from_slice(&in_ch[..len]);
+                for j in 0..len {
+                    let w_idx = (self.in_write_pos + j) % BUFFER_SAMPLES;
+                    self.in_buffer[ch][w_idx] = in_ch[j];
+                }
+            }
+            self.in_write_pos = (self.in_write_pos + frames) % BUFFER_SAMPLES;
+            return;
+        }
+
         for i in 0..frames {
             // Smooth stretch and pitch parameters
             self.current_stretch += (self.time_stretch - self.current_stretch) * smooth_coeff;
             self.current_pitch += (self.pitch_shift_semitones - self.current_pitch) * smooth_coeff;
 
-            let pitch_ratio = self.pitch_factor();
-            let effective_rate = (self.current_stretch * pitch_ratio) as f64;
+            let pitch_factor = self.pitch_factor();
+            let stretch = self.current_stretch.clamp(0.25, 4.0);
 
             // Write input sample into circular buffer
             for ch in 0..num_ch {
@@ -181,20 +211,55 @@ impl DspNode for StretchNode {
                 self.in_buffer[ch][self.in_write_pos] = s;
             }
 
-            // Interpolated read from phase accumulator
-            let r_pos = self.read_phase % (BUFFER_SAMPLES as f64);
-            let r_int = r_pos.floor() as usize;
-            let r_frac = (r_pos - r_pos.floor()) as f32;
-            let r_next = (r_int + 1) % BUFFER_SAMPLES;
+            // Check grain resets
+            if self.grain0_pos >= GRAIN_SIZE as f32 {
+                self.grain0_pos = 0.0;
+                let offset = (GRAIN_SIZE as f32 * stretch) as f64;
+                self.grain0_read_start = (self.in_write_pos as f64 + BUFFER_SAMPLES as f64 - offset) % (BUFFER_SAMPLES as f64);
+            }
+
+            if self.grain1_pos >= GRAIN_SIZE as f32 {
+                self.grain1_pos = 0.0;
+                let offset = (GRAIN_SIZE as f32 * stretch) as f64;
+                self.grain1_read_start = (self.in_write_pos as f64 + BUFFER_SAMPLES as f64 - offset) % (BUFFER_SAMPLES as f64);
+            }
+
+            // Hann window weights: 0.5 * (1 - cos(2 * PI * pos / N))
+            let phase0 = self.grain0_pos / (GRAIN_SIZE as f32);
+            let w0 = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * phase0).cos());
+
+            let phase1 = self.grain1_pos / (GRAIN_SIZE as f32);
+            let w1 = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * phase1).cos());
+
+            let norm_weight = w0 + w1;
+            let inv_w = if norm_weight > 1e-6 { 1.0 / norm_weight } else { 1.0 };
+
+            // Sample indices
+            let r0_pos = (self.grain0_read_start + (self.grain0_pos as f64 * pitch_factor as f64)) % (BUFFER_SAMPLES as f64);
+            let r0_int = r0_pos.floor() as usize;
+            let r0_frac = (r0_pos - r0_pos.floor()) as f32;
+            let r0_next = (r0_int + 1) % BUFFER_SAMPLES;
+
+            let r1_pos = (self.grain1_read_start + (self.grain1_pos as f64 * pitch_factor as f64)) % (BUFFER_SAMPLES as f64);
+            let r1_int = r1_pos.floor() as usize;
+            let r1_frac = (r1_pos - r1_pos.floor()) as f32;
+            let r1_next = (r1_int + 1) % BUFFER_SAMPLES;
 
             for (ch, out_ch) in output.iter_mut().enumerate().take(num_ch) {
-                let s0 = self.in_buffer[ch][r_int];
-                let s1 = self.in_buffer[ch][r_next];
-                out_ch[i] = (1.0 - r_frac) * s0 + r_frac * s1;
+                let s0_a = self.in_buffer[ch][r0_int];
+                let s0_b = self.in_buffer[ch][r0_next];
+                let s0 = (1.0 - r0_frac) * s0_a + r0_frac * s0_b;
+
+                let s1_a = self.in_buffer[ch][r1_int];
+                let s1_b = self.in_buffer[ch][r1_next];
+                let s1 = (1.0 - r1_frac) * s1_a + r1_frac * s1_b;
+
+                out_ch[i] = (w0 * s0 + w1 * s1) * inv_w;
             }
 
             self.in_write_pos = (self.in_write_pos + 1) % BUFFER_SAMPLES;
-            self.read_phase += effective_rate;
+            self.grain0_pos += 1.0;
+            self.grain1_pos += 1.0;
         }
     }
 
@@ -203,7 +268,10 @@ impl DspNode for StretchNode {
             ch.fill(0.0);
         }
         self.in_write_pos = 0;
-        self.read_phase = 0.0;
+        self.grain0_pos = 0.0;
+        self.grain0_read_start = 0.0;
+        self.grain1_pos = HALF_GRAIN as f32;
+        self.grain1_read_start = (BUFFER_SAMPLES - HALF_GRAIN) as f64;
         self.current_stretch = self.time_stretch;
         self.current_pitch = self.pitch_shift_semitones;
     }

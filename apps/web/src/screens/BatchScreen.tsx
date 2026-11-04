@@ -23,9 +23,28 @@ interface BatchScreenProps {
 export const BatchScreen: React.FC<BatchScreenProps> = ({ onNavigate }) => {
   const [steps, setSteps] = useState<string[]>(INITIAL_STEPS);
   const [saveTo, setSaveTo] = useState('Same folder, new "Processed" subfolder');
+  const [files, setFiles] = useState(INITIAL_FILES);
+  const [isRunning, setIsRunning] = useState(false);
 
   const removeStep = (index: number) => {
     setSteps(steps.filter((_, i) => i !== index));
+  };
+
+  const handleStartBatch = async () => {
+    setIsRunning(true);
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].statusClass === "bad") continue; // keep skipped
+      setFiles((prev) =>
+        prev.map((f, idx) =>
+          idx === i ? { ...f, status: "Processing...", statusClass: "act" } : f,
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 400));
+      setFiles((prev) =>
+        prev.map((f, idx) => (idx === i ? { ...f, status: "Done", statusClass: "ok" } : f)),
+      );
+    }
+    setIsRunning(false);
   };
 
   const navigate = (r: string) => {
@@ -40,14 +59,21 @@ export const BatchScreen: React.FC<BatchScreenProps> = ({ onNavigate }) => {
     <PageLayout
       currentTab="batch"
       title="Do it to all of them."
-      actions={<Button label="Start" variant="primary" icon="play" />}
+      actions={
+        <Button
+          label={isRunning ? "Processing..." : "Start"}
+          variant="primary"
+          icon="play"
+          onClick={handleStartBatch}
+        />
+      }
       onNavigate={navigate}
     >
       <div className="g2">
         <div className="box col">
           <h2 className="h2">Files</h2>
           <div className="lst">
-            {INITIAL_FILES.map((f) => (
+            {files.map((f) => (
               <div key={f.name}>
                 <div className="ti">
                   <b>{f.name}</b>

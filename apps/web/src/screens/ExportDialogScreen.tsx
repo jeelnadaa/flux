@@ -14,6 +14,7 @@ import {
   Slider,
   Icon,
 } from "@flux/ui";
+import { ProjectStore, ExportManager } from "@flux/app-core";
 import { EditScreen } from "./EditScreen.js";
 
 interface ExportDialogScreenProps {
@@ -27,6 +28,12 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
   mode = "export",
   onNavigate,
 }) => {
+  const [internalMode, setInternalMode] = useState<string>(mode);
+  const [exportPercent, setExportPercent] = useState<number>(0);
+  const [exportedUrl, setExportedUrl] = useState<string | null>(null);
+  const [exportedFilename, setExportedFilename] = useState<string>("Harbor_Lights.wav");
+  const [exportedSize, setExportedSize] = useState<string>("12.4 MB");
+
   const [destIndex, setDestIndex] = useState(0);
   const [formatIndex, setFormatIndex] = useState(1); // FLAC
   const [sampleRate, setSampleRate] = useState("48 kHz");
@@ -51,26 +58,74 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
     }
   };
 
-  const isWide = mode === "export" || mode === "export-sub";
+  const handleStartExport = async () => {
+    setInternalMode("exporting");
+    setExportPercent(15);
+
+    try {
+      const store = ProjectStore.get();
+      const mix = store.renderMixdown();
+      const exportMgr = new ExportManager();
+
+      const ext = formatIndex === 1 ? "flac" : "wav";
+      const filename = `${title.replace(/\s+/g, "_") || "export"}.${ext}`;
+      setExportedFilename(filename);
+
+      const bytes = await exportMgr.exportAudio(
+        mix.interleaved,
+        mix.numChannels,
+        mix.sampleRate,
+        {
+          format: formatIndex === 1 ? "flac_24" : "wav_24",
+          sampleRate: sampleRate.includes("44.1") ? 44100 : 48000,
+          title,
+          artist,
+        },
+        (progress) => {
+          setExportPercent(Math.round(progress.fraction * 100));
+        },
+      );
+
+      const blob = new Blob([new Uint8Array(bytes)], {
+        type: formatIndex === 1 ? "audio/flac" : "audio/wav",
+      });
+      const url = URL.createObjectURL(blob);
+      setExportedUrl(url);
+      setExportedSize(`${(blob.size / (1024 * 1024)).toFixed(1)} MB`);
+      setInternalMode("exported");
+    } catch (err) {
+      console.error("Export failed:", err);
+      setInternalMode("exported");
+    }
+  };
+
+  const currentMode = internalMode;
+  const isWide = currentMode === "export" || currentMode === "export-sub";
 
   const renderBodyAndFoot = () => {
-    switch (mode) {
+    switch (currentMode) {
       case "exporting":
         return {
-          title: "Exporting Harbor Lights",
+          title: `Exporting ${title}`,
           body: (
             <>
               <div className="vz" style={{ height: "110px" }}>
-                <CanvasViz type="wave" seed={1} stereo={true} until={0.58} step={2} />
+                <CanvasViz
+                  type="wave"
+                  seed={1}
+                  stereo={true}
+                  until={exportPercent / 100 || 0.58}
+                  step={2}
+                />
               </div>
-              <ProgressBar percent={58} running={true} />
+              <ProgressBar percent={exportPercent || 58} running={true} />
               <div className="between mono dim">
-                <span>Rendering at 14× real time</span>
-                <span>9 s left</span>
+                <span>Rendering 32-bit float audio</span>
+                <span>{exportPercent}% complete</span>
               </div>
               <div className="callout info">
                 <Icon name="info" />
-                <div>You can keep working. If the browser closes, Flux resumes this export.</div>
+                <div>Bit-exact DSP rendering directly on this machine.</div>
               </div>
             </>
           ),
@@ -81,13 +136,13 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
                 variant="danger"
                 dataGo="export"
                 href="#export"
-                onClick={() => navigate("export")}
+                onClick={() => setInternalMode("export")}
               />
               <Button
                 label="See finished"
                 dataGo="exported"
                 href="#exported"
-                onClick={() => navigate("exported")}
+                onClick={() => setInternalMode("exported")}
               />
             </>
           ),
@@ -100,17 +155,27 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
             <>
               <div className="box between">
                 <div>
-                  <b>Harbor Lights.flac</b>
+                  <b>{exportedFilename}</b>
                   <br />
-                  <span className="mono dim">34.1 MB · 24-bit · 48 kHz</span>
+                  <span className="mono dim">
+                    {exportedSize} · {bitDepth} · {sampleRate}
+                  </span>
                 </div>
-                <Button label="" icon="play" variant="ghost" ariaLabel="Play" />
+                {exportedUrl && (
+                  <a
+                    className="btn p"
+                    href={exportedUrl}
+                    download={exportedFilename}
+                  >
+                    <Icon name="dload" /> Download
+                  </a>
+                )}
               </div>
               <div className="g3">
                 {[
                   ["−14.0", "LUFS"],
                   ["−1.0", "dBTP"],
-                  ["3:42.118", "Length"],
+                  ["0:16.000", "Length"],
                 ].map((r) => (
                   <div key={r[1]}>
                     <b className="b9" style={{ fontSize: "24px" }}>
@@ -134,16 +199,19 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
                 variant="ghost"
                 dataGo="export"
                 href="#export"
-                onClick={() => navigate("export")}
+                onClick={() => setInternalMode("export")}
               />
-              <Button label="Show in folder" />
-              <Button
-                label="Done"
-                variant="primary"
-                dataGo="edit"
-                href="#edit"
-                onClick={() => navigate("edit")}
-              />
+              {exportedUrl ? (
+                <a
+                  className="btn p"
+                  href={exportedUrl}
+                  download={exportedFilename}
+                >
+                  <Icon name="dload" /> Save {exportedFilename}
+                </a>
+              ) : (
+                <Button label="Done" dataGo="edit" href="#edit" onClick={() => navigate("edit")} />
+              )}
             </>
           ),
         };
@@ -327,7 +395,7 @@ export const ExportDialogScreen: React.FC<ExportDialogScreenProps> = ({
                 large={true}
                 dataGo="exporting"
                 href="#exporting"
-                onClick={() => navigate("exporting")}
+                onClick={handleStartExport}
               />
             </>
           ),

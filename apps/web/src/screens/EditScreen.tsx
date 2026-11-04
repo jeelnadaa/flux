@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ProjectLayout,
   SegmentedControl,
@@ -11,7 +11,7 @@ import {
   Icon,
   CanvasViz,
 } from "@flux/ui";
-import { SnappingEngine } from "@flux/app-core";
+import { SnappingEngine, ProjectStore, FluxProjectState, TransportState } from "@flux/app-core";
 
 interface ClipData {
   left: number;
@@ -189,17 +189,13 @@ const TRACKS: TrackData[] = [
 ];
 
 export const EditScreen: React.FC = () => {
-  const [playheadX, setPlayheadX] = useState<number>(120);
+  const store = ProjectStore.get();
+  const [projectState, setProjectState] = useState<FluxProjectState>(() => store.getState());
   const [snapZeroCross, setSnapZeroCross] = useState<boolean>(true);
   const [snapGrid, setSnapGrid] = useState<boolean>(false);
   const [ripple, setRipple] = useState<boolean>(false);
   const [toolIdx, setToolIdx] = useState<number>(0);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
-
-  const [tracksState, setTracksState] = useState<TrackData[]>(() =>
-    JSON.parse(JSON.stringify(TRACKS)),
-  );
-  const selectedClipName = "Chorus";
   const [fadeCurveIdx, setFadeCurveIdx] = useState<number>(0);
   const [isReversed, setIsReversed] = useState<boolean>(false);
 
@@ -214,76 +210,27 @@ export const EditScreen: React.FC = () => {
 
   const [pinchDist, setPinchDist] = useState<number | null>(null);
 
+  useEffect(() => {
+    const unsub = store.subscribe((s) => {
+      setProjectState({ ...s });
+    });
+    return unsub;
+  }, [store]);
+
   const handleSplit = () => {
-    setTracksState((prev) =>
-      prev.map((trk) => {
-        const foundIdx = trk.clips.findIndex((c) => c.selected);
-        if (foundIdx === -1) return trk;
-        const target = trk.clips[foundIdx];
-        const halfWidth = target.width / 2;
-        const leftClip: ClipData = {
-          ...target,
-          label: `${target.label} (A)`,
-          width: halfWidth,
-          selected: false,
-        };
-        const rightClip: ClipData = {
-          ...target,
-          label: `${target.label} (B)`,
-          left: target.left + halfWidth,
-          width: halfWidth,
-          selected: true,
-        };
-        const updatedClips = [...trk.clips];
-        updatedClips.splice(foundIdx, 1, leftClip, rightClip);
-        return { ...trk, clips: updatedClips };
-      }),
-    );
+    store.splitSelectedClip();
   };
 
   const handleDelete = () => {
-    setTracksState((prev) =>
-      prev.map((trk) => {
-        const foundIdx = trk.clips.findIndex((c) => c.selected);
-        if (foundIdx === -1) return trk;
-        const target = trk.clips[foundIdx];
-        let updatedClips = trk.clips.filter((c) => !c.selected);
-        if (ripple) {
-          updatedClips = updatedClips.map((c) => {
-            if (c.left > target.left) {
-              return { ...c, left: Math.max(0, c.left - target.width) };
-            }
-            return c;
-          });
-        }
-        return { ...trk, clips: updatedClips };
-      }),
-    );
-  };
-
-  const toggleTrackMute = (trackName: string) => {
-    setTracksState((prev) =>
-      prev.map((trk) => (trk.name === trackName ? { ...trk, muted: !trk.muted } : trk)),
-    );
+    store.deleteSelectedClip();
   };
 
   const toggleReverse = () => {
     setIsReversed((prev) => !prev);
-    setTracksState((prev) =>
-      prev.map((trk) => ({
-        ...trk,
-        clips: trk.clips.map((c) =>
-          c.selected
-            ? { ...c, label: isReversed ? c.label.replace(" [Rev]", "") : `${c.label} [Rev]` }
-            : c,
-        ),
-      })),
-    );
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept when focusing inputs
       if (
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "SELECT" ||
@@ -292,12 +239,15 @@ export const EditScreen: React.FC = () => {
         return;
       }
 
-      if (e.key === "s" || e.key === "S") {
+      if (e.code === "Space") {
         e.preventDefault();
-        handleSplit();
+        store.togglePlay();
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        store.splitSelectedClip();
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        handleDelete();
+        store.deleteSelectedClip();
       } else if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         window.location.hash = "#palette";
@@ -309,7 +259,7 @@ export const EditScreen: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [ripple, isReversed]);
+  }, [store]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -395,17 +345,8 @@ export const EditScreen: React.FC = () => {
 
   const handleRulerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const rawX = Math.max(0, e.clientX - rect.left);
-
-    if (snapZeroCross) {
-      const snapped = SnappingEngine.snap(rawX / 100, 100, {
-        thresholdPx: 8,
-        gridIntervalSeconds: snapGrid ? 0.25 : undefined,
-      });
-      setPlayheadX(snapped.snappedTime * 100);
-    } else {
-      setPlayheadX(rawX);
-    }
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    store.seek(Math.floor(frac * projectState.totalFrames));
     setIsScrubbing(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -413,8 +354,8 @@ export const EditScreen: React.FC = () => {
   const handleRulerPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isScrubbing) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const rawX = Math.max(0, e.clientX - rect.left);
-    setPlayheadX(rawX);
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    store.seek(Math.floor(frac * projectState.totalFrames));
   };
 
   const handleRulerPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -428,8 +369,39 @@ export const EditScreen: React.FC = () => {
     }
   };
 
+  const timecodeSec = projectState.playheadFrame / projectState.sampleRate;
+  const tcM = Math.floor(timecodeSec / 60);
+  const tcS = Math.floor(timecodeSec % 60);
+  const tcMs = Math.floor((timecodeSec % 1) * 1000);
+  const timecodeFormatted = `${tcM.toString().padStart(2, "0")}:${tcS.toString().padStart(2, "0")}.${tcMs.toString().padStart(3, "0")}`;
+
+  let selectedClipName = "No clip selected";
+  let selectedTrackName = "Master";
+  for (const t of projectState.tracks) {
+    const c = t.clips.find((clip) => clip.id === projectState.selectedClipId);
+    if (c) {
+      selectedClipName = c.name;
+      selectedTrackName = t.name;
+      break;
+    }
+  }
+
   return (
-    <ProjectLayout currentTab="edit" rightActions={topBarRight}>
+    <ProjectLayout
+      currentTab="edit"
+      projectName={projectState.name}
+      projectStatus="Local-first · 32-bit float"
+      rightActions={topBarRight}
+      isPlaying={projectState.transportState === TransportState.Playing}
+      timecode={timecodeFormatted}
+      isLooping={projectState.loopEnabled}
+      onPlayPause={() => store.togglePlay()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() => store.setLoop(!projectState.loopEnabled)}
+      leftMeter={projectState.meterLevels.leftPeak}
+      rightMeter={projectState.meterLevels.rightPeak}
+    >
       <div className="split">
         <div className="a">
           {/* Edit toolbar */}
@@ -505,8 +477,8 @@ export const EditScreen: React.FC = () => {
             >
               <CanvasViz type="ruler" />
             </div>
-            {tracksState.map((trk) => (
-              <div key={trk.name} className={`trk ${trk.tall ? "tall" : ""}`}>
+            {projectState.tracks.map((trk) => (
+              <div key={trk.id} className={`trk ${trk.tall ? "tall" : ""}`}>
                 <div className="thd">
                   <div className="nm">
                     <span className="dot" style={{ color: `var(${trk.colorVar})` }} />
@@ -517,11 +489,16 @@ export const EditScreen: React.FC = () => {
                       className={`m ${trk.muted ? "on" : ""}`}
                       type="button"
                       aria-label={`Mute ${trk.name}`}
-                      onClick={() => toggleTrackMute(trk.name)}
+                      onClick={() => store.setTrackMute(trk.id, !trk.muted)}
                     >
                       M
                     </button>
-                    <button className="s" type="button" aria-label={`Solo ${trk.name}`}>
+                    <button
+                      className={`s ${trk.solo ? "on" : ""}`}
+                      type="button"
+                      aria-label={`Solo ${trk.name}`}
+                      onClick={() => store.setTrackSolo(trk.id, !trk.solo)}
+                    >
                       S
                     </button>
                     <button type="button" aria-label={`Arm ${trk.name} for recording`}>
@@ -530,13 +507,44 @@ export const EditScreen: React.FC = () => {
                   </div>
                 </div>
                 <div className="lane">
-                  {trk.clips.map((c, i) => (
-                    <ClipView key={i} {...c} />
-                  ))}
+                  {trk.clips.map((c) => {
+                    const leftPct =
+                      (c.startFrame / Math.max(1, projectState.totalFrames)) * 100;
+                    const widthPct =
+                      (c.durationFrames / Math.max(1, projectState.totalFrames)) * 100;
+                    return (
+                      <div
+                        key={c.id}
+                        style={{ display: "contents" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          store.selectClip(c.id);
+                        }}
+                      >
+                        <ClipView
+                          left={leftPct}
+                          width={widthPct}
+                          colorVar={c.colorVar}
+                          seed={c.seed}
+                          kind={c.kind}
+                          label={c.name}
+                          selected={c.id === projectState.selectedClipId}
+                          fadeIn={c.fadeInFrames > 0 ? 18 : undefined}
+                          fadeOut={c.fadeOutFrames > 0 ? 18 : undefined}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
-            <span className="ph" data-ph="" style={{ transform: `translateX(${playheadX}px)` }} />
+            <span
+              className="ph"
+              data-ph=""
+              style={{
+                left: `${(projectState.playheadFrame / Math.max(1, projectState.totalFrames)) * 100}%`,
+              }}
+            />
           </div>
           {contextMenu && (
             <div
@@ -597,7 +605,7 @@ export const EditScreen: React.FC = () => {
         <aside className="b in">
           <div className="between">
             <h3 className="h3">{selectedClipName}</h3>
-            <Pill label="Vocals" />
+            <Pill label={selectedTrackName} />
           </div>
           <div className="g2 mono dim">
             <span>Start 0:42.318</span>

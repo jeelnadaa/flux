@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Button,
   Callout,
@@ -11,8 +11,18 @@ import {
   Select,
   Slider,
 } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 export const SpectralScreen: React.FC = () => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
+
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
+
   const [viewMode, setViewMode] = useState<number>(2); // 0: Spectrogram, 1: Waveform, 2: Both
   const [toolIdx, setToolIdx] = useState<number>(0);
   const [scale, setScale] = useState<string>("Log");
@@ -63,8 +73,23 @@ export const SpectralScreen: React.FC = () => {
     }
   };
 
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
+
   return (
-    <ProjectLayout currentTab="spectral">
+    <ProjectLayout
+      currentTab="spectral"
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="split">
         <div className="a">
           {/* Top toolbar */}

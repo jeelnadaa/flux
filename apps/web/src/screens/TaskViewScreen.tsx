@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { TopBar, Rail, HOME_NAV_ITEMS, CanvasViz, Slider, Toggle, Chip, Icon } from "@flux/ui";
+import { ProjectStore, TransportState } from "@flux/app-core";
 
 interface TaskViewScreenProps {
   mode?: "8d" | "slowed";
@@ -7,6 +8,15 @@ interface TaskViewScreenProps {
 }
 
 export const TaskViewScreen: React.FC<TaskViewScreenProps> = ({ mode = "8d", onNavigate }) => {
+  const store = ProjectStore.get();
+  const [projectState, setProjectState] = useState(() => store.getState());
+
+  useEffect(() => {
+    return store.subscribe((s) => {
+      setProjectState({ ...s });
+    });
+  }, [store]);
+
   const is8D = mode === "8d";
   const [rotationSpeed, setRotationSpeed] = useState(24);
   const [distance, setDistance] = useState(58);
@@ -16,8 +26,10 @@ export const TaskViewScreen: React.FC<TaskViewScreenProps> = ({ mode = "8d", onN
   const [keepPitch, setKeepPitch] = useState(false);
   const [reverb, setReverb] = useState(66);
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
+
+  const isPlaying = projectState.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(projectState.playheadFrame);
 
   const navigate = (r: string) => {
     if (onNavigate) {
@@ -97,12 +109,12 @@ export const TaskViewScreen: React.FC<TaskViewScreenProps> = ({ mode = "8d", onN
               data-play
               aria-label={isPlaying ? "Pause" : "Play"}
               type="button"
-              onClick={() => setIsPlaying(!isPlaying)}
+              onClick={() => store.togglePlayback()}
             >
               <Icon name={isPlaying ? "pause" : "play"} size={18} />
             </button>
             <span className="tc mono" data-tc style={{ fontSize: "19px" }}>
-              00:00:42.318
+              {timecode}
             </span>
             <span className="sp" style={{ flex: 1 }} />
             <button

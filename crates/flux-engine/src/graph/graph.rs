@@ -28,21 +28,31 @@ pub struct AudioGraph {
     // Delay compensation lines for PDC: NodeId -> DelayLine
     pdc_delays: HashMap<NodeId, DelayLine>,
     terminal_nodes: Vec<NodeId>,
+    // Precomputed map of incoming parent nodes for each node: NodeId -> list of parent NodeIds
+    predecessors: HashMap<NodeId, Vec<NodeId>>,
+    // Reusable scratch input buffer per quantum (8 channels x max_block_size)
+    input_scratch: Vec<Vec<f32>>,
+    // Reusable scratch output buffer per quantum (8 channels x max_block_size)
+    output_scratch: Vec<Vec<f32>>,
 }
 
 impl AudioGraph {
     /// Creates a new empty audio graph.
     pub fn new(sample_rate: f32, max_block_size: usize) -> Self {
+        let max_bs = max_block_size.max(128);
         Self {
             nodes: HashMap::new(),
             edges: Vec::new(),
             execution_order: Vec::new(),
             next_node_id: 1,
             sample_rate,
-            max_block_size,
+            max_block_size: max_bs,
             node_buffers: HashMap::new(),
             pdc_delays: HashMap::new(),
             terminal_nodes: Vec::new(),
+            predecessors: HashMap::new(),
+            input_scratch: vec![vec![0.0f32; max_bs]; 8],
+            output_scratch: vec![vec![0.0f32; max_bs]; 8],
         }
     }
 
@@ -147,6 +157,13 @@ impl AudioGraph {
             .filter(|id| !outgoing.contains(id))
             .collect();
 
+        // Precompute incoming predecessor parent nodes
+        let mut predecessors: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+        for &(from, to) in &self.edges {
+            predecessors.entry(to).or_default().push(from);
+        }
+        self.predecessors = predecessors;
+
         // Update PDC compensation
         let mut latencies = HashMap::new();
         for (&id, node) in &self.nodes {
@@ -215,26 +232,17 @@ impl AudioGraph {
             ch[..num_frames].fill(0.0);
         }
 
-        // Map incoming edges: NodeId -> list of predecessor NodeIds
-        let mut incoming_map: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        for &(from, to) in &self.edges {
-            incoming_map.entry(to).or_default().push(from);
-        }
-
-        // Scratch input buffer per quantum
-        let mut input_scratch = vec![vec![0.0f32; num_frames]; 8];
-
         for &node_id in &self.execution_order {
             let (in_channels, out_channels) = {
                 let node = self.nodes.get(&node_id).unwrap();
-                (node.input_channels, node.output_channels)
+                (node.input_channels.min(8), node.output_channels.min(8))
             };
 
             // Prepare inputs for this node
-            if let Some(parents) = incoming_map.get(&node_id).filter(|p| !p.is_empty()) {
+            if let Some(parents) = self.predecessors.get(&node_id).filter(|p| !p.is_empty()) {
                 // Sum outputs from all parent nodes
-                for ch in input_scratch.iter_mut().take(in_channels) {
-                    ch[..num_frames].fill(0.0);
+                for ch in 0..in_channels {
+                    self.input_scratch[ch][..num_frames].fill(0.0);
                 }
 
                 for &parent_id in parents {
@@ -242,7 +250,7 @@ impl AudioGraph {
                     let p_chs = parent_buf.len().min(in_channels);
                     for ch in 0..p_chs {
                         for i in 0..num_frames {
-                            input_scratch[ch][i] += parent_buf[ch][i];
+                            self.input_scratch[ch][i] += parent_buf[ch][i];
                         }
                     }
                 }
@@ -251,34 +259,39 @@ impl AudioGraph {
                 for ch in 0..in_channels {
                     if ch < input.len() {
                         let frames = input[ch].len().min(num_frames);
-                        input_scratch[ch][..frames].copy_from_slice(&input[ch][..frames]);
+                        self.input_scratch[ch][..frames].copy_from_slice(&input[ch][..frames]);
+                        if frames < num_frames {
+                            self.input_scratch[ch][frames..num_frames].fill(0.0);
+                        }
                     } else {
-                        input_scratch[ch][..num_frames].fill(0.0);
+                        self.input_scratch[ch][..num_frames].fill(0.0);
                     }
                 }
             }
 
-            // Process node
+            // Process node into preallocated scratch without heap allocation
             {
                 let node = self.nodes.get_mut(&node_id).unwrap();
-                let mut out_scratch = vec![vec![0.0f32; num_frames]; out_channels];
 
-                let in_refs: Vec<&[f32]> = input_scratch
-                    .iter()
-                    .take(in_channels)
-                    .map(|c| &c[..num_frames])
-                    .collect();
-                let mut out_refs: Vec<&mut [f32]> = out_scratch
-                    .iter_mut()
-                    .map(|c| &mut c[..num_frames])
-                    .collect();
+                let mut in_refs: [&[f32]; 8] = [&[]; 8];
+                for ch in 0..in_channels {
+                    in_refs[ch] = &self.input_scratch[ch][..num_frames];
+                }
 
-                node.dsp.process(&in_refs, &mut out_refs);
+                let mut out_refs: [&mut [f32]; 8] = Default::default();
+                for (ch, buf) in self.output_scratch.iter_mut().take(out_channels).enumerate() {
+                    buf[..num_frames].fill(0.0);
+                    out_refs[ch] = &mut buf[..num_frames];
+                }
+
+                node.dsp
+                    .process(&in_refs[..in_channels], &mut out_refs[..out_channels]);
 
                 // Copy to node's output buffer and apply PDC delay if present
                 let node_buf = self.node_buffers.get_mut(&node_id).unwrap();
                 for ch in 0..out_channels {
-                    node_buf[ch][..num_frames].copy_from_slice(&out_scratch[ch][..num_frames]);
+                    node_buf[ch][..num_frames]
+                        .copy_from_slice(&self.output_scratch[ch][..num_frames]);
                 }
 
                 if let Some(delay) = self.pdc_delays.get_mut(&node_id) {

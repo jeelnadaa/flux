@@ -14,12 +14,32 @@ const GUIDES: readonly [string, string][] = [
   ["Preset file format", "For developers"],
 ];
 
+const GUIDE_ROUTES: Record<string, string> = {
+  "Your first 8D track": "stage",
+  "Edit by deleting words": "script",
+  "Clean up a noisy recording": "cleanup",
+  "Splitting stems": "stems-setup",
+  "Understanding LUFS": "meters",
+  "Drawing paths on the stage": "stage",
+  "Backing up your projects": "prefs-storage",
+  "Keyboard-only editing": "prefs-keys",
+  "Preset file format": "presets",
+};
+
 interface HelpScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const HelpScreen: React.FC<HelpScreenProps> = ({ onNavigate }) => {
   const [query, setQuery] = useState("");
+
+  const navigate = (r: string) => {
+    if (onNavigate) {
+      onNavigate(r);
+    } else {
+      window.location.hash = r;
+    }
+  };
 
   const filtered = GUIDES.filter(
     ([title, sub]) =>
@@ -28,12 +48,22 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ onNavigate }) => {
   );
 
   return (
-    <HelpLayout currentTab="help" title="How can we help?" onNavigate={onNavigate}>
+    <HelpLayout currentTab="help" title="How can we help?" onNavigate={navigate}>
       <Input placeholder="Search help" value={query} onChange={(e) => setQuery(e.target.value)} />
       <div className="g3">
-        {filtered.map(([title, subtitle]) => (
-          <Tile key={title} title={title} subtitle={subtitle} />
-        ))}
+        {filtered.map(([title, subtitle]) => {
+          const route = GUIDE_ROUTES[title] || "help";
+          return (
+            <Tile
+              key={title}
+              title={title}
+              subtitle={subtitle}
+              dataGo={route}
+              href={`#${route}`}
+              onClick={() => navigate(route)}
+            />
+          );
+        })}
       </div>
     </HelpLayout>
   );

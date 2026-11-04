@@ -78,7 +78,9 @@ export const CreativeScreen: React.FC = () => {
               onChange={setSlowedBrightness}
             />
             <Toggle label="Keep pitch" checked={slowedKeepPitch} onChange={setSlowedKeepPitch} />
-            <Button variant="primary">Add to chain</Button>
+            <Button variant="primary" onClick={() => (window.location.hash = "#rack")}>
+              Add to chain
+            </Button>
           </div>
 
           {/* Nightcore */}
@@ -122,7 +124,7 @@ export const CreativeScreen: React.FC = () => {
               checked={nightcoreKeepPitch}
               onChange={setNightcoreKeepPitch}
             />
-            <Button>Add to chain</Button>
+            <Button onClick={() => (window.location.hash = "#rack")}>Add to chain</Button>
           </div>
 
           {/* Lo-Fi */}
@@ -159,7 +161,7 @@ export const CreativeScreen: React.FC = () => {
                 ))}
               </div>
             </details>
-            <Button>Add to chain</Button>
+            <Button onClick={() => (window.location.hash = "#rack")}>Add to chain</Button>
           </div>
         </div>
       </div>

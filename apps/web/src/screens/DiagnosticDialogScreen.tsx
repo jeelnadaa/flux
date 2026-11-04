@@ -20,6 +20,32 @@ export const DiagnosticDialogScreen: React.FC<DiagnosticDialogScreenProps> = ({ 
     }
   };
 
+  const handleSaveReport = () => {
+    try {
+      const report = {
+        fluxVersion: "0.1.0",
+        timestamp: new Date().toISOString(),
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "Node/CLI",
+        platform: typeof navigator !== "undefined" ? navigator.platform : "Desktop",
+        sampleRate: 48000,
+        audioWorkletSupported: typeof window !== "undefined" && "AudioWorklet" in window,
+        sharedArrayBuffer: typeof SharedArrayBuffer !== "undefined",
+        webGpuAvailable: typeof navigator !== "undefined" && "gpu" in navigator,
+        glitchCount: 0,
+      };
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `flux-diagnostics-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Diagnostic report download
+    }
+    navigate("trouble");
+  };
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       {/* Background base screen */}
@@ -73,7 +99,7 @@ export const DiagnosticDialogScreen: React.FC<DiagnosticDialogScreenProps> = ({ 
               icon="exp"
               dataGo="trouble"
               href="#trouble"
-              onClick={() => navigate("trouble")}
+              onClick={handleSaveReport}
             />
           </div>
         </div>

@@ -3,6 +3,7 @@
 use crate::capture::InputLevelMeter;
 use crate::graph::{AudioGraph, NodeId};
 use crate::transport::{Transport, TransportState};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Real-time commands dispatched from UI/main thread to audio thread.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -41,8 +42,8 @@ pub enum EngineCommand {
 pub struct CommandQueue {
     buffer: Vec<Option<EngineCommand>>,
     capacity: usize,
-    write_idx: usize,
-    read_idx: usize,
+    write_idx: AtomicUsize,
+    read_idx: AtomicUsize,
 }
 
 impl CommandQueue {
@@ -51,29 +52,31 @@ impl CommandQueue {
         Self {
             buffer: vec![None; capacity],
             capacity,
-            write_idx: 0,
-            read_idx: 0,
+            write_idx: AtomicUsize::new(0),
+            read_idx: AtomicUsize::new(0),
         }
     }
 
     /// Enqueues a command (called by UI thread).
     pub fn push(&mut self, cmd: EngineCommand) -> bool {
-        let next_write = (self.write_idx + 1) % self.capacity;
-        if next_write == self.read_idx {
+        let write = self.write_idx.load(Ordering::Relaxed);
+        let next_write = (write + 1) % self.capacity;
+        if next_write == self.read_idx.load(Ordering::Acquire) {
             return false; // Queue full
         }
-        self.buffer[self.write_idx] = Some(cmd);
-        self.write_idx = next_write;
+        self.buffer[write] = Some(cmd);
+        self.write_idx.store(next_write, Ordering::Release);
         true
     }
 
     /// Dequeues next command (called by real-time audio thread).
     pub fn pop(&mut self) -> Option<EngineCommand> {
-        if self.read_idx == self.write_idx {
+        let read = self.read_idx.load(Ordering::Relaxed);
+        if read == self.write_idx.load(Ordering::Acquire) {
             return None; // Queue empty
         }
-        let cmd = self.buffer[self.read_idx].take();
-        self.read_idx = (self.read_idx + 1) % self.capacity;
+        let cmd = self.buffer[read].take();
+        self.read_idx.store((read + 1) % self.capacity, Ordering::Release);
         cmd
     }
 }

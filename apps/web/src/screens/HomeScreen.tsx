@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { PageLayout, Icon, EffectCard, CanvasViz } from "@flux/ui";
+import { ProjectStore } from "@flux/app-core";
 
 const RECENT_PROJECTS = [
   { name: "Harbor Lights", meta: "Music · 3:42 · 6 tracks", seed: 1, route: "edit" },
@@ -15,7 +16,7 @@ const TASKS = [
     word: "8D",
     left: "Make it 8D",
     right: "Headphones",
-    go: "edit",
+    go: "stage",
   },
   {
     palette: "slowed",
@@ -23,7 +24,7 @@ const TASKS = [
     word: "Slowed",
     left: "Slowed + reverb",
     right: "0.85×",
-    go: "edit",
+    go: "task-slowed",
   },
   {
     palette: "stutter",
@@ -31,7 +32,7 @@ const TASKS = [
     word: "Vocals",
     left: "Remove vocals",
     right: "Stems",
-    go: "edit",
+    go: "stems-setup",
   },
   {
     palette: "underwater",
@@ -39,7 +40,7 @@ const TASKS = [
     word: "Clean",
     left: "Clean up a voice",
     right: "Noise, echo",
-    go: "edit",
+    go: "cleanup",
   },
   {
     palette: "reverse",
@@ -47,7 +48,7 @@ const TASKS = [
     word: "Text",
     left: "Edit by text",
     right: "Transcript",
-    go: "edit",
+    go: "script",
   },
   {
     palette: "tapestop",
@@ -55,7 +56,7 @@ const TASKS = [
     word: "Magic",
     left: "Make it better",
     right: "Find and fix",
-    go: "edit",
+    go: "magic",
   },
   {
     palette: "radio",
@@ -63,7 +64,7 @@ const TASKS = [
     word: "Convert",
     left: "Convert a file",
     right: "MP3, FLAC",
-    go: "edit",
+    go: "convert",
   },
   {
     palette: "nightcore",
@@ -71,17 +72,28 @@ const TASKS = [
     word: "Ring",
     left: "Make a ringtone",
     right: "30 s",
-    go: "edit",
+    go: "ringtone",
   },
 ] as const;
 
 export const HomeScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const processFile = async (file: File) => {
+    try {
+      await ProjectStore.get().importAudioFile(file);
+      window.location.hash = "#edit";
+    } catch (err) {
+      console.error("Failed to decode audio file:", err);
+      window.location.hash = "#edit";
+    }
+  };
+
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       if (e.clipboardData && e.clipboardData.files.length > 0) {
-        window.location.hash = "#import";
+        const file = e.clipboardData.files[0];
+        void processFile(file);
       }
     };
     window.addEventListener("paste", handlePaste);
@@ -91,7 +103,8 @@ export const HomeScreen: React.FC = () => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files.length > 0) {
-      window.location.hash = "#import";
+      const file = e.dataTransfer.files[0];
+      void processFile(file);
     }
   };
 
@@ -111,8 +124,10 @@ export const HomeScreen: React.FC = () => {
         type="file"
         accept="audio/*,video/*"
         style={{ display: "none" }}
-        onChange={() => {
-          window.location.hash = "#import";
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            void processFile(e.target.files[0]);
+          }
         }}
       />
       <a
@@ -128,8 +143,19 @@ export const HomeScreen: React.FC = () => {
         </span>
         <b style={{ fontSize: "19px", fontWeight: 800 }}>Drop audio or video here</b>
         <span className="dim">
-          or choose a file, paste audio, or <span className="act">start recording</span>. Everything
-          stays on this device.
+          or choose a file, paste audio, or{" "}
+          <span
+            className="act"
+            style={{ cursor: "pointer" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              window.location.hash = "#record";
+            }}
+          >
+            start recording
+          </span>
+          . Everything stays on this device.
         </span>
       </a>
 

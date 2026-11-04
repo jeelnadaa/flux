@@ -2,6 +2,7 @@
 target/
 dist/
 dist-static/
+*.wasm
 brag-output*/
 build/
 coverage/

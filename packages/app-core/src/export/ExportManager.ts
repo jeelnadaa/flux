@@ -2,6 +2,8 @@
  * Audio export and batch format conversion manager.
  */
 
+import { NativeBridge } from "../platform/NativeBridge.js";
+
 export type ExportTargetFormat =
   | "wav_16"
   | "wav_24"
@@ -165,7 +167,28 @@ export class ExportManager {
       throw new DOMException("Export was cancelled", "AbortError");
     }
 
-    // Call WASM export function if available in global environment
+    // 1. Fast-path: Native Rust SIMD export when running on desktop
+    try {
+      const nativeBytes = await NativeBridge.exportAudio(
+        samples,
+        numChannels,
+        sampleRate,
+        options,
+      );
+      if (nativeBytes && nativeBytes.byteLength > 0) {
+        onProgress?.({
+          fraction: 1.0,
+          stage: "finished",
+          framesProcessed: totalFrames,
+          totalFrames,
+        });
+        return nativeBytes;
+      }
+    } catch {
+      // Continue to WASM or JS fallback
+    }
+
+    // 2. Call WASM export function if available in global environment
     const wasm = (
       globalThis as unknown as {
         wasmExportAudio?: (

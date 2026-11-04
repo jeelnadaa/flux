@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Button,
   Callout,
@@ -10,6 +10,7 @@ import {
   Select,
   Slider,
 } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 interface ClipData {
   left: number;
@@ -189,11 +190,19 @@ const TRACKS: TrackData[] = [
 ];
 
 export const AutomationScreen: React.FC = () => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
   const [modeIdx, setModeIdx] = useState<number>(0); // Read, Write, Touch, Latch
   const [selectedParam, setSelectedParam] = useState<string>("Vocals: Volume");
   const [curveIdx, setCurveIdx] = useState<number>(0); // Linear, Smooth, Hold
   const [lanes, setLanes] = useState<string[]>(["Volume", "Pan", "Reverb mix"]);
   const [pointValue, setPointValue] = useState<number>(58);
+
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
 
   const removeLane = (name: string) => {
     setLanes(lanes.filter((l) => l !== name));
@@ -204,8 +213,23 @@ export const AutomationScreen: React.FC = () => {
     setLanes([...lanes, nextName]);
   };
 
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
+
   return (
-    <ProjectLayout currentTab="edit">
+    <ProjectLayout
+      currentTab="edit"
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="split">
         <div className="a">
           {/* Automation Toolbar */}

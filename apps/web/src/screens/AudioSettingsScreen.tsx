@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SettingsLayout,
   Field,
@@ -15,6 +15,15 @@ interface AudioSettingsScreenProps {
 }
 
 export const AudioSettingsScreen: React.FC<AudioSettingsScreenProps> = ({ onNavigate }) => {
+  const [outputOptions, setOutputOptions] = useState<string[]>([
+    "System default",
+    "Studio Headphones",
+    "Laptop speakers",
+  ]);
+  const [micOptions, setMicOptions] = useState<string[]>([
+    "Studio Mic USB",
+    "Laptop mic",
+  ]);
   const [outputDevice, setOutputDevice] = useState("System default");
   const [micDevice, setMicDevice] = useState("Studio Mic USB");
   const [qualityIndex, setQualityIndex] = useState(0); // Best
@@ -22,6 +31,32 @@ export const AudioSettingsScreen: React.FC<AudioSettingsScreenProps> = ({ onNavi
   const [softStart, setSoftStart] = useState(true);
   const [limiter, setLimiter] = useState(true);
   const [loudExportWarn, setLoudExportWarn] = useState(true);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          const ins = devices
+            .filter((d) => d.kind === "audioinput")
+            .map((d) => d.label || "Microphone");
+          const outs = devices
+            .filter((d) => d.kind === "audiooutput")
+            .map((d) => d.label || "Speakers");
+          if (ins.length > 0) {
+            const uniqueIns = Array.from(new Set(ins));
+            setMicOptions(uniqueIns);
+            setMicDevice(uniqueIns[0]);
+          }
+          if (outs.length > 0) {
+            const uniqueOuts = Array.from(new Set(["System default", ...outs]));
+            setOutputOptions(uniqueOuts);
+            setOutputDevice(uniqueOuts[0]);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const navigate = (r: string) => {
     if (onNavigate) {
@@ -36,14 +71,14 @@ export const AudioSettingsScreen: React.FC<AudioSettingsScreenProps> = ({ onNavi
       <div className="box col">
         <Field label="Output">
           <Select
-            options={["System default", "Studio Headphones", "Laptop speakers"]}
+            options={outputOptions}
             value={outputDevice}
             onChange={setOutputDevice}
           />
         </Field>
         <Field label="Microphone">
           <Select
-            options={["Studio Mic USB", "Laptop mic"]}
+            options={micOptions}
             value={micDevice}
             onChange={setMicDevice}
           />

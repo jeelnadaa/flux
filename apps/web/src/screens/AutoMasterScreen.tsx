@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ProjectLayout,
   SegmentedControl,
@@ -10,24 +10,38 @@ import {
   Icon,
   CanvasViz,
 } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 interface AutoMasterScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const AutoMasterScreen: React.FC<AutoMasterScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
   const [intensityIndex, setIntensityIndex] = useState<number>(1);
   const [intensitySlider, setIntensitySlider] = useState<number>(50);
   const [preserveDynamics, setPreserveDynamics] = useState<boolean>(true);
   const [holdingBefore, setHoldingBefore] = useState<boolean>(false);
 
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
+
   const intensityOptions = ["Gentle", "Balanced", "Loud"] as const;
 
   const targetOptions = ["Streaming −14 LUFS", "Podcast −16 LUFS", "Club −9 LUFS", "Custom"];
 
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
+
+  const targetLufs = intensityIndex === 0 ? "-16.0" : intensityIndex === 1 ? "-14.0" : "-9.0";
+
   const metrics = [
-    ["−14.0", "LUFS", "Target met"],
-    ["−1.0", "dBTP", "Below ceiling"],
+    [isPlaying ? (project.meterLevels.leftRms - 4).toFixed(1) : targetLufs, "LUFS", "Target met"],
+    [isPlaying ? project.meterLevels.leftPeak.toFixed(1) : "−1.0", "dBTP", "Below ceiling"],
     ["8.2", "LRA", "Dynamics kept"],
     ["+0.71", "Mono", "Safe"],
   ];
@@ -42,7 +56,20 @@ export const AutoMasterScreen: React.FC<AutoMasterScreenProps> = ({ onNavigate }
   ];
 
   return (
-    <ProjectLayout currentTab="master" onNavigate={onNavigate}>
+    <ProjectLayout
+      currentTab="master"
+      onNavigate={onNavigate}
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="split">
         <div className="a">
           <div className="pg in" style={{ maxWidth: "none" }}>

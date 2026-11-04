@@ -18,6 +18,32 @@ export const HrtfScreen: React.FC = () => {
   const headWidthCm =
     headWidthPct === 52 ? "17.5" : (14.0 + (headWidthPct / 100.0) * 7.0).toFixed(1);
 
+  const auditionProfile = (idx: number) => {
+    setSelectedIdx(idx);
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const biquad = ctx.createBiquadFilter();
+      const freqs = [3200, 2800, 4100, 5200, 2200, 4800];
+      biquad.type = "peaking";
+      biquad.frequency.value = freqs[idx % freqs.length];
+      biquad.gain.value = 6;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
+      osc.connect(biquad);
+      biquad.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.8);
+    } catch {
+      // AudioContext optional preview
+    }
+  };
+
   return (
     <WizardLayout step={3} totalSteps={4}>
       <h1 className="h1">Which one sounds outside your head?</h1>
@@ -31,7 +57,7 @@ export const HrtfScreen: React.FC = () => {
             key={p.name}
             className={`tile ${i === selectedIdx ? "on" : ""}`}
             type="button"
-            onClick={() => setSelectedIdx(i)}
+            onClick={() => auditionProfile(i)}
           >
             <div className="between">
               <b>{p.name}</b>

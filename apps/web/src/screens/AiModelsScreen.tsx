@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { SettingsLayout, Callout, Icon } from "@flux/ui";
+import { SettingsLayout, Callout, Icon, Button, Section, Input } from "@flux/ui";
+import { ByokAiManager, AiProvider } from "@flux/app-core";
 
 interface AiModelsScreenProps {
   onNavigate?: (route: string) => void;
@@ -66,10 +67,28 @@ export const AiModelsScreen: React.FC<AiModelsScreenProps> = () => {
     );
   };
 
+  const aiManager = ByokAiManager.get();
+  const [providers, setProviders] = useState(() => aiManager.getProviders());
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+
+  const handleAddKey = (provider: AiProvider) => {
+    const key = keyInputs[provider];
+    if (key && key.trim().length > 0) {
+      aiManager.addKey(provider, key.trim());
+      setProviders(aiManager.getProviders());
+      setKeyInputs((prev) => ({ ...prev, [provider]: "" }));
+    }
+  };
+
+  const handleRemoveKey = (provider: AiProvider, index: number) => {
+    aiManager.removeKey(provider, index);
+    setProviders(aiManager.getProviders());
+  };
+
   return (
-    <SettingsLayout currentTab="models" title="AI models">
+    <SettingsLayout currentTab="models" title="AI models & Cloud BYOK">
       <div className="between">
-        <span className="dim">Downloaded once and then work offline.</span>
+        <span className="dim">100% Local by default. Bring Your Own Key for cloud AI models with auto-failover.</span>
         <b className="mono">1.2 GB used</b>
       </div>
 
@@ -96,6 +115,78 @@ export const AiModelsScreen: React.FC<AiModelsScreenProps> = () => {
           </div>
         ))}
       </div>
+
+      <Section title="Bring Your Own Key (BYOK) — Cloud AI Providers">
+        <p className="dim" style={{ marginBottom: "16px" }}>
+          Flux never routes your audio through any cloud server. API calls are sent directly from your
+          machine to the provider. Add multiple keys per provider for automatic rate-limit (429/401)
+          rotation, with automatic fallback across providers.
+        </p>
+
+        <div className="lst box">
+          {providers.map((p) => (
+            <div key={p.provider} style={{ display: "block", padding: "16px" }}>
+              <div className="between" style={{ marginBottom: "8px" }}>
+                <div>
+                  <b style={{ fontSize: "15px" }}>{p.name}</b>
+                  <p className="dim" style={{ margin: "4px 0 0" }}>
+                    {p.description}
+                  </p>
+                </div>
+                <span className="mono dim" style={{ fontSize: "12px" }}>
+                  {p.keys.length} key{p.keys.length === 1 ? "" : "s"} configured
+                </span>
+              </div>
+
+              {p.keys.length > 0 && (
+                <div style={{ margin: "10px 0" }}>
+                  {p.keys.map((k, idx) => (
+                    <div
+                      key={idx}
+                      className="between"
+                      style={{
+                        padding: "6px 10px",
+                        background: "var(--surface)",
+                        borderRadius: "6px",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <span className="mono" style={{ fontSize: "13px" }}>
+                        {idx === p.activeKeyIndex ? "★ " : "  "}
+                        {k.slice(0, 7)}...{k.slice(-4)}
+                        {idx === p.activeKeyIndex ? " (Active)" : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn g"
+                        style={{ padding: "2px 8px", fontSize: "12px" }}
+                        onClick={() => handleRemoveKey(p.provider, idx)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="row" style={{ marginTop: "10px", gap: "8px" }}>
+                <Input
+                  placeholder={`Add API key for ${p.name}`}
+                  value={keyInputs[p.provider] || ""}
+                  onChange={(e) =>
+                    setKeyInputs((prev) => ({ ...prev, [p.provider]: e.target.value }))
+                  }
+                />
+                <Button
+                  label="Add Key"
+                  variant="primary"
+                  onClick={() => handleAddKey(p.provider)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
 
       <Callout icon="chip">
         This device: WebGPU, 8 GB of graphics memory. All models will run.

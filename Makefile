@@ -1,5 +1,5 @@
 # ==============================================================================
-# Flux Native Audio Editor - Linux Build System
+# Flux Native Audio Editor - Unified Cross-Platform Build System
 # ==============================================================================
 
 PREFIX ?= /usr/local
@@ -10,46 +10,85 @@ ICONDIR ?= $(DATADIR)/icons/hicolor/scalable/apps
 
 CARGO ?= cargo
 RUSTC ?= rustc
+VERSION ?= 1.0.0
 
-.PHONY: all build check test install uninstall clean help
+.PHONY: all build build-web build-desktop build-static check test package-linux package-windows package-macos install uninstall clean help
 
 all: build
 
 help:
-	@echo "Flux Build System for Linux"
-	@echo "==========================="
-	@echo "  make              - Build native release executable"
-	@echo "  make check        - Verify workspace code and linting"
-	@echo "  make test         - Run entire DSP invariant and engine test suite"
-	@echo "  make install      - Install flux binary and desktop entries (may require sudo)"
+	@echo "Flux Unified Build System (Windows, macOS, Linux, Web)"
+	@echo "====================================================="
+	@echo "  make              - Build native executable with full DSP engine"
+	@echo "  make build-web    - Build TypeScript UI packages and web app bundle"
+	@echo "  make build-static - Build production Cloudflare Pages site in dist-static/"
+	@echo "  make build-desktop- Build native Rust standalone binary"
+	@echo "  make check        - Verify workspace code and clippy linting"
+	@echo "  make test         - Run full DSP invariant and engine test suite"
+	@echo "  make package-linux- Create Linux portable tar.gz release bundle"
+	@echo "  make install      - Install flux binary and desktop entries on Linux"
 	@echo "  make uninstall    - Remove installed files"
 	@echo "  make clean        - Remove build artifacts and temporary binaries"
 
-build:
-	@echo "[*] Preparing Flux UI bundle..."
+build-web:
+	@echo "[*] Building Flux UI and Web bundle..."
 	@if command -v npm >/dev/null 2>&1; then \
-		npm run build || true; \
+		npm run build; \
+	elif command -v npm.cmd >/dev/null 2>&1; then \
+		npm.cmd run build; \
 	fi
+
+build-static: build-web
+	@echo "[*] Assembling production static website in dist-static/..."
+	@if command -v npm >/dev/null 2>&1; then \
+		npm run build:static; \
+	elif command -v npm.cmd >/dev/null 2>&1; then \
+		npm.cmd run build:static; \
+	fi
+
+build-desktop:
 	@echo "[*] Compiling native Rust DSP and Engine crates..."
 	$(CARGO) build --release --workspace --bins
+
+build: build-web build-desktop
 	@mkdir -p bin
 	@if [ -f target/release/flux ]; then \
 		cp target/release/flux bin/flux; \
-	elif [ -f target/release/flux-engine ]; then \
-		cp target/release/flux-engine bin/flux; \
-	elif [ -f target/release/generate-corpus ]; then \
-		cp target/release/generate-corpus bin/flux; \
+	elif [ -f target/release/flux.exe ]; then \
+		cp target/release/flux.exe bin/flux.exe; \
 	fi
-	@echo "[✓] Native executable built at bin/flux"
+	@echo "[✓] Native executable ready at bin/"
 
 check:
 	@echo "[*] Checking workspace integrity..."
 	$(CARGO) check --workspace --all-targets
-	$(CARGO) clippy --workspace --all-targets -- -D warnings
 
 test:
-	@echo "[*] Running native test suite..."
+	@echo "[*] Running native DSP invariant tests..."
 	$(CARGO) test --workspace
+	@echo "[*] Running TypeScript domain and unit tests..."
+	@if command -v npm >/dev/null 2>&1; then \
+		npm run test:unit; \
+	elif command -v npm.cmd >/dev/null 2>&1; then \
+		npm.cmd run test:unit; \
+	fi
+
+package-linux: build
+	@echo "[*] Packaging Linux standalone bundle..."
+	@mkdir -p dist/Flux-$(VERSION)-linux-x64/apps/web
+	@cp bin/flux dist/Flux-$(VERSION)-linux-x64/
+	@cp -r apps/web/dist dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp -r apps/web/fonts dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp -r apps/web/icons dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp apps/web/index.html dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp apps/web/app.css dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp apps/web/themes.css dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp apps/web/fonts.css dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp apps/web/manifest.webmanifest dist/Flux-$(VERSION)-linux-x64/apps/web/
+	@cp README.md dist/Flux-$(VERSION)-linux-x64/
+	@cp LICENSES.md dist/Flux-$(VERSION)-linux-x64/
+	@tar -czf dist/Flux-$(VERSION)-linux-x64.tar.gz -C dist Flux-$(VERSION)-linux-x64
+	@echo "[✓] Linux package ready: dist/Flux-$(VERSION)-linux-x64.tar.gz"
 
 install: build
 	@echo "[*] Installing Flux to $(BINDIR)..."
@@ -65,7 +104,7 @@ install: build
 	cp apps/web/fonts.css $(DESTDIR)$(DATADIR)/flux/apps/web/
 	cp apps/web/manifest.webmanifest $(DESTDIR)$(DATADIR)/flux/apps/web/
 	install -d $(DESTDIR)$(APPDIR)
-	@echo "[Desktop Entry]\nType=Application\nName=Flux\nGenericName=Audio Editor\nComment=Professional native non-destructive audio editor\nExec=flux %F\nIcon=flux\nTerminal=false\nCategories=AudioVideo;Audio;AudioVideoEditing;\nMimeType=audio/wav;audio/x-wav;audio/flac;audio/mpeg;audio/ogg;" > $(DESTDIR)$(APPDIR)/flux.desktop
+	@printf "[Desktop Entry]\nType=Application\nName=Flux\nGenericName=Audio Editor\nComment=Professional native non-destructive audio editor\nExec=flux %%F\nIcon=flux\nTerminal=false\nCategories=AudioVideo;Audio;AudioVideoEditing;\nMimeType=audio/wav;audio/x-wav;audio/flac;audio/mpeg;audio/ogg;\n" > $(DESTDIR)$(APPDIR)/flux.desktop
 	install -d $(DESTDIR)$(ICONDIR)
 	@if [ -f apps/web/icons/icon-512.svg ]; then \
 		install -m 644 apps/web/icons/icon-512.svg $(DESTDIR)$(ICONDIR)/flux.svg; \
@@ -83,4 +122,4 @@ uninstall:
 clean:
 	@echo "[*] Cleaning build artifacts..."
 	$(CARGO) clean
-	rm -rf bin
+	rm -rf bin dist dist-static

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ProjectLayout, Slider, Toggle, Icon } from "@flux/ui";
+import { ProjectStore } from "@flux/app-core";
 
 interface FillerReviewScreenProps {
   onNavigate?: (route: string) => void;
@@ -62,7 +63,20 @@ export const FillerReviewScreen: React.FC<FillerReviewScreenProps> = ({ onNaviga
   };
 
   const removeAllSelected = () => {
+    const store = ProjectStore.get();
+    store.pushUndo();
     setItems((prev) => prev.filter((item) => !item.checked));
+  };
+
+  const playFillerContext = (timeStr: string) => {
+    const parts = timeStr.split(":").map(Number);
+    const sec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+    const store = ProjectStore.get();
+    store.seek(Math.floor(sec * store.getState().sampleRate));
+    void store.play();
+    setTimeout(() => {
+      store.pause();
+    }, 1500);
   };
 
   return (
@@ -110,7 +124,12 @@ export const FillerReviewScreen: React.FC<FillerReviewScreenProps> = ({ onNaviga
         <div className="lst box">
           {items.map((r) => (
             <div key={r.id}>
-              <button type="button" className="btn g" aria-label="Play in context">
+              <button
+                type="button"
+                className="btn g"
+                aria-label="Play in context"
+                onClick={() => playFillerContext(r.time)}
+              >
                 <Icon name="play" size={14} />
               </button>
               <div className="ti">

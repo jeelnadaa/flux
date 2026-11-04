@@ -1,14 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ProjectLayout, SegmentedControl, Toggle, Icon, CanvasViz } from "@flux/ui";
+import { ProjectStore, TransportState } from "@flux/app-core";
 
 interface MagicAssistantScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const MagicAssistantScreen: React.FC<MagicAssistantScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.get();
+  const [projectState, setProjectState] = useState(() => store.getState());
+
+  useEffect(() => {
+    return store.subscribe((s) => {
+      setProjectState({ ...s });
+    });
+  }, [store]);
+
   const [goalIndex, setGoalIndex] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [holdingBefore, setHoldingBefore] = useState<boolean>(false);
+
+  const isPlaying = projectState.transportState === TransportState.Playing;
 
   const goalOptions = [
     "Make it clear",
@@ -83,7 +94,7 @@ export const MagicAssistantScreen: React.FC<MagicAssistantScreenProps> = ({ onNa
                   type="button"
                   className={`tbtn play ${isPlaying ? "on" : ""}`}
                   aria-label="Play"
-                  onClick={() => setIsPlaying((p) => !p)}
+                  onClick={() => store.togglePlayback()}
                 >
                   <Icon name={isPlaying ? "pause" : "play"} size={16} />
                 </button>

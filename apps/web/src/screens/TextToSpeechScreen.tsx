@@ -11,6 +11,7 @@ import {
   Icon,
   CanvasViz,
 } from "@flux/ui";
+import { ByokAiManager, ProjectStore } from "@flux/app-core";
 
 interface TextToSpeechScreenProps {
   onNavigate?: (route: string) => void;
@@ -46,6 +47,61 @@ export const TextToSpeechScreen: React.FC<TextToSpeechScreenProps> = ({ onNaviga
 
   const insertTag = (tag: string) => {
     setScript((prev) => `${prev} [${tag}]`);
+  };
+
+  const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
+  const [providerStatus, setProviderStatus] = useState<string>("");
+
+  const handlePreview = async () => {
+    if (!script.trim() || isSynthesizing) return;
+    setIsSynthesizing(true);
+    setProviderStatus("Synthesizing speech...");
+
+    try {
+      const ai = ByokAiManager.get();
+      const res = await ai.synthesizeSpeech(script, { voice: selectedVoice });
+      setProviderStatus(`Generated using ${res.providerUsed}`);
+
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      const buf = await ctx.decodeAudioData(res.audioBuffer.slice(0));
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start();
+    } catch (err) {
+      console.error("Preview TTS failed:", err);
+      setProviderStatus("Synthesis failed");
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+
+  const handleAddToTimeline = async () => {
+    if (!script.trim() || isSynthesizing) return;
+    setIsSynthesizing(true);
+    setProviderStatus("Rendering speech to timeline...");
+
+    try {
+      const ai = ByokAiManager.get();
+      const res = await ai.synthesizeSpeech(script, { voice: selectedVoice });
+      const blob = new Blob([res.audioBuffer], {
+        type: res.format === "mp3" ? "audio/mpeg" : "audio/wav",
+      });
+      await ProjectStore.get().importAudioFile(blob, `Speech: ${selectedVoice}`);
+      if (onNavigate) {
+        onNavigate("edit");
+      } else {
+        window.location.hash = "#edit";
+      }
+    } catch (err) {
+      console.error("Add TTS to timeline failed:", err);
+      setProviderStatus("Failed to add speech to timeline");
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   return (
@@ -85,13 +141,28 @@ export const TextToSpeechScreen: React.FC<TextToSpeechScreenProps> = ({ onNaviga
             </div>
 
             <div className="row">
-              <button type="button" className="btn lg">
+              <button
+                type="button"
+                className="btn lg"
+                onClick={handlePreview}
+                disabled={isSynthesizing}
+              >
                 <Icon name="play" size={14} />
-                Preview
+                {isSynthesizing ? "Synthesizing..." : "Preview"}
               </button>
-              <button type="button" className="btn p lg" onClick={() => onNavigate?.("edit")}>
+              <button
+                type="button"
+                className="btn p lg"
+                onClick={handleAddToTimeline}
+                disabled={isSynthesizing}
+              >
                 Add to timeline
               </button>
+              {providerStatus && (
+                <span className="mono dim" style={{ fontSize: 13, alignSelf: "center" }}>
+                  {providerStatus}
+                </span>
+              )}
             </div>
 
             <Callout icon="tag">

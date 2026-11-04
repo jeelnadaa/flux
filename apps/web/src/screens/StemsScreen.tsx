@@ -1,11 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ProjectLayout, SegmentedControl, Slider, Pill, Icon, CanvasViz } from "@flux/ui";
+import { ProjectStore, TransportState, type FluxProjectState, type AudioTrack } from "@flux/app-core";
 
 interface StemsScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const StemsScreen: React.FC<StemsScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.getInstance();
+  const [project, setProject] = useState<FluxProjectState>(() => store.getState());
+
+  useEffect(() => {
+    return store.subscribe((newState: FluxProjectState) => {
+      setProject({ ...newState });
+    });
+  }, [store]);
+
   const [activePresetIndex, setActivePresetIndex] = useState<number>(0);
   const [vocalsLevel, setVocalsLevel] = useState<number>(78);
   const [drumsLevel, setDrumsLevel] = useState<number>(70);
@@ -21,6 +31,20 @@ export const StemsScreen: React.FC<StemsScreenProps> = ({ onNavigate }) => {
   const [muteOther, setMuteOther] = useState<boolean>(false);
   const [soloOther, setSoloOther] = useState<boolean>(false);
 
+  const applyTrackStemMuteSolo = (
+    stemName: string,
+    isMute: boolean,
+    isSolo: boolean,
+  ) => {
+    const trk = project.tracks.find(
+      (t: AudioTrack) => t.name.toLowerCase().includes(stemName.toLowerCase()),
+    );
+    if (trk) {
+      if (trk.muted !== isMute) store.toggleTrackMute(trk.id);
+      if (trk.solo !== isSolo) store.toggleTrackSolo(trk.id);
+    }
+  };
+
   const handlePresetChange = (preset: string, idx: number) => {
     setActivePresetIndex(idx);
     if (preset === "Karaoke") {
@@ -29,17 +53,24 @@ export const StemsScreen: React.FC<StemsScreenProps> = ({ onNavigate }) => {
       setMuteDrums(false);
       setMuteBass(false);
       setMuteOther(false);
+      applyTrackStemMuteSolo("vocal", true, false);
+      applyTrackStemMuteSolo("drum", false, false);
+      applyTrackStemMuteSolo("bass", false, false);
     } else if (preset === "Acapella") {
       setSoloVocals(true);
       setMuteVocals(false);
+      applyTrackStemMuteSolo("vocal", false, true);
     } else if (preset === "No drums") {
       setMuteDrums(true);
       setSoloDrums(false);
       setMuteVocals(false);
+      applyTrackStemMuteSolo("drum", true, false);
+      applyTrackStemMuteSolo("vocal", false, false);
     } else if (preset === "No bass") {
       setMuteBass(true);
       setSoloBass(false);
       setMuteVocals(false);
+      applyTrackStemMuteSolo("bass", true, false);
     } else {
       setMuteVocals(false);
       setSoloVocals(false);
@@ -49,8 +80,15 @@ export const StemsScreen: React.FC<StemsScreenProps> = ({ onNavigate }) => {
       setSoloBass(false);
       setMuteOther(false);
       setSoloOther(false);
+      project.tracks.forEach((t: AudioTrack) => {
+        if (t.muted) store.toggleTrackMute(t.id);
+        if (t.solo) store.toggleTrackSolo(t.id);
+      });
     }
   };
+
+  const isPlaying = project.transportState === TransportState.Playing;
+  const timecode = store.formatTimecode(project.playheadFrame);
 
   const stems = [
     {
@@ -96,7 +134,19 @@ export const StemsScreen: React.FC<StemsScreenProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <ProjectLayout currentTab="aitools">
+    <ProjectLayout
+      currentTab="aitools"
+      isPlaying={isPlaying}
+      timecode={timecode}
+      onPlayPause={() => store.togglePlayback()}
+      onStop={() => store.stop()}
+      onBackToStart={() => store.seek(0)}
+      onLoopToggle={() =>
+        store.setLoop(!project.loopEnabled, project.loopStartFrame, project.loopEndFrame)
+      }
+      leftMeter={project.meterLevels.leftPeak}
+      rightMeter={project.meterLevels.rightPeak}
+    >
       <div className="split">
         <div className="a">
           <div className="tlbar">

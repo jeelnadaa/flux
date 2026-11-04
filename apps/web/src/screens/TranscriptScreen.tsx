@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ProjectLayout, SegmentedControl, Toggle, Pill, Icon, CanvasViz } from "@flux/ui";
+import { ProjectStore } from "@flux/app-core";
 
 interface TranscriptScreenProps {
   onNavigate?: (route: string) => void;
@@ -9,12 +10,47 @@ const tabItems = ["Edit", "Review fillers", "Speakers"] as const;
 type TabItem = (typeof tabItems)[number];
 
 export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.get();
   const [activeTab, setActiveTab] = useState<TabItem>("Edit");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [fillRoomTone, setFillRoomTone] = useState<boolean>(true);
   const [smoothPitch, setSmoothPitch] = useState<boolean>(false);
 
   const [selectedWord, setSelectedWord] = useState<string>('"the the" · 00:12:33.1 · 0.42 s');
+
+  const handleWordClick = (word: string, timeSec: number) => {
+    setSelectedWord(`"${word}" · 00:${Math.floor(timeSec / 60).toString().padStart(2, "0")}:${(timeSec % 60).toFixed(1)}`);
+    store.seek(Math.floor(timeSec * store.getState().sampleRate));
+  };
+
+  const handleExportSubtitles = () => {
+    const srtContent = `1
+00:00:01,000 --> 00:00:04,500
+So, um, the first thing I noticed about the harbor recordings
+
+2
+00:00:04,600 --> 00:00:08,200
+was how much low rumble came through the hull.
+
+3
+00:00:08,500 --> 00:00:12,000
+And that was on the first night, before we moved the mics.
+`;
+    const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "harbor-lights-transcript.srt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleListenJoin = () => {
+    store.play();
+    setTimeout(() => {
+      store.pause();
+    }, 2000);
+  };
 
   const mayaWords1: Array<[string, string]> = [
     ["So,", "fl"],
@@ -116,7 +152,7 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }
             <button type="button" className="btn lbl" onClick={() => onNavigate?.("fillers")}>
               Fillers: 23
             </button>
-            <button type="button" className="btn" onClick={() => onNavigate?.("export-sub")}>
+            <button type="button" className="btn" onClick={handleExportSubtitles}>
               <Icon name="exp" size={14} />
               Subtitles
             </button>
@@ -155,7 +191,8 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }
                     key={idx}
                     className={`wd ${c}`}
                     tabIndex={0}
-                    onClick={() => setSelectedWord(`"${t}" · 00:12:0${4 + Math.floor(idx / 3)}`)}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleWordClick(t, 4 + idx * 0.45)}
                   >
                     {t}{" "}
                   </span>
@@ -174,7 +211,8 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }
                     key={idx}
                     className={`wd ${c}`}
                     tabIndex={0}
-                    onClick={() => setSelectedWord(`"${t}" · 00:12:3${1 + Math.floor(idx / 3)}`)}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleWordClick(t, 31 + idx * 0.45)}
                   >
                     {t}{" "}
                   </span>
@@ -193,7 +231,8 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }
                     key={idx}
                     className={`wd ${c}`}
                     tabIndex={0}
-                    onClick={() => setSelectedWord(`"${t}" · 00:12:4${8 + Math.floor(idx / 3)}`)}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleWordClick(t, 48 + idx * 0.45)}
                   >
                     {t}{" "}
                   </span>
@@ -227,7 +266,7 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({ onNavigate }
               onChange={setSmoothPitch}
             />
             <div className="row">
-              <button type="button" className="btn">
+              <button type="button" className="btn" onClick={handleListenJoin}>
                 <Icon name="play" size={14} />
                 Listen to the join
               </button>

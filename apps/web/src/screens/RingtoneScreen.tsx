@@ -1,16 +1,20 @@
 import React, { useState } from "react";
 import { PageLayout, CanvasViz, Button, SegmentedControl, Callout, Slider, Toggle } from "@flux/ui";
+import { ProjectStore, RingtoneMaker, ExportManager } from "@flux/app-core";
 
 interface RingtoneScreenProps {
   onNavigate?: (route: string) => void;
 }
 
 export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) => {
+  const store = ProjectStore.getInstance();
   const [phoneIndex, setPhoneIndex] = useState(0); // 0 = iPhone, 1 = Android
   const [fadeIn, setFadeIn] = useState(18);
   const [fadeOut, setFadeOut] = useState(30);
   const [levelSpeaker, setLevelSpeaker] = useState(true);
   const [loopSmoothly, setLoopSmoothly] = useState(false);
+  const [selectionStartSec, setSelectionStartSec] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const navigate = (r: string) => {
     if (onNavigate) {
@@ -19,6 +23,58 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
       window.location.hash = r;
     }
   };
+
+  const handleFindCatchiest = () => {
+    const mixdown = store.renderMixdown();
+    const section = RingtoneMaker.findCatchiestPart(
+      mixdown.interleaved,
+      mixdown.sampleRate,
+      30.0,
+    );
+    setSelectionStartSec(section.startTimeSec);
+    setStatusMessage(`Found chorus peak energy at ${section.startTimeSec.toFixed(1)}s (score ${section.score.toFixed(0)})`);
+  };
+
+  const handlePlaySelection = () => {
+    const sr = store.getState().sampleRate;
+    const startFrame = Math.floor(selectionStartSec * sr);
+    const endFrame = startFrame + Math.floor(30.0 * sr);
+    store.setLoop(true, startFrame, endFrame);
+    store.seek(startFrame);
+    store.play();
+  };
+
+  const handleExportRingtone = async () => {
+    const sr = store.getState().sampleRate;
+    const startFrame = Math.floor(selectionStartSec * sr);
+    const endFrame = startFrame + Math.floor(30.0 * sr);
+    const mix = store.renderMixdown(startFrame, endFrame);
+
+    let finalSamples = mix.interleaved;
+    if (levelSpeaker) {
+      finalSamples = RingtoneMaker.applySpeakerLeveling(finalSamples);
+    }
+
+    const ext = phoneIndex === 0 ? "m4a" : "wav";
+    const exportMgr = new ExportManager();
+    const outBytes = await exportMgr.exportAudio(finalSamples, mix.numChannels, sr, {
+      format: "wav_16",
+    });
+
+    const blob = new Blob([new Uint8Array(outBytes)], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `flux-ringtone-${phoneIndex === 0 ? "iphone.m4r" : "android.wav"}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    navigate("exported");
+  };
+
+  const leftPercent = Math.min(80, (selectionStartSec / 60) * 100);
 
   return (
     <PageLayout
@@ -31,7 +87,7 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
           icon="exp"
           dataGo="exported"
           href="#exported"
-          onClick={() => navigate("exported")}
+          onClick={handleExportRingtone}
         />
       }
       onNavigate={navigate}
@@ -41,8 +97,8 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
         <div
           style={{
             position: "absolute",
-            left: "32%",
-            width: "18%",
+            left: `${leftPercent}%`,
+            width: "30%",
             top: 0,
             bottom: 0,
             background: "color-mix(in srgb,var(--sig) 26%,transparent)",
@@ -53,7 +109,7 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
           className="mono"
           style={{
             position: "absolute",
-            left: "32%",
+            left: `${leftPercent}%`,
             top: "6px",
             paddingLeft: "9px",
           }}
@@ -62,9 +118,26 @@ export const RingtoneScreen: React.FC<RingtoneScreenProps> = ({ onNavigate }) =>
         </span>
       </div>
 
+      {statusMessage && (
+        <Callout icon="sparkle" variant="info">
+          {statusMessage}
+        </Callout>
+      )}
+
       <div className="row">
-        <Button label="Play selection" icon="play" variant="primary" large={true} />
-        <Button label="Find the catchiest part" icon="mag" large={true} />
+        <Button
+          label="Play selection"
+          icon="play"
+          variant="primary"
+          large={true}
+          onClick={handlePlaySelection}
+        />
+        <Button
+          label="Find the catchiest part"
+          icon="mag"
+          large={true}
+          onClick={handleFindCatchiest}
+        />
       </div>
 
       <div className="g2">

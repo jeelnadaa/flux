@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Icon, type IconName } from "../icons.js";
 import { Button } from "./Button.js";
 import { SegmentedControl } from "./SegmentedControl.js";
+import { ProjectStore, TransportState, type FluxProjectState } from "@flux/app-core";
 
 export const PROJ_NAV_ITEMS: readonly [string, IconName, string][] = [
   ["edit", "wave", "Edit"],
@@ -132,10 +133,15 @@ export interface TransportProps {
   keySig?: string;
   sampleRate?: string;
   lufs?: string;
+  isLooping?: boolean;
   onPlayPause?: () => void;
+  onStop?: () => void;
+  onBackToStart?: () => void;
   onRecord?: () => void;
   onLoopToggle?: () => void;
   onHoldOriginal?: () => void;
+  leftMeter?: number;
+  rightMeter?: number;
   extra?: React.ReactNode;
   className?: string;
 }
@@ -147,17 +153,27 @@ export const Transport: React.FC<TransportProps> = ({
   keySig = "D min",
   sampleRate = "48 kHz",
   lufs = "−14.2 LUFS",
+  isLooping = false,
   onPlayPause,
+  onStop,
+  onBackToStart,
   onRecord,
   onLoopToggle,
   onHoldOriginal,
+  leftMeter = -60,
+  rightMeter = -60,
   extra,
   className = "",
 }) => {
   return (
     <footer className={`tp ${className}`} role="region" aria-label="Transport">
       <div className="tgrp">
-        <button className="tbtn hide-s" type="button" aria-label="Back to start">
+        <button
+          className="tbtn hide-s"
+          type="button"
+          aria-label="Back to start"
+          onClick={onBackToStart}
+        >
           <Icon name="back" />
         </button>
         <button
@@ -169,7 +185,12 @@ export const Transport: React.FC<TransportProps> = ({
         >
           <Icon name={isPlaying ? "pause" : "play"} />
         </button>
-        <button className="tbtn hide-s" type="button" aria-label="Stop">
+        <button
+          className="tbtn hide-s"
+          type="button"
+          aria-label="Stop"
+          onClick={onStop}
+        >
           <Icon name="stop" />
         </button>
         <button
@@ -182,7 +203,7 @@ export const Transport: React.FC<TransportProps> = ({
           <Icon name="rec" />
         </button>
         <button
-          className="tbtn on hide-s"
+          className={`tbtn ${isLooping ? "on" : ""} hide-s`}
           type="button"
           aria-label="Loop"
           data-toggle=""
@@ -212,10 +233,20 @@ export const Transport: React.FC<TransportProps> = ({
       </button>
       <div className="meter" role="img" aria-label="Output level">
         <div className="m">
-          <i data-lv="" />
+          <i
+            data-lv=""
+            style={{
+              width: `${Math.max(0, Math.min(100, ((leftMeter + 60) * 100) / 60))}%`,
+            }}
+          />
         </div>
         <div className="m">
-          <i data-lv="" />
+          <i
+            data-lv=""
+            style={{
+              width: `${Math.max(0, Math.min(100, ((rightMeter + 60) * 100) / 60))}%`,
+            }}
+          />
         </div>
       </div>
       <span className="mono dim hide-m">{lufs}</span>
@@ -230,6 +261,21 @@ export interface ProjectLayoutProps {
   children: React.ReactNode;
   rightActions?: React.ReactNode;
   transportExtra?: React.ReactNode;
+  isPlaying?: boolean;
+  timecode?: string;
+  bpm?: string;
+  keySig?: string;
+  sampleRate?: string;
+  lufs?: string;
+  isLooping?: boolean;
+  onPlayPause?: () => void;
+  onStop?: () => void;
+  onBackToStart?: () => void;
+  onRecord?: () => void;
+  onLoopToggle?: () => void;
+  onHoldOriginal?: () => void;
+  leftMeter?: number;
+  rightMeter?: number;
   onNavigate?: (id: string) => void;
   className?: string;
 }
@@ -256,19 +302,173 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
   projectName = "Harbor Lights",
   projectStatus = "Saved 12 seconds ago",
   children,
-  rightActions = defaultProjectRightActions,
+  rightActions,
   transportExtra,
+  isPlaying,
+  timecode,
+  bpm = "124",
+  keySig = "F#m",
+  sampleRate = "48 kHz",
+  lufs,
+  isLooping,
+  onPlayPause,
+  onStop,
+  onBackToStart,
+  onRecord,
+  onLoopToggle,
+  onHoldOriginal,
+  leftMeter,
+  rightMeter,
   onNavigate,
   className = "",
 }) => {
+  const store = ProjectStore.getInstance();
+  const [projectState, setProjectState] = useState<FluxProjectState>(() => store.getState());
+
+  useEffect(() => {
+    return store.subscribe((s) => {
+      setProjectState({ ...s });
+    });
+  }, [store]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          (activeEl as HTMLElement).isContentEditable);
+      if (isInput) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        store.togglePlayback();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          store.redo();
+        } else {
+          store.undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        store.redo();
+      } else if (e.code === "Home") {
+        e.preventDefault();
+        store.seek(0);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [store]);
+
+  const resolvedIsPlaying =
+    isPlaying !== undefined ? isPlaying : projectState.transportState === TransportState.Playing;
+  const resolvedTimecode = timecode || store.formatTimecode(projectState.playheadFrame);
+  const resolvedIsLooping = isLooping !== undefined ? isLooping : projectState.loopEnabled;
+  const resolvedOnPlayPause = onPlayPause || (() => store.togglePlayback());
+  const resolvedOnStop = onStop || (() => store.stop());
+  const resolvedOnBackToStart = onBackToStart || (() => store.seek(0));
+  const resolvedOnLoopToggle =
+    onLoopToggle ||
+    (() =>
+      store.setLoop(
+        !projectState.loopEnabled,
+        projectState.loopStartFrame,
+        projectState.loopEndFrame,
+      ));
+  const resolvedLeftMeter =
+    leftMeter !== undefined ? leftMeter : projectState.meterLevels.leftPeak;
+  const resolvedRightMeter =
+    rightMeter !== undefined ? rightMeter : projectState.meterLevels.rightPeak;
+  const resolvedLufs =
+    lufs || `${(projectState.meterLevels.leftRms || -14.2).toFixed(1)} LUFS`;
+
+  const effectiveRightActions = rightActions || (
+    <>
+      <SegmentedControl items={["Simple", "Pro"]} selectedIndex={1} className="hide-s" dataMode />
+      <button
+        className="tbtn"
+        type="button"
+        aria-label="Undo"
+        title="Undo (Ctrl+Z)"
+        onClick={() => store.undo()}
+        style={{ opacity: store.canUndo() ? 1.0 : 0.4 }}
+      >
+        <Icon name="undo" />
+      </button>
+      <button
+        className="tbtn hide-s"
+        type="button"
+        aria-label="Redo"
+        title="Redo (Ctrl+Y)"
+        onClick={() => store.redo()}
+        style={{ opacity: store.canRedo() ? 1.0 : 0.4 }}
+      >
+        <Icon name="redo" />
+      </button>
+      <a
+        className="btn g lbl-s hide-s"
+        href="#history"
+        data-go="history"
+        aria-label="History"
+        onClick={() => onNavigate?.("history")}
+      >
+        <Icon name="hist" />
+      </a>
+      <Button
+        variant="magic"
+        className="lbl-s"
+        icon="mag"
+        label="Magic"
+        dataGo="magic"
+        href="#magic"
+        onClick={() => onNavigate?.("magic")}
+      />
+      <Button
+        variant="primary"
+        className="lbl-s"
+        icon="exp"
+        label="Export"
+        dataGo="export"
+        href="#export"
+        onClick={() => onNavigate?.("export")}
+      />
+    </>
+  );
+
   return (
     <div className={`app ${className}`}>
-      <TopBar projectName={projectName} projectStatus={projectStatus} rightActions={rightActions} />
+      <TopBar
+        projectName={projectName}
+        projectStatus={projectStatus}
+        rightActions={effectiveRightActions}
+      />
       <Rail items={PROJ_NAV_ITEMS} current={currentTab} onNavigate={onNavigate} />
       <main className="main" id="m">
         {children}
       </main>
-      <Transport extra={transportExtra} />
+      <Transport
+        isPlaying={resolvedIsPlaying}
+        timecode={resolvedTimecode}
+        bpm={bpm}
+        keySig={keySig}
+        sampleRate={sampleRate}
+        lufs={resolvedLufs}
+        isLooping={resolvedIsLooping}
+        onPlayPause={resolvedOnPlayPause}
+        onStop={resolvedOnStop}
+        onBackToStart={resolvedOnBackToStart}
+        onRecord={onRecord}
+        onLoopToggle={resolvedOnLoopToggle}
+        onHoldOriginal={onHoldOriginal}
+        leftMeter={resolvedLeftMeter}
+        rightMeter={resolvedRightMeter}
+        extra={transportExtra}
+      />
     </div>
   );
 };

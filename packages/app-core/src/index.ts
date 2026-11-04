@@ -47,5 +47,8 @@ export * from "./spatial/SpatialModels.js";
 export * from "./creative/CreativeModels.js";
 export * from "./ai/AiModels.js";
 export * from "./ai/AdvancedAiModels.js";
+export * from "./ai/ByokAiManager.js";
+export * from "./platform/NativeBridge.js";
+export * from "./state/ProjectStore.js";
 export * from "./workflow/index.js";
 export * from "./hardening/index.js";

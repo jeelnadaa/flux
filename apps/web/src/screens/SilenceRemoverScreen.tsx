@@ -8,19 +8,21 @@ import {
   Button,
   SegmentedControl,
 } from "@flux/ui";
+import { ProjectStore } from "@flux/app-core";
 
 interface PauseData {
   time: string;
   duration: string;
   action: string;
   enabled: boolean;
+  startSec: number;
 }
 
 const INITIAL_PAUSES: PauseData[] = [
-  { time: "0:42.1", duration: "1.9 s", action: "Shorten to 300 ms", enabled: true },
-  { time: "1:18.4", duration: "0.8 s", action: "Shorten to 300 ms", enabled: true },
-  { time: "2:06.7", duration: "3.4 s", action: "Shorten to 300 ms", enabled: true },
-  { time: "2:44.0", duration: "1.1 s", action: "Keep", enabled: false },
+  { time: "0:42.1", duration: "1.9 s", action: "Shorten to 300 ms", enabled: true, startSec: 42.1 },
+  { time: "1:18.4", duration: "0.8 s", action: "Shorten to 300 ms", enabled: true, startSec: 78.4 },
+  { time: "2:06.7", duration: "3.4 s", action: "Shorten to 300 ms", enabled: true, startSec: 126.7 },
+  { time: "2:44.0", duration: "1.1 s", action: "Keep", enabled: false, startSec: 164.0 },
 ];
 
 export const SilenceRemoverScreen: React.FC = () => {
@@ -35,8 +37,18 @@ export const SilenceRemoverScreen: React.FC = () => {
   const [crossfadeJoins, setCrossfadeJoins] = useState(true);
   const [applied, setApplied] = useState(false);
 
+  const store = ProjectStore.getInstance();
+
   const handleTogglePause = (index: number) => {
     setPauses((prev) => prev.map((p, i) => (i === index ? { ...p, enabled: !p.enabled } : p)));
+  };
+
+  const handlePreviewPause = (startSec: number) => {
+    const sr = store.getState().sampleRate;
+    const startFrame = Math.max(0, Math.floor((startSec - 0.5) * sr));
+    store.seek(startFrame);
+    store.play();
+    setTimeout(() => store.stop(), 2000);
   };
 
   const handleApply = () => {
@@ -86,7 +98,13 @@ export const SilenceRemoverScreen: React.FC = () => {
                   <b>{r.duration} pause</b>
                   <span>{r.action}</span>
                 </div>
-                <Button variant="ghost" icon="play" iconOnly ariaLabel="Preview" />
+                <Button
+                  variant="ghost"
+                  icon="play"
+                  iconOnly
+                  ariaLabel="Preview"
+                  onClick={() => handlePreviewPause(r.startSec)}
+                />
                 <Toggle label="" checked={r.enabled} onChange={() => handleTogglePause(i)} />
               </div>
             ))}

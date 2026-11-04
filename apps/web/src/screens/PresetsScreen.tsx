@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { PageLayout, SegmentedControl, Input, Tile, Button } from "@flux/ui";
 
 interface PresetItem {
@@ -21,13 +21,15 @@ const PRESETS: PresetItem[] = [
 ];
 
 export const PresetsScreen: React.FC = () => {
+  const [presetsList, setPresetsList] = useState<PresetItem[]>(PRESETS);
   const [selectedCategoryIdx, setSelectedCategoryIdx] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [importedNotice, setImportedNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCategory = CATEGORIES[selectedCategoryIdx];
 
-  const filteredPresets = PRESETS.filter((p) => {
+  const filteredPresets = presetsList.filter((p) => {
     const matchesCategory = selectedCategoryIdx === 0 ? true : p.category === selectedCategory;
     const matchesSearch =
       searchQuery.trim().length === 0 ||
@@ -37,15 +39,50 @@ export const PresetsScreen: React.FC = () => {
   });
 
   const handleImport = () => {
-    // Open hidden file picker or trigger mock import
-    setImportedNotice("Imported preset successfully");
-    setTimeout(() => setImportedNotice(null), 3000);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      try {
+        const text = await e.target.files[0].text();
+        const parsed = JSON.parse(text);
+        const name = parsed.name || e.target.files[0].name.replace(/\.[^/.]+$/, "");
+        const newItem: PresetItem = {
+          name,
+          subtitle: parsed.category || "Custom Preset",
+          category: "Effects",
+        };
+        setPresetsList((prev) => [newItem, ...prev]);
+        setImportedNotice(`Imported "${name}" successfully`);
+        setTimeout(() => setImportedNotice(null), 3000);
+      } catch {
+        setImportedNotice("Failed to parse preset file");
+        setTimeout(() => setImportedNotice(null), 3000);
+      }
+    }
   };
 
   const handleExport = () => {
-    // Trigger mock export
-    setImportedNotice("Presets exported");
-    setTimeout(() => setImportedNotice(null), 3000);
+    try {
+      const data = {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        presets: presetsList,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "flux-factory-presets.fluxpreset";
+      a.click();
+      URL.revokeObjectURL(url);
+      setImportedNotice("Presets exported successfully");
+      setTimeout(() => setImportedNotice(null), 3000);
+    } catch {
+      setImportedNotice("Export failed");
+      setTimeout(() => setImportedNotice(null), 3000);
+    }
   };
 
   return (
@@ -55,6 +92,13 @@ export const PresetsScreen: React.FC = () => {
       currentTab="presets"
       actions={
         <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".fluxpreset,application/json"
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
           <Button label="Import .fluxpreset" icon="imp" onClick={handleImport} />
           <Button label="Export" icon="exp" onClick={handleExport} />
         </>

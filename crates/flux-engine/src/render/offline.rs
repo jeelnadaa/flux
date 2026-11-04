@@ -32,13 +32,35 @@ impl OfflineRenderer {
         output_channels: usize,
         block_size: usize,
         cancel_token: Option<&AtomicBool>,
+        progress_callback: Option<&mut dyn FnMut(f32)>,
+    ) -> Result<AudioBuffer, &'static str> {
+        Self::render_with_tail(
+            graph,
+            input,
+            output_channels,
+            block_size,
+            0,
+            cancel_token,
+            progress_callback,
+        )
+    }
+
+    /// Renders an audio input through the graph to an output buffer, including tail frames for reverb/delay decay.
+    pub fn render_with_tail(
+        graph: &mut AudioGraph,
+        input: &AudioBuffer,
+        output_channels: usize,
+        block_size: usize,
+        tail_frames: usize,
+        cancel_token: Option<&AtomicBool>,
         mut progress_callback: Option<&mut dyn FnMut(f32)>,
     ) -> Result<AudioBuffer, &'static str> {
         let total_frames = input.num_frames();
+        let grand_total = total_frames + tail_frames;
         let in_channels = input.channels.len();
         graph.reset();
 
-        let mut output_channels_vec = vec![Vec::with_capacity(total_frames); output_channels];
+        let mut output_channels_vec = vec![Vec::with_capacity(grand_total); output_channels];
         let mut frame_cursor = 0;
 
         let mut in_block = vec![vec![0.0f32; block_size]; in_channels];
@@ -78,7 +100,41 @@ impl OfflineRenderer {
             frame_cursor += frames_this_block;
 
             if let Some(cb) = progress_callback.as_deref_mut() {
-                let progress = frame_cursor as f32 / total_frames as f32;
+                let progress = frame_cursor as f32 / grand_total.max(1) as f32;
+                cb(progress);
+            }
+        }
+
+        // Render tail frames if requested (feeds silence into graph for natural ring-out)
+        let mut tail_rendered = 0;
+        while tail_rendered < tail_frames {
+            if let Some(token) = cancel_token {
+                if token.load(Ordering::Relaxed) {
+                    return Err("Render cancelled by user");
+                }
+            }
+
+            let frames_this_block = (tail_frames - tail_rendered).min(block_size);
+            for ch in in_block.iter_mut().take(in_channels) {
+                ch[..frames_this_block].fill(0.0);
+            }
+
+            let in_refs: Vec<&[f32]> = in_block.iter().map(|ch| &ch[..frames_this_block]).collect();
+            let mut out_refs: Vec<&mut [f32]> = out_block
+                .iter_mut()
+                .map(|ch| &mut ch[..frames_this_block])
+                .collect();
+
+            graph.process(&in_refs, &mut out_refs);
+
+            for ch in 0..output_channels {
+                output_channels_vec[ch].extend_from_slice(&out_block[ch][..frames_this_block]);
+            }
+
+            tail_rendered += frames_this_block;
+
+            if let Some(cb) = progress_callback.as_deref_mut() {
+                let progress = (total_frames + tail_rendered) as f32 / grand_total.max(1) as f32;
                 cb(progress);
             }
         }

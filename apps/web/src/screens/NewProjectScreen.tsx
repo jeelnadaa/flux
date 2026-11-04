@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PageLayout, Tile, Field, Input, Select, Button } from "@flux/ui";
+import { ProjectStore } from "@flux/app-core";
 
 const TEMPLATES: readonly [string, string, string][] = [
   ["Blank", "One empty track at 48 kHz", "wave"],
@@ -28,6 +29,61 @@ export const NewProjectScreen: React.FC<NewProjectScreenProps> = ({ onNavigate }
     }
   };
 
+  const handleCreateProject = (templateTitle: string) => {
+    const store = ProjectStore.get();
+    store.pushUndo();
+    const st = store.getState();
+    st.name =
+      name === "Untitled project" && templateTitle !== "Blank"
+        ? `${templateTitle} Project`
+        : name;
+    const sr =
+      sampleRate === "44.1 kHz"
+        ? 44100
+        : sampleRate === "96 kHz"
+          ? 96000
+          : sampleRate === "192 kHz"
+            ? 192000
+            : 48000;
+    st.sampleRate = sr;
+
+    const tColors = ["--t1", "--t2", "--t3", "--t4", "--t5"];
+    let trackNames = ["Track 1"];
+    if (templateTitle === "Podcast") trackNames = ["Host Voice", "Guest Voice", "Music Bed"];
+    else if (templateTitle === "Music")
+      trackNames = [
+        "Kick",
+        "Snare",
+        "Bass",
+        "Lead Vocal",
+        "Synth 1",
+        "Synth 2",
+        "Guitars",
+        "Master FX",
+      ];
+    else if (templateTitle === "Voiceover") trackNames = ["Lead Voice", "Room Tone"];
+    else if (templateTitle === "Lecture") trackNames = ["Speaker Mic"];
+    else if (templateTitle === "Interview") trackNames = ["Interviewer", "Subject"];
+    else if (templateTitle === "8D music") trackNames = ["Stereo In", "Spatial Bed"];
+
+    st.tracks = trackNames.map((tName, idx) => ({
+      id: `track-${Date.now()}-${idx + 1}`,
+      name: tName,
+      colorVar: tColors[idx % tColors.length],
+      volume: 1.0,
+      pan: 0.0,
+      muted: false,
+      solo: false,
+      tall: true,
+      clips: [],
+    }));
+    st.totalFrames = sr * 16;
+    st.playheadFrame = 0;
+    st.selectedClipId = null;
+    st.selectedTrackId = st.tracks[0]?.id || null;
+    navigate("edit");
+  };
+
   return (
     <PageLayout
       currentTab="home"
@@ -39,7 +95,7 @@ export const NewProjectScreen: React.FC<NewProjectScreenProps> = ({ onNavigate }
           variant="primary"
           dataGo="edit"
           href="#edit"
-          onClick={() => navigate("edit")}
+          onClick={() => handleCreateProject("Blank")}
         />
       }
       onNavigate={navigate}
@@ -53,7 +109,7 @@ export const NewProjectScreen: React.FC<NewProjectScreenProps> = ({ onNavigate }
             icon={icon}
             dataGo="edit"
             href="#edit"
-            onClick={() => navigate("edit")}
+            onClick={() => handleCreateProject(title)}
           />
         ))}
       </div>

@@ -7,6 +7,8 @@ export interface LetterInfo {
   l: HTMLElement;
   i: number;
   x: number;
+  lastWeight?: number;
+  lastScale?: string;
 }
 
 let kin: LetterInfo[] = [];
@@ -16,6 +18,7 @@ let px = -1e4;
 let isPlaying = false;
 let rafId: number | null = null;
 let listenersAttached = false;
+let idleFrames = 0;
 
 function updateKinTokens() {
   if (typeof window === "undefined" || typeof document === "undefined") return;
@@ -103,6 +106,19 @@ export function staggerEntrance(root: HTMLElement): void {
   });
 }
 
+function safeRaf(cb: (ms: number) => void): number | null {
+  if (typeof requestAnimationFrame !== "undefined") {
+    return requestAnimationFrame(cb);
+  }
+  return null;
+}
+
+function safeCancelRaf(id: number | null) {
+  if (id !== null && typeof cancelAnimationFrame !== "undefined") {
+    cancelAnimationFrame(id);
+  }
+}
+
 function tick(ms: number) {
   if (typeof window === "undefined") return;
 
@@ -112,6 +128,8 @@ function tick(ms: number) {
 
   if (!calm && kin.length > 0) {
     const lv = isPlaying ? 0.5 + 0.4 * Math.sin(ms / 170) : 0;
+    let hasActiveMotion = false;
+
     kin.forEach((k) => {
       const v = Math.min(
         1,
@@ -122,12 +140,35 @@ function tick(ms: number) {
             lv * 0.25,
         ),
       );
-      k.l.style.fontWeight = `${Math.round(kinLo + v * (kinHi - kinLo))}`;
-      k.l.style.transform = `scaleY(${(0.94 + v * 0.2).toFixed(3)})`;
+      const targetWeight = Math.round(kinLo + v * (kinHi - kinLo));
+      const targetScale = (0.94 + v * 0.2).toFixed(3);
+
+      if (k.lastWeight !== targetWeight) {
+        k.l.style.fontWeight = `${targetWeight}`;
+        k.lastWeight = targetWeight;
+        hasActiveMotion = true;
+      }
+      if (k.lastScale !== targetScale) {
+        k.l.style.transform = `scaleY(${targetScale})`;
+        k.lastScale = targetScale;
+        hasActiveMotion = true;
+      }
     });
+
+    if (hasActiveMotion || isPlaying || px !== -1e4) {
+      idleFrames = 0;
+    } else {
+      idleFrames++;
+    }
+
+    // Sleep RAF if nothing is playing, mouse is outside, and styles are stationary
+    if (!isPlaying && px === -1e4 && idleFrames > 10) {
+      rafId = null;
+      return;
+    }
   }
 
-  rafId = requestAnimationFrame(tick);
+  rafId = safeRaf(tick);
 }
 
 function attachGlobalListeners() {
@@ -138,6 +179,10 @@ function attachGlobalListeners() {
     "pointermove",
     (e: PointerEvent) => {
       px = e.clientX;
+      idleFrames = 0;
+      if (rafId === null) {
+        rafId = safeRaf(tick);
+      }
     },
     { passive: true },
   );
@@ -158,20 +203,23 @@ function attachGlobalListeners() {
 export function startKineticAnimation(): void {
   if (typeof window === "undefined") return;
   attachGlobalListeners();
+  idleFrames = 0;
   if (rafId === null) {
-    rafId = requestAnimationFrame(tick);
+    rafId = safeRaf(tick);
   }
 }
 
 export function stopKineticAnimation(): void {
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
+  safeCancelRaf(rafId);
+  rafId = null;
 }
 
 export function setKineticPlaying(playing: boolean): void {
   isPlaying = playing;
+  if (playing && rafId === null) {
+    idleFrames = 0;
+    rafId = safeRaf(tick);
+  }
 }
 
 export function getKineticLetters(): LetterInfo[] {
