@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+import time
 
 log = os.environ.get("FLUX_STUB_LOG")
 if log:
@@ -13,4 +14,5 @@ for a in sys.argv[1:]:
 if os.environ.get("FLUX_STUB_PIP_FAIL"):
     print("ERROR: No matching distribution found", file=sys.stderr)
     sys.exit(1)
+time.sleep(float(os.environ.get("FLUX_STUB_PIP_SLEEP", "0")))
 print("Successfully installed (stub)")

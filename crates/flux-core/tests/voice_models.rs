@@ -272,7 +272,7 @@ fn fixture() -> Fx {
             {"id": "t-turbo", "name": "Test Turbo", "role": "speech", "loader": "turbo", "repo": "r", "licence": "MIT",
              "languages": ["en"], "sounds": true, "min_vram_gb": 4.0, "note": "n",
              "files": [f("a.bin", &shared), f("turbo.json", &turbo)],
-             "params": [{"key": "temperature", "label": "Variety", "min": 0.05, "max": 2.0, "step": 0.05, "default": 0.8, "tip": "t"}]},
+             "params": [{"key": "temperature", "label": "Variety", "min": 0.05, "max": 2.0, "step": 0.05, "default": 0.8, "tip": "t"}, {"key": "top_k", "label": "Choices", "min": 1.0, "max": 1000.0, "step": 1.0, "default": 1000.0, "tip": "t"}]},
             {"id": "t-english", "name": "Test English", "role": "speech", "loader": "english", "repo": "r", "licence": "MIT",
              "languages": ["en"], "sounds": false, "min_vram_gb": 6.0, "note": "n",
              "files": [f("a.bin", &shared), f("english.json", &english)],
@@ -306,6 +306,7 @@ fn fixture() -> Fx {
     .unwrap();
     let log = d.join("stub.log");
     std::env::set_var("FLUX_STUB_LOG", &log);
+    std::env::set_var("FLUX_STUB_PIP_SLEEP", "0.6");
     let a = Api::new(Store::at(data).unwrap(), true);
     Fx {
         _one_at_a_time: guard,
@@ -608,11 +609,39 @@ fn chosen_models_speak_and_convert_with_their_settings_labelled_synthetic() {
     let (code, msg) = fails(a, "clone.speak", json!({"voice": "robin", "text": "hi"}));
     assert_eq!(code, "not_installed");
     assert!(msg.contains("Test Turbo isn't downloaded"), "{msg}");
-    call(
+    // The progress bar moves through the engine's install steps, not only while bytes download.
+    let job = call(
         a,
         "clone.model.download",
-        json!({"model": "t-turbo", "confirm": true, "device_kind": "cpu", "wait": true}),
+        json!({"model": "t-turbo", "confirm": true, "device_kind": "cpu"}),
+    )["job"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let mut seen: Vec<(String, f64)> = vec![];
+    loop {
+        let j = call(a, "job.get", json!({"id": job}));
+        let st = j["stage"].as_str().unwrap_or("").to_string();
+        if st.starts_with("Installing") {
+            seen.push((st, j["progress"].as_f64().unwrap()));
+        }
+        if j["state"] != "running" {
+            assert_eq!(j["state"], "done", "{j}");
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let max_of = |name: &str| {
+        seen.iter()
+            .filter(|x| x.0 == name)
+            .map(|x| x.1)
+            .fold(0.0, f64::max)
+    };
+    let (torch, cb) = (
+        max_of("Installing PyTorch"),
+        max_of("Installing Chatterbox"),
     );
+    assert!(torch > 0.0 && cb > torch, "{seen:?}");
 
     // Speaking onto the open project: one clip on Generated speech, labelled synthetic, pauses kept as silence.
     call(a, "project.new", json!({"name": "Cloning"}));

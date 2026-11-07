@@ -365,7 +365,6 @@
     if (performance.now() - liveT > 40) flushLive();
   };
   function flushLive(end) { if (liveQ) { const q = liveQ; liveQ = null; liveT = performance.now(); call('fx.set', { fx: q.fx, params: q.params, gesture: liveG }).catch(e => fail(e)); } if (end) { liveG = null; refresh(); } }
-  F.lvl = () => { const p = D.st.peak || [0, 0], m = Math.max(p[0] || 0, p[1] || 0); return m > 0 ? 20 * Math.log10(m) : -70; };
   F.stagePlace = async (trackId, az, dist) => { const t = F.track(trackId); if (!t) return; const e = (t.fx || []).find(x => x.kind === 'spatial'); const params = { mode: 4, azimuth: Math.round(az), distance: Math.max(.2, Math.min(10, dist)) }; if (e) await act('fx.set', { fx: e.id, params }); else { try { await addFx('spatial', 'track:' + trackId, params); } catch (er) { fail(er); } } };
   F.stagePath = async pts => { let e = F.fxOf('spatial'); if (!e) { try { await addFx('spatial'); } catch (er) { fail(er); return; } e = F.fxOf('spatial'); } const xy = pts.map(([az, d]) => { const r = Math.max(0, Math.min(1, d / 10)), a = az * Math.PI / 180; return [+(Math.sin(a) * r).toFixed(4), +(Math.cos(a) * r).toFixed(4)]; }); await act('fx.set_path', { fx: e.id, points: xy }); await act('fx.set', { fx: e.id, params: { mode: 5 } }); };
 

@@ -406,7 +406,8 @@
    {
     "name": "Installing Chatterbox",
     "args": [
-     "chatterbox-tts==0.1.7"
+     "chatterbox-tts==0.1.7",
+     "setuptools==80.9.0"
     ]
    }
   ],

@@ -602,13 +602,15 @@ fn write_runner(dir: &Path) -> Result<PathBuf> {
     Ok(p)
 }
 
-/// Install the runtime: Python, then the pip steps, then check it imports every loader.
+/// Install the runtime: Python, then the pip steps, then check it imports every loader. `share` is the job progress
+/// at which the runtime is done; the Python download fills the meter's span and each pip step moves it further.
 fn install_runtime(
     root: &Path,
     c: &Catalog,
     kind: &str,
     ctx: &JobCtx,
     meter: &mut Meter,
+    share: f32,
 ) -> Result<Value> {
     let dir = runtime_dir(root, c);
     std::fs::create_dir_all(&dir)?;
@@ -653,7 +655,10 @@ fn install_runtime(
     }
     ctx.stage("Downloading Python", "done");
     ctx.stage("Unpacking", "done");
-    for s in &c.runtime.steps {
+    let py_end = meter.from + meter.span;
+    let n = c.runtime.steps.len().max(1) as f32;
+    for (i, s) in c.runtime.steps.iter().enumerate() {
+        ctx.progress(py_end + (share * 0.95 - py_end) * i as f32 / n);
         ctx.stage(&s.name, "active");
         let mut cmd = python_cmd(root, c)?;
         cmd.args([
@@ -672,6 +677,7 @@ fn install_runtime(
         }
         run_logged(cmd, ctx, &s.name)?;
         ctx.stage(&s.name, "done");
+        ctx.progress(py_end + (share * 0.95 - py_end) * (i + 1) as f32 / n);
     }
     ctx.stage("Checking the voice engine", "active");
     let runner = write_runner(&dir)?;
@@ -1003,9 +1009,9 @@ pub fn h_download(api: &Api, v: &Value) -> Result<Value> {
                     done: 0,
                     total: py.max(1),
                     from: 0.0,
-                    span: rt_share * 0.3,
+                    span: rt_share * 0.1,
                 };
-                out["runtime"] = install_runtime(&root2, &c2, &kind2, ctx, &mut m)?;
+                out["runtime"] = install_runtime(&root2, &c2, &kind2, ctx, &mut m, rt_share)?;
                 ctx.progress(rt_share);
             }
             if !todo.is_empty() {

@@ -4,9 +4,9 @@ A non-destructive audio editor for Windows, macOS (Apple silicon and Intel) and 
 AI agents can drive every feature.
 
 > **Status: v2 agent-complete.** The desktop app (engine, every screen, Live, MCP, auto-update), the website and
-> the release pipeline are built and tested on this machine. Voice models download and run from the app, tested against a local
-> mirror and a stub engine. Not yet done: a real model download and listening checks (queued), and the first GitHub
-> release run (waits for a push). See
+> the release pipeline are built and tested on this machine. Voice models download and run from the app; Chatterbox Turbo has run
+> for real on an NVIDIA chip and on a processor. Not yet done: listening checks and the other models on real hardware
+> (queued). See
 > [PLAN.md](PLAN.md) and [PROGRESS.md](PROGRESS.md).
 
 ## What works today

@@ -101,6 +101,8 @@ Model code and trained weights have distinct licenses and must be audited separa
 | CPython 3.11 (python-build-standalone builds) | Runs the models | PSF-2.0 (permissive); build scripts MPL-2.0 / BSD | Allowed; pinned archive with SHA-256 |
 | PyTorch 2.6.0, torchaudio 2.6.0 | Model runtime (CUDA 12.4, CPU or Apple builds) | BSD-3-Clause / BSD-2-Clause | Allowed; pinned |
 | `chatterbox-tts` 0.1.7 | Model code | MIT | Allowed; pinned |
+| `resemble-perth` 1.0.1 | Chatterbox's inaudible watermark | MIT | Allowed (pulled in by chatterbox-tts) |
+| `setuptools` 80.9.0 | Pinned so `pkg_resources` exists for the watermarker (removed in setuptools 81+) | MIT | Allowed; pinned |
 | Their pip dependencies (transformers, diffusers, librosa, numpy, safetensors, the Perth watermarker and others) | Installed by pip at their versions | Mostly Apache-2.0 / BSD / MIT / ISC | **Review queued**: a full audit of the resolved set is in the human queue |
 
 Stems, clean-up and text to speech use Flux's own DSP and the system speech engine; no model weights ship with Flux.

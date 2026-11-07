@@ -176,5 +176,8 @@ window.FD = (function () {
   }
   const kindName = k => { const s = spec(k); return s ? s.name : k; };
 
-  return { call, native, updater, pickFiles, pickFolder, saveAs, reveal, openUrl, onDrop, D, need, stale, PROJECT_KEYS, peaks, spectrogram, esc, db, num, tc, len, pos, bytes, ago, khz, hz, sr, minus, tracks, clips, clip, track, chain, findFx, spec, fxOf, pval, pct, unpct, fmtp, kindName };
+  // Output level in dBFS from the last status peak. Defined here, not in app.js, because viz.js draws from its first
+  // animation frame, which can run before app.js has loaded.
+  const lvl = () => { const p = (D.st && D.st.peak) || [0, 0], m = Math.max(p[0] || 0, p[1] || 0); return m > 0 ? 20 * Math.log10(m) : -70; };
+  return { call, native, lvl, updater, pickFiles, pickFolder, saveAs, reveal, openUrl, onDrop, D, need, stale, PROJECT_KEYS, peaks, spectrogram, esc, db, num, tc, len, pos, bytes, ago, khz, hz, sr, minus, tracks, clips, clip, track, chain, findFx, spec, fxOf, pval, pct, unpct, fmtp, kindName };
 })();

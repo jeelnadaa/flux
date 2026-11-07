@@ -39,6 +39,10 @@ def check():
     import torch
     import chatterbox
     from chatterbox import tts_turbo, tts, mtl_tts, vc  # noqa: F401  every loader must import
+    import perth
+    if getattr(perth, "PerthImplicitWatermarker", None) is None:
+        # perth hides its import errors; without the watermark the models refuse to load.
+        from perth.perth_net.perth_net_implicit.perth_watermarker import PerthImplicitWatermarker  # noqa: F401  raises the real error
     out = {
         "ok": True,
         "python": sys.version.split()[0],
@@ -97,10 +101,16 @@ def write_wav(path, xs, sr):
 
 def call(fn, **kw):
     # Pass only what this model's generate() accepts, so one request shape fits every loader.
+    # Settings arrive from JSON as floats; whole-number settings (top_k) go back to int, by the model's own default.
     sig = inspect.signature(fn)
-    if any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values()):
+    ps = sig.parameters
+    for k, v in list(kw.items()):
+        d = ps[k].default if k in ps else None
+        if isinstance(v, float) and isinstance(d, int) and not isinstance(d, bool):
+            kw[k] = int(round(v))
+    if any(p.kind == p.VAR_KEYWORD for p in ps.values()):
         return fn(**kw)
-    return fn(**{k: v for k, v in kw.items() if k in sig.parameters})
+    return fn(**{k: v for k, v in kw.items() if k in ps})
 
 
 def run(req_path):
