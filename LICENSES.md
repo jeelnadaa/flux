@@ -73,37 +73,29 @@ processes, so their licences do not apply to Flux's code.
 
 The desktop UI (`apps/desktop/ui`) has no third-party JavaScript.
 
----|---|---|---|---|
-| `typescript` | Build tooling / compiler | Apache-2.0 | Allowed | Microsoft Corporation |
-| `esbuild` | Fast web bundler | MIT | Allowed | Evan Wallace |
-| `react` / `react-dom` | UI component runtime & DOM renderer | MIT | Allowed | Meta Platforms, Inc. |
-| `@types/react` / `@types/react-dom` | React TypeScript definitions | MIT | Allowed | DefinitelyTyped contributors |
-| `eslint` / `typescript-eslint` | Code quality & static analysis | MIT / Apache-2.0 | Allowed | Development gate |
-| `prettier` | Code formatting | MIT | Allowed | Development gate |
-| `license-checker-rseidelsohn` | License compliance auditing | MIT | Allowed | Development gate |
-| `onnxruntime-web` | In-browser ML inference runtime (WebGPU / WASM) | MIT | Allowed | Microsoft Corporation |
-| `GSAP` *(Landing prototype)* | Kinetic animations & scroll scenes | GreenSock standard licence | **Review Queued** | Terms review queued before production release |
-| `Lenis` *(Landing prototype)* | Smooth scrolling | MIT | Allowed | Studio Freight |
-
 ---
 
 ## 5. Machine Learning Models & Weights Policy
 
 Model code and trained weights have distinct licenses and must be audited separately.
 
-| Model Pipeline | Intended Implementation | Weight Licence Policy | Status |
+| Model | Use in Flux | Code and weights licence | Status |
 |---|---|---|---|
-| Stem Separation | HTDemucs / BS-RoFormer | Audit weights licence per model card; non-commercial weights prohibited | Planned P6 |
-| Neural Denoise | DeepFilterNet / RNNoise | Permissive (MIT / Apache / CC-BY) only | Planned P6 |
-| Speech Recognition / VAD | Whisper / Silero VAD | MIT / Permissive weights only | Planned P6 |
-| Text-to-Speech | Permissive models | Coqui XTTS prohibited (non-commercial); permissive weights only | Planned P7 |
+| Chatterbox Turbo (Resemble AI) | Voice cloning default; sound tags in scripts; watermark | MIT | Chosen; weights not downloaded (needs the user's permission) |
+| Chatterbox (Resemble AI) | Voice conversion of the user's own recording; 23 languages | MIT | Chosen; weights not downloaded |
+| OpenVoice V2 (MyShell) | Lightest voice cloning fallback | MIT | Chosen; weights not downloaded |
+| Dia (Nari Labs) | Not used | Its README limits use to research and education | Rejected |
+| Coqui XTTS | Not used | Coqui Public Model Licence (non-commercial) | Rejected |
+
+Stems, clean-up and text to speech use Flux's own DSP and the system speech engine; no model weights ship with Flux.
+Weights are never committed to git. Check each model card again before downloading.
 
 ---
 
 ## 6. Audio Codecs, Patents & Containers
 
-- **MP3:** Patents have expired worldwide; decoding via Symphonia and encoding via LAME/platform encoder.
-- **AAC:** Use platform encoders (`WebCodecs` in browser, Media Foundation in desktop) to avoid patent indemnification issues with custom FDK-AAC builds.
+- **MP3:** Patents have expired worldwide; decoded by Symphonia and encoded by the `rusty_mp3` crate.
+- **AAC, Opus, M4R:** exported only through an `ffmpeg` already on the computer; Flux ships no AAC encoder.
 - **FLAC, Vorbis, Opus:** Unencumbered open formats.
 - **WAV, AIFF:** Standard uncompressed formats.
 
@@ -111,15 +103,9 @@ Model code and trained weights have distinct licenses and must be audited separa
 
 ## 7. Verification Commands
 
-To run all automated license scans across the monorepo:
-
 ```bash
-# Rust workspace dependency scan
 cargo deny check licenses
-
-# JavaScript/TypeScript dependency scan
-npm run license:check
-
-# Run full local CI suite including license scan
-just ci
 ```
+
+The website's two scripts load from cdnjs and jsDelivr and are listed in section 4. CI runs `cargo deny check` on
+every push.

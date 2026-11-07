@@ -16,7 +16,7 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 
 ### R0 Repo
 - [x] R0.1 Delete old code and brag output; archive old PLAN/PROGRESS
-- [ ] R0.2 New workspace, PLAN.md, AGENTS.md, ADRs
+- [x] R0.2 New workspace, PLAN.md (v2), ADRs 0001-0004 (AGENTS.md still describes v1's web-only rules; left for the user to change)
 
 ### R1 Engine (`crates/flux-core`)
 - [x] R1.1 Project model, edit commands, undo/redo (snapshot), project hash
@@ -63,8 +63,8 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R5.3 Build caches (rust-cache + sccache + npm) so a push only rebuilds what changed (user request 2026-11-07)
 
 ### R6 Verification and docs
-- [ ] R6.1 Full local test run, screenshots checked
-- [ ] R6.2 README, MCP guide, in-app agent guide, LICENSES
+- [x] R6.1 Full local test run, screenshots checked
+- [x] R6.2 README, MCP guide (Live and cloning sections), in-app agent guide, LICENSES (stale v1 rows removed; cloning models listed)
 
 ## Human and hardware queue
 
@@ -99,6 +99,8 @@ None.
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-08: R0.2, R6.1-R6.2: PLAN.md written for v2 (Live and voice cloning specs), 4 ADRs, MCP guide covers live_* and clone_*, LICENSES cleaned. Full run: 85 Rust tests, 16 E2E checks, 3 site tests, check-js 16 files, clippy, typos, cargo deny all green.
 
 - 2026-11-08: R5.1-R5.3: CI and Release workflows rewritten for the desktop app (old ones built the removed web app). Checked locally: YAML parses, version stamping dry run (2.0.77 into Cargo.toml and tauri.conf.json, updater files off without the key), typos clean (6 identifier words allowed), cargo deny ok. Not yet run on GitHub.
 

@@ -47,6 +47,38 @@ tool_master_apply {target: -16}
 export_start {format: "mp3", wait: true}
 ```
 
+## Live
+
+`live_*` tools run the Live page: computer sound or a microphone through a preset to any output.
+
+```text
+live_presets {}                                   # built-ins and yours
+live_devices {}                                   # device ids
+live_start {route: "output", preset: "out-8d-orbit", output: "<device id>"}
+live_preset_create {from: "out-8d-orbit", name: "My orbit"}             # returns the new id
+live_module_add {preset: "<new id>", kind: "phaser", lane: "post"}
+live_render {preset: "<new id>", source: "demo-music", seconds: 8}      # audition offline
+live_status {}                                    # levels, dropouts
+```
+
+Built-in presets are read-only: copy one with `live_preset_create {from}` first. `live_kinds` lists every effect,
+parameter and modulator shape with a description.
+
+## Voice cloning
+
+`clone_*` tools need a consented voice. `clone_status` says which model this computer gets and whether it is
+installed. Scripts use placeholders: sounds (`[laugh]`, `(sighs)`, `*chuckles*`), hesitations said in the voice
+(`[hmm]`, `[um]`, or plain words) and pauses (`[pause]`, `[long pause]`, `[pause 2s]`). Check a script first:
+
+```text
+clone_tags {}
+clone_script {text: "[hmm] So I opened it [laugh] [pause] and it was empty."}
+clone_speak {voice: "robin", text: "..."}           # unavailable until the model is installed
+clone_convert {voice: "robin", path: "C:/me.wav"}   # your take, re-voiced, timing kept
+```
+
+`consent_required` means the voice doesn't exist or the consent recording is missing.
+
 ## Privacy
 
 Flux never uploads audio. Diagnostics (`system_diagnostics`) contain no audio, transcripts or file names.

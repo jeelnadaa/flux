@@ -3,8 +3,10 @@
 A non-destructive audio editor for Windows, macOS (Apple silicon and Intel) and Linux, with an MCP server so
 AI agents can drive every feature.
 
-> **Status: rebuild in progress (v2).** The old browser app was removed on 2026-11-07. The engine and the MCP server
-> are done and tested; the desktop app, site and release pipeline are next. See [PROGRESS.md](PROGRESS.md).
+> **Status: v2 agent-complete.** The desktop app (engine, every screen, Live, MCP, auto-update), the website and
+> the release pipeline are built and tested on this machine. Not yet done: running the voice cloning model (waits
+> for permission to download it), the first GitHub release run (waits for a push), and listening checks. See
+> [PLAN.md](PLAN.md) and [PROGRESS.md](PROGRESS.md).
 
 ## What works today
 
