@@ -77,6 +77,8 @@ pub struct Settings {
     pub favorites: Vec<String>,
     pub recent_fx: Vec<String>,
     pub mcp_enabled: bool,
+    /// Download and install new releases in the background (desktop app only).
+    pub auto_update: bool,
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -107,6 +109,7 @@ impl Default for Settings {
             favorites: vec![],
             recent_fx: vec![],
             mcp_enabled: true,
+            auto_update: true,
         }
     }
 }

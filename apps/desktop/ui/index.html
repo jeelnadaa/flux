@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'">
+<title>Flux</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="themes.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="desktop.css">
+<script>try{var t=localStorage.getItem("flux-theme"),f=localStorage.getItem("flux-font");if(t)document.documentElement.dataset.flux=t;if(f)document.documentElement.dataset.font=f}catch(e){}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="crush"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="3"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter></svg>
+<div id="frame"><div id="stage" aria-live="off"></div></div>
+<script src="flux-api.js"></script>
+<script src="viz.js"></script>
+<script src="app-core.js"></script>
+<script src="screens-a.js"></script>
+<script src="screens-b.js"></script>
+<script src="screens-c.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

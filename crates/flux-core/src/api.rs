@@ -51,6 +51,10 @@ pub struct Session {
     pub last_error: Option<String>,
     pub started: std::time::Instant,
     pub calls: u64,
+    /// Gesture id of the call in progress (a slider drag sends the same id on every move).
+    pub gesture: Option<String>,
+    /// Gesture id of the last committed change. Changes in one gesture share one undo step.
+    pub last_gesture: Option<String>,
 }
 
 #[derive(Clone)]
@@ -96,6 +100,8 @@ impl Session {
             project: None,
             pool: Arc::new(Pool::new()),
             undo: vec![],
+            gesture: None,
+            last_gesture: None,
             redo: vec![],
             engine: None,
             rev: 1,
@@ -158,14 +164,21 @@ impl Session {
                     return Ok(v);
                 }
                 p.modified = crate::project::now_secs();
-                self.undo.push(Hist {
-                    label: label.to_string(),
-                    time: crate::project::now_secs(),
-                    project: before.clone(),
-                });
-                if self.undo.len() > MAX_UNDO {
-                    self.undo.remove(0);
+                let same_gesture = self.gesture.is_some()
+                    && self.gesture == self.last_gesture
+                    && self.redo.is_empty()
+                    && self.undo.last().is_some_and(|h| h.label == label);
+                if !same_gesture {
+                    self.undo.push(Hist {
+                        label: label.to_string(),
+                        time: crate::project::now_secs(),
+                        project: before.clone(),
+                    });
+                    if self.undo.len() > MAX_UNDO {
+                        self.undo.remove(0);
+                    }
                 }
+                self.last_gesture = self.gesture.clone();
                 self.redo.clear();
                 self.changed(Some(&before), label);
                 Ok(v)
@@ -307,6 +320,7 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> Result<Value> {
+        self.last_gesture = None;
         let h = self
             .undo
             .pop()
@@ -322,6 +336,7 @@ impl Session {
         Ok(json!({ "undone": label }))
     }
     pub fn redo(&mut self) -> Result<Value> {
+        self.last_gesture = None;
         let h = self
             .redo
             .pop()
@@ -394,7 +409,15 @@ impl Api {
         if !params.is_object() {
             bail!(err("bad_params", "params must be an object"));
         }
+        // `gesture` groups a stream of calls (one slider drag) into one undo step. Handlers never see it.
+        let mut params = params;
+        let gesture = match params.as_object_mut().and_then(|o| o.remove("gesture")) {
+            None | Some(Value::Null) => None,
+            Some(Value::String(g)) if !g.is_empty() && g.len() <= 64 => Some(g),
+            Some(_) => bail!(err("bad_params", "gesture must be a short string")),
+        };
         crate::methods::check_params(spec, &params)?;
+        self.lock().gesture = gesture;
         let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             (spec.handler)(self, &params)
         }));
@@ -413,6 +436,7 @@ impl Api {
             }
         };
         let mut s = self.lock();
+        s.gesture = None;
         s.calls += 1;
         if r.is_ok() && spec.records {
             if let Some(m) = s.macro_rec.as_mut() {

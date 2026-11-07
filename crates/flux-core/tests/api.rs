@@ -257,3 +257,50 @@ fn actions_record_and_replay() {
         n0 + 2
     );
 }
+
+#[test]
+fn a_gesture_is_one_undo_step() {
+    let (a, d) = api("gesture");
+    let f = wav(&d, "g.wav", 48000, 1.0);
+    call(&a, "media.import", json!({"path": f, "wait": true}));
+    let fx = call(&a, "fx.add", json!({"kind": "gain", "target": "master"}))["fx"]
+        .as_u64()
+        .unwrap();
+    let start = hash(&a);
+    let steps = |a: &Api| {
+        call(a, "history.list", json!({}))["items"]
+            .as_array()
+            .unwrap()
+            .len()
+    };
+    let n0 = steps(&a);
+    // Ten moves in one drag land as one step, and undo returns to the state before the drag.
+    for i in 1..=10 {
+        call(
+            &a,
+            "fx.set",
+            json!({"fx": fx, "params": {"gain": -(i as f64)}, "gesture": "drag-1"}),
+        );
+    }
+    assert_eq!(steps(&a), n0 + 1);
+    let after = hash(&a);
+    call(&a, "history.undo", json!({}));
+    assert_eq!(hash(&a), start);
+    call(&a, "history.redo", json!({}));
+    assert_eq!(hash(&a), after);
+    // A new gesture, or no gesture, starts a new step.
+    call(
+        &a,
+        "fx.set",
+        json!({"fx": fx, "params": {"gain": -3.0}, "gesture": "drag-2"}),
+    );
+    call(&a, "fx.set", json!({"fx": fx, "params": {"gain": -4.0}}));
+    call(&a, "fx.set", json!({"fx": fx, "params": {"gain": -5.0}}));
+    assert_eq!(steps(&a), n0 + 4);
+    // A bad gesture is rejected, not ignored.
+    let r = a.call(
+        "fx.set",
+        json!({"fx": fx, "params": {"gain": -1.0}, "gesture": 5}),
+    );
+    assert!(r.is_err());
+}

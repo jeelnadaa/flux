@@ -2046,6 +2046,9 @@ fn style_name(s: &str) -> String {
         "slowed" => "Slowed + reverb".into(),
         "8d" => "8D".into(),
         "lofi" => "Lo-fi".into(),
+        "nightcore" => "Nightcore".into(),
+        "cathedral" => "Cathedral".into(),
+        "robot" => "Robot".into(),
         _ => fx::spec(s)
             .map(|x| x.name.to_string())
             .unwrap_or_else(|| s.to_string()),

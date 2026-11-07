@@ -26,6 +26,8 @@ pub struct ExportOpts {
     pub target: f32,
     pub ceiling: f32,
     pub dither: bool,
+    /// Fade the end of the export to silence over this many seconds (0 = off).
+    pub fade_out_s: f32,
     pub tags: BTreeMap<String, String>,
     pub seed: u64,
 }
@@ -43,6 +45,7 @@ impl Default for ExportOpts {
             target: -14.0,
             ceiling: -1.0,
             dither: true,
+            fade_out_s: 0.0,
             tags: BTreeMap::new(),
             seed: 1,
         }
@@ -492,6 +495,21 @@ fn run(cmd: &mut std::process::Command) -> Result<()> {
 }
 
 /// Full export of already-rendered audio: resample, normalize, encode, verify.
+/// Raised-cosine fade over the last `n` samples, ending at exactly zero.
+pub fn fade_out(l: &mut [f32], r: &mut [f32], n: usize) {
+    let len = l.len().min(r.len());
+    let n = n.min(len);
+    if n == 0 {
+        return;
+    }
+    for k in 0..n {
+        let i = len - n + k;
+        let g = 0.5 + 0.5 * (std::f32::consts::PI * (k + 1) as f32 / n as f32).cos();
+        l[i] *= g;
+        r[i] *= g;
+    }
+}
+
 pub fn export_audio(
     mut l: Vec<f32>,
     mut r: Vec<f32>,
@@ -513,6 +531,11 @@ pub fn export_audio(
         l = resample(&l, sr, out_sr);
         r = resample(&r, sr, out_sr);
     }
+    fade_out(
+        &mut l,
+        &mut r,
+        (o.fade_out_s.clamp(0.0, 30.0) * out_sr as f32) as usize,
+    );
     let (gain, limited) = normalize(&mut l, &mut r, out_sr, o);
     if let Some(d) = path.parent() {
         std::fs::create_dir_all(d).ok();
@@ -656,6 +679,28 @@ mod tests {
         .unwrap();
         assert!((rep2.integrated + 20.0).abs() < 0.2, "{}", rep2.integrated);
     }
+    #[test]
+    fn fade_out_reaches_silence_and_leaves_the_rest() {
+        let mut l = vec![1.0f32; 1000];
+        let mut r = vec![0.5f32; 1000];
+        fade_out(&mut l, &mut r, 100);
+        assert_eq!(l[899], 1.0);
+        assert_eq!(r[899], 0.5);
+        assert!(l[900] < 1.0 && l[900] > 0.99);
+        assert!(l[950] > 0.4 && l[950] < 0.6);
+        assert!(l[999].abs() < 1e-6 && r[999].abs() < 1e-6);
+        // monotone: no bumps on the way down
+        assert!(l[900..].windows(2).all(|w| w[1] <= w[0]));
+        // zero length does nothing; a fade longer than the audio covers all of it
+        let before = l.clone();
+        fade_out(&mut l, &mut r, 0);
+        assert_eq!(l, before);
+        let mut a = vec![1.0f32; 10];
+        let mut b = vec![1.0f32; 10];
+        fade_out(&mut a, &mut b, 5000);
+        assert!(a[0] < 1.0 && a[9].abs() < 1e-6);
+    }
+
     #[test]
     fn dither_is_seeded_and_only_on_integer_paths() {
         let x = tone(48000, 0.2, 0.001);
