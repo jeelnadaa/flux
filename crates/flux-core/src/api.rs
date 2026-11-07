@@ -51,6 +51,7 @@ pub struct Session {
     pub last_error: Option<String>,
     pub started: std::time::Instant,
     pub calls: u64,
+    pub live: crate::live::Live,
     /// Gesture id of the call in progress (a slider drag sends the same id on every move).
     pub gesture: Option<String>,
     /// Gesture id of the last committed change. Changes in one gesture share one undo step.
@@ -117,6 +118,7 @@ impl Session {
             last_error: None,
             started: std::time::Instant::now(),
             calls: 0,
+            live: Default::default(),
         }
     }
 

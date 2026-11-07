@@ -304,12 +304,13 @@ fn add_generated_media(
     Ok(id)
 }
 
-fn spec_json(s: &fx::FxSpec) -> Value {
+pub fn spec_json(s: &fx::FxSpec) -> Value {
     json!({
         "kind": s.kind, "name": s.name, "group": s.group, "master_only": s.master_only, "default_mix": s.default_mix,
+        "tip": fx::tips::effect(s.kind),
         "params": s.params.iter().map(|p| {
             let options: Option<Vec<&str>> = p.unit.strip_prefix("enum:").map(|o| o.split('|').collect());
-            json!({ "key": p.key, "label": p.label, "min": p.min, "max": p.max, "default": p.def, "unit": if options.is_some() { "enum" } else { p.unit }, "log": p.log, "options": options })
+            json!({ "key": p.key, "label": p.label, "min": p.min, "max": p.max, "default": p.def, "unit": if options.is_some() { "enum" } else { p.unit }, "log": p.log, "options": options, "tip": fx::tips::param(s.kind, p.key) })
         }).collect::<Vec<_>>()
     })
 }
@@ -3615,6 +3616,37 @@ pub static METHODS: &[MethodSpec] = &[
     m!("app.capabilities", "What this computer supports: audio engine, buffers, folders, AAC, offline.", "", false, h_capabilities),
     m!("ai.status", "Which smart features are available and how each works (DSP, system, or needs a model).", "", false, h_ai_status),
     m!("mcp.info", "How to connect an agent to Flux over MCP.", "", false, h_mcp_info),
+    m!("live.status", "Live routes: what is running, levels, buffer, dropouts, and how this computer captures its own sound.", "", false, crate::live_presets::h_status),
+    m!("live.devices", "Outputs (each can be a capture source on Windows and macOS) and inputs (microphones; on Linux also Monitor sources).", "", false, crate::live_presets::h_devices),
+    m!("live.start", "Start a live route: sound from the computer or a microphone, through a live preset, out to a device.", "!route:string:output (computer sound) or input (microphone)|preset:string:Live preset id|source:string:system, input, demo-music or demo-voice|source_device:string:Device id to capture (an output for system, an input for input)|output:string:Output device id to play to; none plays nowhere", false, crate::live_presets::h_start),
+    m!("live.stop", "Stop a live route.", "!route:string:output or input", false, crate::live_presets::h_stop),
+    m!("live.set", "Change a running route: switch preset or bypass (hear the untouched sound).", "!route:string:output or input|preset:string:Live preset id|bypass:boolean:Hear the sound without the preset", false, crate::live_presets::h_set),
+    m!("live.kinds", "Every module usable live with parameters, ranges, defaults and tooltips; modulator shapes, tempo syncs, limits and tooltips for every preset control.", "", false, crate::live_presets::h_kinds),
+    m!("live.presets", "Built-in and your own live presets.", "kind:string:output, input or all", false, crate::live_presets::h_presets),
+    m!("live.preset.get", "A live preset with every lane, module, modulator and macro.", "!id:string:Live preset id", false, crate::live_presets::h_preset_get),
+    m!("live.preset.create", "Make a new live preset, empty or as a copy of another (including built-ins).", "name:string:Name|kind:string:output, input or any|from:string:Preset id to copy", false, crate::live_presets::h_preset_create),
+    m!("live.preset.save", "Save a whole live preset object (as from live.preset.get). Creates a user preset if the id is new or built-in.", "!preset:object:The live preset", false, crate::live_presets::h_preset_save),
+    m!("live.preset.update", "Change a preset's name, description, kind, tags, tempo, input and output gain, width, balance or safety limiter.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|name:string:Name|description:string:Description|kind:string:output, input or any|tags:array:Tags|tempo:number:BPM 30..300|input_gain_db:number:dB|output_gain_db:number:dB|width:number:0..2|balance:number:-1..1|safety_limiter:boolean:Limit at -1 dB", false, crate::live_presets::h_preset_update),
+    m!("live.preset.delete", "Delete a user live preset.", "!id:string:Live preset id", false, crate::live_presets::h_preset_delete),
+    m!("live.preset.export", "Export a live preset as JSON, or to a .fluxlive file.", "!id:string:Live preset id|path:string:File to write", false, crate::live_presets::h_preset_export),
+    m!("live.preset.import", "Import a live preset from a file or JSON text. It becomes a new user preset.", "path:string:A .fluxlive or .json file|json:string:Preset JSON", false, crate::live_presets::h_preset_import),
+    m!("live.module.add", "Add a module (any live effect) to a lane or the post chain.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!kind:string:Effect kind from live.kinds|lane:string:Lane id, or post (default)|index:integer:Position|params:object:Parameter values|mix:number:Dry/wet 0..1|enabled:boolean:On", false, crate::live_presets::h_module_add),
+    m!("live.module.set", "Change a module's parameters, mix, on/off, or spatial path.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!module:string:Module id|params:object:Parameter values|mix:number:Dry/wet 0..1|enabled:boolean:On|path:array:Spatial path points [[x,y],...] in -1..1", false, crate::live_presets::h_module_set),
+    m!("live.module.remove", "Remove a module (and anything modulating it).", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!module:string:Module id", false, crate::live_presets::h_module_remove),
+    m!("live.module.move", "Move a module to another position or lane.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!module:string:Module id|lane:string:Lane id or post|index:integer:Position", false, crate::live_presets::h_module_move),
+    m!("live.lane.add", "Add a parallel lane. Lanes run side by side on the input and are mixed before the post chain.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|name:string:Name|gain_db:number:Level|pan:number:-1..1", false, crate::live_presets::h_lane_add),
+    m!("live.lane.set", "Change a lane's name, level, pan or mute.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!lane:string:Lane id|name:string:Name|gain_db:number:Level -60..12|pan:number:-1..1|mute:boolean:Muted", false, crate::live_presets::h_lane_set),
+    m!("live.lane.remove", "Remove a lane and its modules.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!lane:string:Lane id", false, crate::live_presets::h_lane_remove),
+    m!("live.mod.add", "Add a modulator: LFO, random, smooth random, step sequencer, envelope follower or noise.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|name:string:Name|shape:string:sine, triangle, saw, ramp, square, random, smooth, steps, follower or noise|rate_hz:number:0.01..40|sync:string:Tempo sync like 1/4, 1/8t, 2/1 (empty for free)|depth:number:0..1|offset:number:-1..1|phase:number:0..1|bipolar:boolean:Both ways|smooth:number:0..1|steps:array:Step values 0..1|attack_ms:number:Follower attack|release_ms:number:Follower release|seed:integer:Random seed|targets:array:[{module,param,amount}]", false, crate::live_presets::h_mod_add),
+    m!("live.mod.set", "Change a modulator. Any field of live.mod.add.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!mod:string:Modulator id|name:string:Name|shape:string:Shape|rate_hz:number:Hz|sync:string:Sync|depth:number:0..1|offset:number:-1..1|phase:number:0..1|bipolar:boolean:Both ways|smooth:number:0..1|steps:array:Steps|attack_ms:number:ms|release_ms:number:ms|seed:integer:Seed|targets:array:[{module,param,amount}]", false, crate::live_presets::h_mod_set),
+    m!("live.mod.remove", "Remove a modulator.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!mod:string:Modulator id", false, crate::live_presets::h_mod_remove),
+    m!("live.mod.target", "Connect a modulator to any module parameter (or mix), change how far it moves it, or disconnect with amount 0.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!mod:string:Modulator id|!module:string:Module id|!param:string:Parameter key or mix|amount:number:-1..1 of the parameter's range", false, crate::live_presets::h_mod_target),
+    m!("live.macro.add", "Add a macro: one knob that moves many parameters.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|name:string:Name|value:number:0..1", false, crate::live_presets::h_macro_add),
+    m!("live.macro.set", "Turn a macro, rename it, or replace its targets.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!macro:string:Macro id|name:string:Name|value:number:0..1|targets:array:[{module,param,from,to,curve}]", false, crate::live_presets::h_macro_set),
+    m!("live.macro.remove", "Remove a macro.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!macro:string:Macro id", false, crate::live_presets::h_macro_remove),
+    m!("live.macro.target", "Connect a macro to a parameter with the values at 0 and 1 and a curve, or disconnect with remove.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|!macro:string:Macro id|!module:string:Module id|!param:string:Parameter key or mix|from:number:Value at 0|to:number:Value at 1|curve:number:-1..1|remove:boolean:Disconnect", false, crate::live_presets::h_macro_target),
+    m!("live.randomize", "Nudge every parameter of a user preset at random, around where it is. A creative starting point.", "!preset:string:Live preset id (a user preset; built-ins are read-only)|amount:number:0..1|seed:integer:Random seed", false, crate::live_presets::h_randomize),
+    m!("live.render", "Render a live preset offline through test music, a test voice or an audio file, to a WAV, with before and after levels. Use it to audition presets you build.", "!preset:string:Live preset id|source:string:demo-music, demo-voice, or a file path|seconds:number:0.5..120|path:string:WAV to write", false, crate::live_presets::h_render),
     m!("settings.get", "Read all settings.", "", false, h_settings_get),
     m!("settings.set", "Change settings (theme, font, mode, output, input, buffer, safety_limiter, export_dir, ...).", "!values:object:Settings to change, e.g. {\"theme\":\"vinyl\"}", false, h_settings_set),
     m!("system.diagnostics", "A diagnostic report. Never includes audio, transcripts or file names.", "", false, h_diag),

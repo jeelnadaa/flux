@@ -9,6 +9,7 @@ pub mod glitch;
 pub mod pitch;
 pub mod space;
 pub mod spatial;
+pub mod tips;
 
 use serde::Serialize;
 

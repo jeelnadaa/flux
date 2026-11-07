@@ -6,7 +6,9 @@ Rebuild started 2026-11-07 at the user's request. The old web/WASM code was dele
 ## Current focus
 
 Rebuild v2: native desktop app (Windows, macOS Apple + Intel, Linux), Flux MCP server, landing and download site,
-CI/CD that publishes a GitHub release on every push to `main`.
+CI/CD that publishes a GitHub release on every push to `main`. Added 2026-11-07: in-app auto-update, Live
+(computer sound and microphone through modular live presets, app + MCP), tooltips on every control, voice cloning
+research, launch video.
 
 ## Checklist (v2 rebuild)
 
@@ -34,9 +36,20 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R2.3 `flux-mcp serve` (HTTP API + UI) for E2E tests
 
 ### R3 Desktop app (`apps/desktop`)
-- [ ] R3.1 UI shell ported from design (kit, viz, routing, themes, fonts, motion)
-- [ ] R3.2 All 87 screens wired to real data
-- [ ] R3.3 Tauri shell, file dialogs, drag and drop, icons, bundles
+- [x] R3.1 UI shell ported from design (kit, viz, routing, themes, fonts, motion)
+- [x] R3.2 All screens wired to real data (90 render against the real engine without errors)
+- [x] R3.3 Tauri shell, file dialogs, drag and drop, icons, bundles (signed NSIS + MSI built locally)
+- [x] R3.4 In-app auto-update: background check (5 s after launch, then every 6 h), signed download, install on restart or quit, toggle in Settings > About (user request 2026-11-07)
+
+### R7 Live (user request 2026-11-07)
+- [x] R7.1 Live engine: capture computer sound (WASAPI loopback; CoreAudio tap on macOS 14.6+; Monitor inputs on Linux) or a microphone, process, play to any output; drift-correcting resampler; feedback guard; lock-free updates
+- [x] R7.2 Modular live presets: parallel lanes + post chain of any of 39 live effects, 10 modulator shapes (LFOs, random, steps, envelope follower) with tempo sync, macros with ranges and curves, safety limiter
+- [x] R7.3 41 built-in live presets (21 for computer sound, 20 for a microphone); create, copy, edit, randomize, export/import (.fluxlive), hostile-input checks
+- [x] R7.4 31 `live.*` methods = 31 MCP tools, including `live.render` so agents can audition presets offline
+- [ ] R7.5 Live page in the app (composed from the kit; not in design/), with tooltips on every control
+- [x] R7.6 Tooltips: every effect and parameter (`fx.catalog`, `live.kinds`), enforced by a test
+- [ ] R7.7 Tooltips shown on every control in the UI
+- [ ] R7.8 Voice cloning with a local model chosen for the computer: research, consent design, gate
 
 ### R4 Site (`site/`, deployed by Cloudflare Pages from `dist-static/`)
 - [ ] R4.1 Landing improved for the desktop app
@@ -53,6 +66,9 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 
 ## Human and hardware queue
 
+- Listen to all 41 built-in live presets on headphones and speakers (agents can't judge sound).
+- Live on macOS (14.6+ system audio permission) and Linux (PipeWire/Pulse monitor inputs): only built in CI so far.
+
 - Listening checks for every effect (no agent can judge sound).
 - Real-device playback and recording on WASAPI, CoreAudio and ALSA (tests use the null device).
 - macOS and Linux builds are only exercised in CI; run them on real machines.
@@ -65,12 +81,19 @@ None.
 
 ## Decision log
 
+- 2026-11-07: Live can't make Flux appear as an output device for other apps: that needs a signed kernel audio driver. Instead Flux captures an output device (loopback) and plays to another. To route a processed mic into call apps the user installs a virtual cable; Flux says so in the app and over MCP.
+- 2026-11-07: Live presets exclude speed, convolver, noise reduction and tape stop (they need a file or move time). "Slowed + reverb" therefore lowers pitch and says so.
+- 2026-11-07: Updater signing key lives outside the repo (`%USERPROFILE%\.flux-signing`); CI reads `TAURI_SIGNING_PRIVATE_KEY`. Builds are not code-signed (queued).
+
 - 2026-11-07: `.gitignore` `Flux-*/` matched `crates/flux-core/` on case-insensitive Windows; anchored to the repo root.
 - 2026-11-07: Without bundled models, stems/cleanup/master/magic use DSP and say so; transcript, fillers, dub and clone return `unavailable`. TTS uses the OS speech engine and is labelled synthetic.
 
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-07: R7.1-R7.4, R7.6: live engine + presets + 31 MCP tools + tooltips. 82 Rust tests green (14 new live unit tests, 1 end-to-end API test, tooltip coverage test); tests fail when modulation or in-place updates are broken on purpose. Real hardware on this Windows machine: WASAPI loopback of the headphones read -33.0 dB RMS for a -30 dBFS sine (expected -33.0), 0 dropouts; microphone route ran; a route played into the Bluetooth headphones and switched presets live; capture-and-play on one device refused as feedback.
+- 2026-11-07: R3.3-R3.4: Tauri shell; signed NSIS (8.2 MB) and MSI (11.4 MB) built; release app launched and flux-mcp attached (headless=false).
 
 - 2026-11-07: R1.7-R1.10, R2.1-R2.3: session API (123 methods, one registry for UI/MCP/tests), jobs, localhost control server (token, Host/Origin checks), flux-mcp stdio (headless + attach) and `serve`. 62 Rust tests green; clippy -D warnings clean; cargo deny ok. Auto-master lands within 0.25 LU of target (iterative limiter trim). Glide test: largest sample step 0.0078 on a -24 dB change (was 0.34 before smoothing).
 

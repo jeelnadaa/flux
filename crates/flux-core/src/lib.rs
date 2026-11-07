@@ -8,6 +8,8 @@ pub mod dsp;
 pub mod export;
 pub mod fx;
 pub mod jobs;
+pub mod live;
+pub mod live_presets;
 pub mod media;
 pub mod methods;
 pub mod project;

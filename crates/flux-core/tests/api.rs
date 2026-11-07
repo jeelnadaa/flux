@@ -304,3 +304,230 @@ fn a_gesture_is_one_undo_step() {
     );
     assert!(r.is_err());
 }
+
+fn code(a: &Api, m: &str, p: Value) -> &'static str {
+    flux_core::api::error_code(&a.call(m, p).expect_err(m))
+}
+
+#[test]
+fn live_presets_build_edit_route_render_export_and_import() {
+    let (a, d) = api("live");
+    // catalogue: kinds with tooltips, shapes, many built-ins of each kind
+    let k = call(&a, "live.kinds", json!({}));
+    let kinds = k["kinds"].as_array().unwrap();
+    assert!(kinds.len() >= 35);
+    assert!(kinds.iter().all(|x| x["tip"].is_string()
+        && x["params"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| p["tip"].is_string())));
+    assert!(kinds.iter().all(|x| x["kind"] != "speed"));
+    assert_eq!(k["shapes"].as_array().unwrap().len(), 10);
+    let outs = call(&a, "live.presets", json!({"kind": "output"}));
+    let ins = call(&a, "live.presets", json!({"kind": "input"}));
+    assert!(outs.as_array().unwrap().len() >= 15 && ins.as_array().unwrap().len() >= 15);
+
+    // built-ins are read-only; copying one makes an editable preset
+    assert_eq!(
+        code(
+            &a,
+            "live.module.add",
+            json!({"preset": "out-8d-orbit", "kind": "gain"})
+        ),
+        "read_only"
+    );
+    let mine = call(&a, "live.preset.create", json!({"from": "out-8d-orbit"}));
+    let id = mine["id"].as_str().unwrap().to_string();
+    assert!(id.starts_with("user-") && mine["builtin"] == false);
+    assert_eq!(mine["post"].as_array().unwrap().len(), 2);
+
+    // build a rig: a parallel lane with an octave, an LFO on reverb, a macro on spatial rate
+    let r = call(&a, "live.lane.add", json!({"preset": id, "name": "Octave"}));
+    let lane = r["result"]["lane"].as_str().unwrap().to_string();
+    let r = call(
+        &a,
+        "live.module.add",
+        json!({"preset": id, "kind": "pitch", "lane": lane, "params": {"semitones": -12}}),
+    );
+    let pitch = r["result"]["module"].as_str().unwrap().to_string();
+    let r = call(
+        &a,
+        "live.mod.add",
+        json!({"preset": id, "shape": "steps", "sync": "1/8", "steps": [0, 1, 0.5, 1]}),
+    );
+    let lfo = r["result"]["mod"].as_str().unwrap().to_string();
+    call(
+        &a,
+        "live.mod.target",
+        json!({"preset": id, "mod": lfo, "module": "rv", "param": "mix", "amount": 0.4}),
+    );
+    call(
+        &a,
+        "live.macro.target",
+        json!({"preset": id, "macro": "speed", "module": pitch, "param": "semitones", "from": -12, "to": 0}),
+    );
+    let p = call(
+        &a,
+        "live.macro.set",
+        json!({"preset": id, "macro": "speed", "value": 0.9}),
+    )["preset"]
+        .clone();
+    assert_eq!(p["lanes"][0]["modules"][0]["kind"], "pitch");
+    assert_eq!(p["mods"][0]["targets"][0]["param"], "mix");
+    // bad edits are refused with clear codes, and leave the preset as it was
+    assert_eq!(
+        code(
+            &a,
+            "live.module.add",
+            json!({"preset": id, "kind": "speed"})
+        ),
+        "bad_params"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "live.module.set",
+            json!({"preset": id, "module": pitch, "params": {"loudness": 3}})
+        ),
+        "bad_params"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "live.mod.target",
+            json!({"preset": id, "mod": lfo, "module": "ghost", "param": "gain"})
+        ),
+        "bad_params"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "live.mod.set",
+            json!({"preset": id, "mod": lfo, "sync": "1/7"})
+        ),
+        "bad_params"
+    );
+    let again = call(&a, "live.preset.get", json!({"id": id}));
+    assert_eq!(again, p);
+
+    // removing a module also removes what pointed at it
+    call(
+        &a,
+        "live.module.remove",
+        json!({"preset": id, "module": "rv"}),
+    );
+    let p = call(&a, "live.preset.get", json!({"id": id}));
+    assert!(p["mods"][0]["targets"].as_array().unwrap().is_empty());
+
+    // a route on the test source plays the preset; edits reach it live
+    let st = call(
+        &a,
+        "live.start",
+        json!({"route": "output", "preset": id, "source": "demo-music", "output": "none"}),
+    );
+    assert_eq!(st["running"], true);
+    std::thread::sleep(Duration::from_millis(400));
+    let s1 = call(&a, "live.status", json!({}));
+    assert!(s1["routes"]["output"]["frames"].as_u64().unwrap() > 9000);
+    assert!(s1["routes"]["output"]["out_rms_db"].as_f64().unwrap() > -40.0);
+    assert_eq!(code(&a, "live.preset.delete", json!({"id": id})), "busy");
+    call(
+        &a,
+        "live.preset.update",
+        json!({"preset": id, "output_gain_db": -20}),
+    );
+    std::thread::sleep(Duration::from_millis(400));
+    let s2 = call(&a, "live.status", json!({}));
+    let drop_db = s1["routes"]["output"]["out_rms_db"].as_f64().unwrap()
+        - s2["routes"]["output"]["out_rms_db"].as_f64().unwrap();
+    assert!(drop_db > 12.0, "output gain edit dropped only {drop_db} dB");
+    call(&a, "live.set", json!({"route": "output", "bypass": true}));
+    call(&a, "live.stop", json!({"route": "output"}));
+    assert!(call(&a, "live.status", json!({}))["routes"]["output"].is_null());
+    // devices are off in tests: a real source is refused, not faked
+    assert_eq!(
+        code(
+            &a,
+            "live.start",
+            json!({"route": "input", "preset": "in-robot"})
+        ),
+        "no_device"
+    );
+    assert_eq!(
+        code(&a, "live.start", json!({"route": "sideways"})),
+        "bad_params"
+    );
+
+    // offline render through the test voice
+    let out = d.join("robot.wav");
+    let r = call(
+        &a,
+        "live.render",
+        json!({"preset": "in-robot", "seconds": 2, "path": out.display().to_string()}),
+    );
+    assert_eq!(r["changed"], true);
+    assert!(
+        r["out_peak_db"].as_f64().unwrap() <= -0.9,
+        "safety limiter: {}",
+        r["out_peak_db"]
+    );
+    assert_eq!(hound::WavReader::open(&out).unwrap().duration(), 96000);
+
+    // export, import as a new preset, identical content
+    let file = d.join("mine.fluxlive");
+    call(
+        &a,
+        "live.preset.export",
+        json!({"id": id, "path": file.display().to_string()}),
+    );
+    let imp = call(
+        &a,
+        "live.preset.import",
+        json!({"path": file.display().to_string()}),
+    );
+    assert_ne!(imp["id"], p["id"]);
+    let p = call(&a, "live.preset.get", json!({"id": id}));
+    let (mut x, mut y) = (imp.clone(), p.clone());
+    x["id"] = json!(null);
+    y["id"] = json!(null);
+    assert_eq!(x, y);
+    // hostile imports are refused
+    assert_eq!(
+        code(&a, "live.preset.import", json!({"json": "{not json"})),
+        "bad_file"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "live.preset.import",
+            json!({"json": "{\"post\":[{\"kind\":\"rm -rf\"}]}"})
+        ),
+        "bad_file"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "live.preset.import",
+            json!({"json": "x".repeat(600 * 1024)})
+        ),
+        "bad_file"
+    );
+
+    // randomize stays in range and is seeded
+    let r1 = call(
+        &a,
+        "live.randomize",
+        json!({"preset": imp["id"], "amount": 1, "seed": 4}),
+    )["preset"]
+        .clone();
+    for m in r1["lanes"][0]["modules"].as_array().unwrap() {
+        let st = m["params"]["semitones"].as_f64().unwrap();
+        assert!((-12.0..=12.0).contains(&st));
+    }
+    call(&a, "live.preset.delete", json!({"id": imp["id"]}));
+    assert_eq!(
+        code(&a, "live.preset.get", json!({"id": imp["id"]})),
+        "not_found"
+    );
+}
