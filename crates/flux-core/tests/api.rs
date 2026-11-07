@@ -644,6 +644,31 @@ fn voice_cloning_needs_consent_and_reports_the_model_for_this_computer() {
     );
     assert_eq!(sc["model_text"], "Well [laugh] hmm, [sigh] okay");
     assert_eq!(sc["sounds"], 2);
+    assert_eq!(sc["hesitations"], 1);
+    let sc = call(
+        &a,
+        "clone.script",
+        json!({"text": "[hmm] So [laugh] [pause 1.5s] (um) yes"}),
+    );
+    assert_eq!(
+        sc["segments"],
+        json!([
+            {"type": "say", "value": "Hmm, So [laugh]"},
+            {"type": "silence", "value": 1500},
+            {"type": "say", "value": "Um, yes"}
+        ])
+    );
+    assert_eq!(
+        (sc["hesitations"].as_u64(), sc["silence_ms"].as_u64()),
+        (Some(2), Some(1500))
+    );
+    let t = call(&a, "clone.tags", json!({}));
+    assert!(t["hesitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|h| h["tag"] == "hmm"));
+    assert!(t["pauses"].as_array().unwrap().len() >= 3);
     assert_eq!(
         code(
             &a,

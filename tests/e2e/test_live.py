@@ -283,8 +283,21 @@ def main():
             page.fill('[data-cin="script"]', "Okay [laugh] hmm, (sighs) fine.")
             page.click('[data-cact="check"]')
             wait(page, 500)
-            pills = ev("[...document.querySelectorAll('.box p .pill')].map(p => p.textContent)")
+            pills = ev("[...document.querySelectorAll('[data-cparts] .pill')].map(p => p.textContent)")
             assert pills == ["laugh", "sigh"], pills
+            # Hesitation and pause placeholders, typed and inserted from the chips.
+            page.fill('[data-cin="script"]', "So [laugh] [pause 1.5s] (um) yes")
+            page.click('[data-cact="tag"][data-t="hmm"]')
+            page.click('[data-cact="check"]')
+            wait(page, 500)
+            script_now = page.input_value('[data-cin="script"]')
+            assert "[hmm]" in script_now, script_now
+            pills = ev("[...document.querySelectorAll('[data-cparts] .pill')].map(p => p.textContent)")
+            assert pills.count("hmm") == 1 and "um" in pills and "laugh" in pills and "1.5 s pause" in pills, pills
+            summary = page.inner_text("[data-csum]")
+            assert "1 sound" in summary and "2 hesitations" in summary and "1.5 s of pauses" in summary, summary
+            for kind in ["Sounds", "Hesitations", "Pauses"]:
+                assert page.locator(f"text={kind}").count() >= 1, kind
             page.fill('[data-cin="script"]', "hello [yodel]")
             page.click('[data-cact="check"]')
             wait(page, 500)

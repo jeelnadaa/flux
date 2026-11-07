@@ -36,9 +36,13 @@ AI agents can drive every feature.
 
 - **Voice cloning, with consent.** Flux checks the computer (graphics chip, video memory, memory) and picks a local
   model: Chatterbox Turbo (MIT), which performs `[laugh]`, `[sigh]`, `[cough]` and other sounds written in a script
-  and says hmm and um as written; Chatterbox (MIT) to turn your own recording into the voice, keeping your timing;
+  and says hesitations in the cloned voice; Chatterbox (MIT) to turn your own recording into the voice, keeping your
+  timing, laughs and hesitations exactly;
   OpenVoice V2 (MIT) where memory is tight. A voice is only made with the owner's consent recording and a clip, kept
-  on this computer. **Speaking in the voice is not working yet:** the model download waits for permission, so
+  on this computer. Scripts take three kinds of placeholder, inserted by typing or from chips: sounds (`[laugh]`,
+  `(sighs)`, `*chuckles*`), hesitations said in the voice (`[hmm]`, `[um]`, `[uh]`, or plain words) and exact
+  silences (`[pause]`, `[long pause]`, `[pause 2s]`). `clone.script` shows the pieces the generator will speak and the
+  silences between them. **Speaking in the voice is not working yet:** the model download waits for permission, so
   `clone.speak` and `clone.convert` say exactly what they would use and why they can't yet.
 
 - **Website (`site/`).** A landing page and a download page with no web app. The download page reads the latest

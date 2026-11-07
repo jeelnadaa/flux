@@ -51,7 +51,7 @@ pub const MODELS: &[Model] = &[
         size_gb: 1.4,
         languages: 1,
         needs: "Best on an NVIDIA graphics chip with 4 GB of video memory or Apple silicon; also runs on a processor with 8 GB of memory, more slowly.",
-        note: "The most expressive: clones a voice from one 5 to 20 second clip and performs [laugh], [chuckle], [sigh], [gasp], [cough] and other sounds written in the script, and says hmm, um and uh as written. English. Adds an inaudible watermark marking speech as synthetic.",
+        note: "The most expressive: clones a voice from one 5 to 20 second clip and performs [laugh], [chuckle], [sigh], [gasp], [cough] and other sounds written in the script, and says hmm, um and uh in the cloned voice, written as words or as [hmm] placeholders. A reference clip with laughter in it carries that laugh into the clone. English. Adds an inaudible watermark marking speech as synthetic.",
     },
     Model {
         id: "chatterbox",
@@ -154,17 +154,66 @@ pub const TAGS: &[(&str, &[&str])] = &[
     ("shush", &["shush", "shh"]),
 ];
 
-/// A script, split into what is said and the sounds between.
+/// Hesitations a script can ask for as placeholders: [hmm], (um), *uh*. The voice says them as words, in the cloned
+/// voice, so they sound like the speaker rather than a sound effect. Written plainly (hmm, um) they work the same.
+pub const HESITATIONS: &[(&str, &[&str])] = &[
+    ("hmm", &["hmm", "hm", "hmmm", "mm", "mmm", "thinking"]),
+    ("um", &["um", "umm", "erm"]),
+    ("uh", &["uh", "uhh", "er", "err"]),
+    ("mm-hmm", &["mm-hmm", "mhm", "uh-huh", "agree"]),
+    ("ah", &["ah", "ahh", "aah"]),
+    ("oh", &["oh", "ohh", "ooh"]),
+    ("huh", &["huh"]),
+    ("uh-oh", &["uh-oh"]),
+    ("well", &["well"]),
+];
+
+/// Plain words that count as hesitations when they stand alone in the text.
+const HESITATION_WORDS: &[&str] = &[
+    "hmm", "hm", "hmmm", "mm", "mmm", "um", "umm", "erm", "uh", "uhh", "er", "mm-hmm", "mhm",
+    "uh-huh", "ah", "ahh", "huh",
+];
+
+/// Longest pause a script can ask for, in milliseconds.
+pub const MAX_PAUSE_MS: u32 = 5000;
+
+/// A script, split into what is said, the hesitations, the sounds and the pauses between.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", content = "value", rename_all = "lowercase")]
 pub enum Part {
     Text(String),
+    Hesitation(&'static str),
     Sound(&'static str),
+    Pause(u32),
 }
 
-/// Parse a script with placeholders. Hesitations like hmm, um and uh are words and stay in the text, so the voice
-/// says them. An unknown tag in [] {} or <> is refused with the list of known ones, because models guess badly.
-/// Text in () or ** that isn't a known sound is kept as words.
+/// Read a pause placeholder: pause, beat, long pause, pause 2s, pause 300ms, 1.5s.
+fn pause_ms(inner: &str) -> Option<u32> {
+    match inner {
+        "pause" | "short pause" => return Some(500),
+        "beat" => return Some(300),
+        "long pause" => return Some(1200),
+        _ => {}
+    }
+    let rest = inner.strip_prefix("pause").map(str::trim).unwrap_or(inner);
+    let (num, scale) = if let Some(n) = rest.strip_suffix("ms") {
+        (n, 1.0)
+    } else if let Some(n) = rest
+        .strip_suffix("seconds")
+        .or_else(|| rest.strip_suffix("second"))
+    {
+        (n, 1000.0)
+    } else {
+        (rest.strip_suffix('s')?, 1000.0)
+    };
+    let v: f64 = num.trim().parse().ok()?;
+    (v.is_finite() && v > 0.0).then(|| ((v * scale).round() as u32).clamp(50, MAX_PAUSE_MS))
+}
+
+/// Parse a script with placeholders. Sounds ([laugh], (sighs)) are performed by the model. Hesitations ([hmm], [um])
+/// and plain hmm, um, uh are said as words in the voice. Pauses ([pause], [pause 2s]) become silence. An unknown tag
+/// in [] {} or <> is refused with the list of known ones, because models guess badly. Text in () or ** that isn't a
+/// known placeholder is kept as words.
 pub fn parse_script(s: &str) -> Result<Vec<Part>> {
     if s.chars().count() > 5000 {
         bail!(err(
@@ -192,25 +241,32 @@ pub fn parse_script(s: &str) -> Result<Vec<Part>> {
                     .collect::<String>()
                     .trim()
                     .to_lowercase();
-                match TAGS
-                    .iter()
-                    .find(|(_, al)| al.contains(&inner.as_str()))
-                    .map(|(t, _)| *t)
-                {
-                    Some(t) => {
+                let inner = inner.split_whitespace().collect::<Vec<_>>().join(" ");
+                let find = |list: &[(&'static str, &[&str])]| {
+                    list.iter()
+                        .find(|(_, al)| al.contains(&inner.as_str()))
+                        .map(|(t, _)| *t)
+                };
+                let part = find(TAGS)
+                    .map(Part::Sound)
+                    .or_else(|| find(HESITATIONS).map(Part::Hesitation))
+                    .or_else(|| pause_ms(&inner).map(Part::Pause));
+                match part {
+                    Some(p) => {
                         if !text.trim().is_empty() {
                             out.push(Part::Text(text.trim().to_string()));
                         }
                         text.clear();
-                        out.push(Part::Sound(t));
+                        out.push(p);
                         i = j + 1;
                         continue;
                     }
                     None if matches!(cs[i], '[' | '{' | '<') => {
-                        let known: Vec<&str> = TAGS.iter().map(|t| t.0).collect();
+                        let known: Vec<&str> =
+                            TAGS.iter().chain(HESITATIONS).map(|t| t.0).collect();
                         bail!(err(
                             "bad_params",
-                            format!("Flux doesn't know the sound [{inner}]. Use one of: {}. Hesitations like hmm and um are words: write them as they sound.", known.join(", "))
+                            format!("Flux doesn't know [{inner}]. Use one of: {}, or a pause such as [pause], [long pause] or [pause 2s].", known.join(", "))
                         ));
                     }
                     None => {}
@@ -229,16 +285,108 @@ pub fn parse_script(s: &str) -> Result<Vec<Part>> {
     Ok(out)
 }
 
-/// The script as Chatterbox Turbo reads it: words with [tag] markers.
-pub fn turbo_text(parts: &[Part]) -> String {
-    parts
-        .iter()
-        .map(|p| match p {
+/// One piece of the script as Chatterbox Turbo reads it: words with [tag] markers, without pauses.
+fn turbo_piece(parts: &[Part]) -> String {
+    let mut out = String::new();
+    for (k, p) in parts.iter().enumerate() {
+        let w = match p {
             Part::Text(t) => t.clone(),
             Part::Sound(s) => format!("[{s}]"),
+            Part::Pause(_) => continue,
+            Part::Hesitation(h) => {
+                // A hesitation is said as a word, set off by a comma like people write it. It starts with a capital
+                // where a sentence starts.
+                let start = out.trim_end().is_empty() || out.trim_end().ends_with(['.', '!', '?']);
+                let mut w = if start {
+                    let mut c = h.chars();
+                    c.next()
+                        .map(|f| f.to_uppercase().chain(c).collect())
+                        .unwrap_or_default()
+                } else {
+                    h.to_string()
+                };
+                let next_is_words = matches!(parts.get(k + 1), Some(Part::Text(t)) if !t.starts_with([',', '.', '!', '?', ';', ':']));
+                if next_is_words {
+                    w.push(',');
+                } else if parts.get(k + 1).is_none() {
+                    w.push_str("...");
+                }
+                w
+            }
+        };
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(&w);
+    }
+    out
+}
+
+/// The script as Chatterbox Turbo reads it: words with [tag] markers. A pause shows as "...".
+pub fn turbo_text(parts: &[Part]) -> String {
+    segments(parts)
+        .iter()
+        .map(|s| match s {
+            Segment::Say(t) => t.clone(),
+            Segment::Silence(_) => "...".into(),
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// What the generator does, in order: speak a piece in the voice, or leave silence. Pauses split the script so the
+/// silence is exact rather than left to the model.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", content = "value", rename_all = "lowercase")]
+pub enum Segment {
+    Say(String),
+    Silence(u32),
+}
+
+pub fn segments(parts: &[Part]) -> Vec<Segment> {
+    let mut out = vec![];
+    let mut piece: Vec<Part> = vec![];
+    let mut silence = 0u32;
+    for p in parts {
+        if let Part::Pause(ms) = p {
+            if !piece.is_empty() {
+                out.push(Segment::Say(turbo_piece(&piece)));
+                piece.clear();
+            }
+            // Pauses that touch add up, to at most MAX_PAUSE_MS.
+            silence = (silence + ms).min(MAX_PAUSE_MS);
+        } else {
+            if silence > 0 {
+                out.push(Segment::Silence(silence));
+                silence = 0;
+            }
+            piece.push(p.clone());
+        }
+    }
+    if !piece.is_empty() {
+        out.push(Segment::Say(turbo_piece(&piece)));
+    }
+    if silence > 0 {
+        out.push(Segment::Silence(silence));
+    }
+    out
+}
+
+/// Hesitations in the script, written as placeholders or as plain words.
+pub fn hesitation_count(parts: &[Part]) -> usize {
+    parts
+        .iter()
+        .map(|p| match p {
+            Part::Hesitation(_) => 1,
+            Part::Text(t) => t
+                .split(|c: char| {
+                    c.is_whitespace() || matches!(c, ',' | '.' | '!' | '?' | ';' | ':' | '"')
+                })
+                .filter(|w| HESITATION_WORDS.contains(&w.to_lowercase().as_str()))
+                .count(),
+            _ => 0,
+        })
+        .sum()
 }
 
 fn run(cmd: &str, args: &[&str]) -> Option<String> {
@@ -594,8 +742,15 @@ pub fn h_profile_delete(api: &Api, v: &Value) -> Result<Value> {
 pub fn h_tags(_: &Api, _: &Value) -> Result<Value> {
     Ok(json!({
         "tags": TAGS.iter().map(|(t, al)| json!({"tag": t, "also": al})).collect::<Vec<_>>(),
-        "how": "Write sounds in the script as [laugh], (laughs), *sighs* or {cough}. Write hesitations as words: hmm, um, uh, mm-hmm. To keep your own timing exactly, record yourself and use clone.convert.",
-        "example": "So I opened the box [laugh] and, hmm, it was empty. [sigh] Of course it was.",
+        "hesitations": HESITATIONS.iter().map(|(t, al)| json!({"tag": t, "also": al})).collect::<Vec<_>>(),
+        "pauses": [
+            {"tag": "beat", "ms": 300},
+            {"tag": "pause", "ms": 500},
+            {"tag": "long pause", "ms": 1200},
+            {"tag": "pause 2s", "ms": 2000, "note": format!("Any length, as pause 300ms or pause 1.5s, up to {} seconds.", MAX_PAUSE_MS / 1000)},
+        ],
+        "how": "Sounds the voice performs: [laugh], (laughs), *sighs*, {cough}. Hesitations said in the voice: [hmm], [um], [uh], or write them as words (hmm, um). Silence: [pause], [long pause], [pause 2s]. To keep your own timing, laughs and hesitations exactly, record yourself and use clone.convert.",
+        "example": "So I opened the box [laugh] and [hmm] it was empty. [pause] [sigh] Of course it was.",
     }))
 }
 
@@ -603,9 +758,15 @@ pub fn h_tags(_: &Api, _: &Value) -> Result<Value> {
 pub fn h_script(_: &Api, v: &Value) -> Result<Value> {
     let text = os(v, "text").ok_or_else(|| err("bad_params", "`text` is required"))?;
     let parts = parse_script(&text)?;
-    Ok(
-        json!({"parts": parts, "model_text": turbo_text(&parts), "sounds": parts.iter().filter(|p| matches!(p, Part::Sound(_))).count()}),
-    )
+    let segs = segments(&parts);
+    Ok(json!({
+        "parts": parts,
+        "model_text": turbo_text(&parts),
+        "segments": segs,
+        "sounds": parts.iter().filter(|p| matches!(p, Part::Sound(_))).count(),
+        "hesitations": hesitation_count(&parts),
+        "silence_ms": segs.iter().map(|s| match s { Segment::Silence(ms) => *ms, _ => 0 }).sum::<u32>(),
+    }))
 }
 
 fn need_voice(api: &Api, v: &Value) -> Result<String> {
@@ -754,6 +915,89 @@ mod tests {
         assert_eq!(
             parse_script("wait [laugh").unwrap(),
             vec![Part::Text("wait [laugh".into())]
+        );
+    }
+
+    #[test]
+    fn hesitation_and_pause_placeholders_are_said_in_the_voice_and_timed() {
+        let p = parse_script("[hmm] I think so. (um) Well [laugh] [pause] it's *uh* fine [long pause] [pause 2s] Bye [hmm]").unwrap();
+        assert_eq!(
+            p,
+            vec![
+                Part::Hesitation("hmm"),
+                Part::Text("I think so.".into()),
+                Part::Hesitation("um"),
+                Part::Text("Well".into()),
+                Part::Sound("laugh"),
+                Part::Pause(500),
+                Part::Text("it's".into()),
+                Part::Hesitation("uh"),
+                Part::Text("fine".into()),
+                Part::Pause(1200),
+                Part::Pause(2000),
+                Part::Text("Bye".into()),
+                Part::Hesitation("hmm"),
+            ]
+        );
+        assert_eq!(
+            segments(&p),
+            vec![
+                Segment::Say("Hmm, I think so. Um, Well [laugh]".into()),
+                Segment::Silence(500),
+                Segment::Say("it's uh, fine".into()),
+                Segment::Silence(3200),
+                Segment::Say("Bye hmm...".into()),
+            ]
+        );
+        assert_eq!(
+            turbo_text(&p),
+            "Hmm, I think so. Um, Well [laugh] ... it's uh, fine ... Bye hmm..."
+        );
+        // Placeholders and plain words both count as hesitations.
+        assert_eq!(hesitation_count(&p), 4);
+        assert_eq!(
+            hesitation_count(&parse_script("Hmm, um, I mean... uh-huh.").unwrap()),
+            3
+        );
+        // Aliases, spacing and case.
+        assert_eq!(
+            parse_script("[ Mm-Hmm ]").unwrap(),
+            vec![Part::Hesitation("mm-hmm")]
+        );
+        assert_eq!(parse_script("{erm}").unwrap(), vec![Part::Hesitation("um")]);
+        assert_eq!(
+            parse_script("<thinking>").unwrap(),
+            vec![Part::Hesitation("hmm")]
+        );
+        // Pause lengths: any unit, clamped to 50 ms .. 5 s; pauses that touch add up to at most 5 s.
+        assert_eq!(
+            parse_script("[pause 300ms]").unwrap(),
+            vec![Part::Pause(300)]
+        );
+        assert_eq!(parse_script("[1.5s]").unwrap(), vec![Part::Pause(1500)]);
+        assert_eq!(
+            parse_script("[pause 2 seconds]").unwrap(),
+            vec![Part::Pause(2000)]
+        );
+        assert_eq!(
+            parse_script("[pause 90s]").unwrap(),
+            vec![Part::Pause(MAX_PAUSE_MS)]
+        );
+        assert_eq!(parse_script("[beat]").unwrap(), vec![Part::Pause(300)]);
+        let long = parse_script("a [pause 4s] [pause 4s] b").unwrap();
+        assert_eq!(segments(&long)[1], Segment::Silence(MAX_PAUSE_MS));
+        assert!(parse_script("[pause -1s]").is_err());
+        assert!(parse_script("[pause NaNs]").is_err());
+        // A script that starts with silence keeps it.
+        assert_eq!(
+            segments(&parse_script("[pause] hi").unwrap()),
+            vec![Segment::Silence(500), Segment::Say("hi".into())]
+        );
+        // The refusal names hesitations and pauses too.
+        let e = parse_script("[yodel]").unwrap_err().to_string();
+        assert!(
+            e.contains("hmm") && e.contains("laugh") && e.contains("pause"),
+            "{e}"
         );
     }
 

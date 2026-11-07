@@ -50,6 +50,7 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R7.6 Tooltips: every effect and parameter (`fx.catalog`, `live.kinds`), enforced by a test
 - [x] R7.7 Tooltips shown on every control in the UI (tips.js; engine tips for effects and parameters)
 - [x] R7.8 Voice cloning, part 1: model picked for the computer (Chatterbox Turbo MIT first: performs [laugh], [sigh] and other script sounds; Chatterbox MIT for converting your own recording; OpenVoice V2 MIT lightest), hardware probe, consent-gated voice profiles, script parser for sounds and hesitations, clone screen, 8 MCP tools
+- [x] R7.10 Cloning scripts: hesitation placeholders ([hmm], [um], [uh], [mm-hmm] and more, said in the voice) and exact pauses ([pause], [long pause], [pause 2s]); the script splits into spoken pieces and silences; chips for all three kinds (user request 2026-11-08)
 - [!] R7.9 Voice cloning, part 2: download the model (with the user's permission) and run it, so clone.speak and clone.convert produce audio. Blocked: needs the user's OK to download about 1.4 GB (Chatterbox Turbo) plus 3.2 GB (Chatterbox) of weights and a PyTorch or ONNX runtime to test against
 
 ### R4 Site (`site/`, deployed by Cloudflare Pages from `dist-static/`)
@@ -96,6 +97,8 @@ None.
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-08: R7.10: hesitation and pause placeholders. New unit test fails when the hesitation comma rule is removed; API test checks segments [say, silence 1500, say]; E2E inserts [hmm] from a chip and sees 1 sound, 2 hesitations, 1.5 s of pauses. 85 Rust tests, 16 E2E checks green; no overflow at 1440/390.
 
 - 2026-11-07: R4.1-R4.2: desktop-only site. tests/site: 3 green (installer classification for 7 kinds, OS detection, no /app links, CSP allows only api.github.com). build:static fails on /app links or missing files. No horizontal overflow at 390/820/1440 on both pages (headless Chromium).
 

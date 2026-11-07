@@ -39,13 +39,18 @@
     return `<div class="lst box">${vs.map(v => `<div><span class="act">${ic('voice', 18)}</span><div class="ti"><b>${esc(v.name)}</b><span>${v.owner === 'me' ? 'Your own voice' : 'With their permission'} · ${F.num(v.reference_seconds, 1)} s clip · consent recorded ${F.ago(v.created * 1000)}</span></div>
       ${btn(u.voice === v.id ? 'Selected' : 'Use', { k: u.voice === v.id ? 'p' : '', x: `data-cact="use" data-id="${esc(v.id)}"` + tip('Speak scripts in this voice.') })}${btn('', { k: 'g', i: 'trash', a: 'Delete ' + esc(v.name), x: `data-cact="del" data-id="${esc(v.id)}"` + tip('Delete this voice, its clip and its consent recording.') })}</div>`).join('')}</div>`;
   }
+  // Placeholder chips, one row per kind, so a script can be written by clicking.
+  const chips = (label, list) => list.length ? `<div class="row" style="gap:6px;align-items:center"><span class="mono" style="min-width:96px;opacity:.7">${label}</span>${list.map(([t, h]) => `<button type="button" class="chip" data-cact="tag" data-t="${esc(t)}"${tip(h)}>[${esc(t)}]</button>`).join('')}</div>` : '';
+  const part = p => p.type === 'sound' ? pill(esc(p.value), 'sig') : p.type === 'hesitation' ? pill(esc(p.value), 'ok') : p.type === 'pause' ? pill(F.num(p.value / 1000, 1) + ' s pause') : esc(p.value);
   function script() {
-    const u = U(), parts = u.parts;
+    const u = U(), parts = u.parts, tg = D.ctags || {};
     return `<div class="box col">
-      <textarea class="inp" rows="5" aria-label="Script" data-cin="script" style="font-size:17px;font-weight:500"${tip('Write sounds as [laugh], (sighs), *chuckles* or {cough}. Write hesitations as words: hmm, um, uh.')}>${esc(u.script)}</textarea>
-      <div class="row" style="gap:6px">${(D.ctags && D.ctags.tags || []).map(t => `<button type="button" class="chip" data-cact="tag" data-t="${esc(t.tag)}"${tip('Insert [' + t.tag + '] at the cursor. Also written as ' + t.also.slice(0, 3).join(', ') + '.')}>[${esc(t.tag)}]</button>`).join('')}</div>
-      ${parts ? `<p style="margin:0;line-height:1.9">${parts.map(p => p.type === 'sound' ? pill(esc(p.value), 'sig') : esc(p.value)).join(' ')}</p>` : ''}
-      <div class="row">${btn('Check script', { x: 'data-cact="check"' + tip('Shows the words and sounds in order, as the model will read them.') })}
+      <textarea class="inp" rows="5" aria-label="Script" data-cin="script" style="font-size:17px;font-weight:500"${tip('Write sounds as [laugh], (sighs), *chuckles* or {cough}. Hesitations as [hmm], [um] or plain words, said in the voice. Pauses as [pause] or [pause 2s].')}>${esc(u.script)}</textarea>
+      ${chips('Sounds', (tg.tags || []).map(t => [t.tag, 'Insert [' + t.tag + '] at the cursor: the voice performs it. Also written as ' + t.also.slice(0, 3).join(', ') + '.']))}
+      ${chips('Hesitations', (tg.hesitations || []).map(t => [t.tag, 'Insert [' + t.tag + '] at the cursor: the voice says it, in its own way. Also written as ' + t.also.slice(0, 3).join(', ') + ', or just as a word.']))}
+      ${chips('Pauses', (tg.pauses || []).map(t => [t.tag, 'Insert [' + t.tag + '] at the cursor: ' + F.num(t.ms / 1000, 1) + ' s of silence.' + (t.note ? ' ' + t.note : '')]))}
+      ${parts ? `<p style="margin:0;line-height:1.9" data-cparts>${parts.map(part).join(' ')}</p><p class="mono" style="margin:0;opacity:.7" data-csum>${u.sum}</p>` : ''}
+      <div class="row">${btn('Check script', { x: 'data-cact="check"' + tip('Shows the words, hesitations, sounds and pauses in order, as the voice will perform them.') })}
         ${btn('Speak in this voice', { k: 'p', i: 'play', x: `data-cact="speak"${u.voice ? '' : ' disabled'}` + tip('Speaks the script in the selected voice, labelled synthetic.') })}
         ${btn('Turn my recording into this voice', { i: 'swap', x: `data-cact="convert"${u.voice ? '' : ' disabled'}` + tip('Record yourself saying it, with your own laughs and pauses, and Flux re-voices it, keeping your timing.') })}</div>
       ${u.err ? cal('warn', esc(u.err), 'warn') : ''}${u.msg ? cal('check', esc(u.msg)) : ''}
@@ -70,7 +75,7 @@
     use: el => { U().voice = el.dataset.id; Flux.rr(); },
     del: async el => { if (!confirm('Delete this voice and its recordings? This can\'t be undone.')) return; try { await call('clone.profile.delete', { id: el.dataset.id }); if (U().voice === el.dataset.id) U().voice = null; } catch (e) { U().err = e.message; } reload(); },
     tag: el => { const ta = document.querySelector('[data-cin="script"]'), t = '[' + el.dataset.t + ']'; const u = U(), at = ta ? ta.selectionStart : u.script.length; u.script = u.script.slice(0, at) + (at && u.script[at - 1] !== ' ' ? ' ' : '') + t + ' ' + u.script.slice(at); u.parts = null; Flux.rr(); },
-    check: async () => { const u = U(); u.err = u.msg = null; try { const r = await call('clone.script', { text: u.script }); u.parts = r.parts; } catch (e) { u.parts = null; u.err = e.message; } Flux.rr(); },
+    check: async () => { const u = U(); u.err = u.msg = null; try { const r = await call('clone.script', { text: u.script }); u.parts = r.parts; u.sum = `${r.sounds} sound${r.sounds === 1 ? '' : 's'} · ${r.hesitations} hesitation${r.hesitations === 1 ? '' : 's'} · ${F.num(r.silence_ms / 1000, 1)} s of pauses · ${r.segments.length} piece${r.segments.length === 1 ? '' : 's'}`; } catch (e) { u.parts = null; u.err = e.message; } Flux.rr(); },
     speak: async () => { const u = U(); u.err = u.msg = null; try { await call('clone.speak', { voice: u.voice, text: u.script }); u.msg = 'Done. The speech is labelled synthetic.'; } catch (e) { u.err = e.message; } Flux.rr(); },
     convert: async () => { const u = U(); u.err = u.msg = null; const fs = await F.pickFiles({ multiple: false, kind: 'audio' }); if (!fs || !fs[0]) return; try { await call('clone.convert', { voice: u.voice, path: fs[0] }); u.msg = 'Done. The result is labelled synthetic.'; } catch (e) { u.err = e.message; } Flux.rr(); },
   };

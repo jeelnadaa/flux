@@ -27,3 +27,11 @@ and the effect panels (`ctl-grid` of `sl` sliders, `seg`, `tg`, `sel`) for the d
 
 **Checked:** 1440, 820 and 390 px; all 13 themes and 6 fonts at 390 px with no sideways scrolling
 (`tests/e2e/test_live.py`).
+
+## Voice cloning: the Script section
+
+Composed from the kit inside `wiz` (wide): a `box col` holding the script `inp` (textarea), then three rows of
+`chip` buttons labelled in mono (Sounds, Hesitations, Pauses), one chip per placeholder. After Check script, the
+parts read inline: words as text, sounds as `pill sig`, hesitations as `pill ok`, pauses as a plain `pill` with the
+length ("0.5 s pause"), and a mono summary line (sounds, hesitations, seconds of pauses, pieces). No new CSS.
+Checked at 1440 and 390 px with no sideways scrolling.
