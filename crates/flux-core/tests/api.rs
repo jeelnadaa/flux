@@ -698,3 +698,48 @@ fn voice_cloning_needs_consent_and_reports_the_model_for_this_computer() {
         .unwrap()
         .is_empty());
 }
+
+#[test]
+fn first_run_sound_checks_work_without_a_project_and_3d_uses_the_head_profile() {
+    let (a, _d) = api("hpcheck");
+    // The headphone check runs before any project exists.
+    for k in ["left", "right", "moving"] {
+        let r = call(&a, "audio.test_tone", json!({"kind": k}));
+        assert_eq!(r["playing"], k);
+    }
+    call(
+        &a,
+        "settings.set",
+        json!({"values": {"hrtf_profile": "C", "head_width_cm": 20.5}}),
+    );
+    call(&a, "project.new", json!({"name": "3d"}));
+    let fx = call(&a, "fx.add", json!({"kind": "spatial", "target": "master"}))["fx"]
+        .as_u64()
+        .unwrap();
+    let p = call(&a, "project.get", json!({}));
+    let e = p["master"]["fx"]
+        .as_array()
+        .or(p["master_fx"].as_array())
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_u64() == Some(fx))
+        .unwrap()
+        .clone();
+    assert_eq!(e["params"]["head_width"], 20.5);
+    assert_eq!(e["params"]["depth"], 100.0);
+    // A width given by the caller wins.
+    let fx2 = call(
+        &a,
+        "fx.add",
+        json!({"kind": "spatial", "target": "master", "params": {"head_width": 14}}),
+    )["fx"]
+        .as_u64()
+        .unwrap();
+    let p = call(&a, "project.get", json!({}));
+    let all = p["master"]["fx"]
+        .as_array()
+        .or(p["master_fx"].as_array())
+        .unwrap();
+    let e2 = all.iter().find(|e| e["id"].as_u64() == Some(fx2)).unwrap();
+    assert_eq!(e2["params"]["head_width"], 14.0);
+}

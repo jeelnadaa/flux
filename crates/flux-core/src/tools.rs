@@ -726,8 +726,21 @@ pub fn reverse_swell(x_l: &[f32], x_r: &[f32], sr: f32, len: usize) -> Stereo {
     out
 }
 
-/// Test tones for the headphone check: "left", "right", "moving".
-pub fn test_tone(kind: &str, sr: f32) -> Stereo {
+/// The listener's head profile from first-run setup, as 3D renderer settings: (depth %, room %). Depth scales the
+/// far-ear delay, head shadow and rear cue; a little room helps sound seem outside the head for some listeners.
+/// A, D: lighter cues (bright); B: the default; C: full cues, strongest behind; E, F: strong cues with some room.
+pub fn hrtf_profile(profile: &str) -> (f32, f32) {
+    match profile {
+        "A" | "D" => (65.0, 0.0),
+        "C" => (100.0, 8.0),
+        "E" | "F" => (90.0, 15.0),
+        _ => (80.0, 0.0),
+    }
+}
+
+/// Test tones for the headphone check: "left", "right", "moving". The moving sound uses the listener's head width
+/// and profile, so each profile on the head-shape screen can be heard.
+pub fn test_tone(kind: &str, sr: f32, head_cm: f32, profile: &str) -> Stereo {
     let n = (sr * if kind == "moving" { 4.0 } else { 1.2 }) as usize;
     let mut l = vec![0f32; n];
     let mut r = vec![0f32; n];
@@ -750,6 +763,10 @@ pub fn test_tone(kind: &str, sr: f32) -> Stereo {
         let mut sp = crate::fx::build("spatial", sr, &Default::default()).unwrap();
         let mut pm = BTreeMap::new();
         pm.insert("mode".into(), 4.0);
+        let (depth, room) = hrtf_profile(profile);
+        pm.insert("head_width".into(), head_cm.clamp(12.0, 22.0));
+        pm.insert("depth".into(), depth);
+        pm.insert("room".into(), room);
         let spec = crate::fx::spec("spatial").unwrap();
         let seg = n / 4;
         for (k, az) in [0.0f32, -90.0, 90.0, 180.0].iter().enumerate() {
@@ -923,6 +940,83 @@ pub fn db(x: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn rms(x: &[f32]) -> f32 {
+        (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt()
+    }
+
+    #[test]
+    fn a_wider_head_delays_the_far_ear_more() {
+        // One click at 90 degrees left: it reaches the right ear later, by the Woodworth delay for that head.
+        let sr = 48000.0;
+        let arrival = |head: f32| {
+            let mut sp = crate::fx::build("spatial", sr, &Default::default()).unwrap();
+            let mut pm = BTreeMap::new();
+            for (k, v) in [
+                ("mode", 4.0),
+                ("azimuth", -90.0),
+                ("head_width", head),
+                ("smoothing", 0.0),
+            ] {
+                pm.insert(k.to_string(), v);
+            }
+            sp.set(&crate::fx::resolve(
+                crate::fx::spec("spatial").unwrap(),
+                &pm,
+            ));
+            let n = 48000;
+            let (mut l, mut r) = (vec![0f32; n], vec![0f32; n]);
+            l[24000] = 1.0;
+            r[24000] = 1.0;
+            let ctx = crate::fx::Ctx {
+                sr,
+                pos: 0,
+                len: n as i64,
+                tempo: 120.0,
+            };
+            for (x, y) in l
+                .chunks_mut(crate::fx::BLOCK)
+                .zip(r.chunks_mut(crate::fx::BLOCK))
+            {
+                sp.process(x, y, &ctx);
+            }
+            let peak = |x: &[f32]| {
+                (23900..24300)
+                    .max_by(|a, b| x[*a].abs().partial_cmp(&x[*b].abs()).unwrap())
+                    .unwrap() as i64
+                    - 24000
+            };
+            (peak(&l), peak(&r))
+        };
+        assert_eq!(arrival(12.0), (0, 13));
+        assert_eq!(arrival(22.0), (0, 24));
+    }
+
+    #[test]
+    fn the_moving_tone_follows_head_width_and_profile() {
+        let sr = 48000.0;
+        // Second quarter of the moving sound is at the left (-90 degrees): the right ear hears it later and quieter.
+        let part = |head: f32, prof: &str| {
+            let (l, r) = test_tone("moving", sr, head, prof);
+            let q = l.len() / 4;
+            let (a, b) = (q + q / 4, 2 * q - q / 4);
+            (l[a..b].to_vec(), r[a..b].to_vec())
+        };
+        assert_ne!(
+            part(22.0, "B").1,
+            part(12.0, "B").1,
+            "head width changes the moving sound"
+        );
+        let ild = |l: &[f32], r: &[f32]| 20.0 * (rms(l) / rms(r)).log10();
+        let (la, ra) = part(17.5, "A");
+        let (lc, rc) = part(17.5, "C");
+        assert!(
+            ild(&lc, &rc) > ild(&la, &ra) + 0.5,
+            "C {} A {}",
+            ild(&lc, &rc),
+            ild(&la, &ra)
+        );
+    }
     use crate::dsp::{Rng, TAU};
     fn mix(sr: f32, secs: f32) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
         // centered "voice" (harmonic, 300 Hz + harmonics) plus wide noisy hats

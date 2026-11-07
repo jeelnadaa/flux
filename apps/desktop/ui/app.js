@@ -178,7 +178,7 @@
     onboarded: async () => { const s = await act('settings.set', { values: { onboarded: true } }, { refresh: false }); if (s) D.settings = s; },
     tone: el => act('audio.test_tone', { kind: ds(el).kind === 'move' ? 'moving' : ds(el).kind }, { refresh: false }),
     'hp-answer': async el => { D.ui.hp = ds(el).v; const s = await act('settings.set', { values: { headphones_checked: true } }, { refresh: false }); if (s) D.settings = s; rr(); if (ds(el).v === 'swapped') D.ui.hpSwap = true; },
-    hrtf: async el => { const s = await act('settings.set', { values: { hrtf_profile: ds(el).v, head_width_cm: +ds(el).w } }, { refresh: false }); if (s) D.settings = s; rr(); },
+    hrtf: async el => { const s = await act('settings.set', { values: { hrtf_profile: ds(el).v, head_width_cm: +ds(el).w } }, { refresh: false }); if (s) { D.settings = s; rr(); act('audio.test_tone', { kind: 'moving' }, { refresh: false }); } },
     'pick-export-dir': async () => { const d = await F.pickFolder(); if (d) { const s = await act('settings.set', { values: { export_dir: d } }, { refresh: false }); if (s) D.settings = s; rr(); } },
     set: async el => { const v = ds(el).v; const s = await act('settings.set', { values: { [ds(el).k]: v === '' ? null : v } }, { refresh: false }); if (s) D.settings = s; rr(); },
     'set-toggle': async el => { const k = ds(el).k; const s = await act('settings.set', { values: { [k]: !(D.settings || {})[k] } }, { refresh: false }); if (s) { D.settings = s; applyLook(); } rr(); },

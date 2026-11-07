@@ -1745,9 +1745,17 @@ fn target_of(api: &Api, v: &Value) -> Result<String> {
 fn h_fx_add(api: &Api, v: &Value) -> Result<Value> {
     let kind = s_(v, "kind")?;
     let target = target_of(api, v)?;
-    let params = fparams(v, "params")?;
+    let mut params = fparams(v, "params")?;
     let name = fx::spec(&kind).map(|s| s.name).unwrap_or("effect");
     let mut s = api.lock();
+    if kind == "spatial" {
+        // 3D starts from the listener's own head, as set up on first run.
+        let (depth, _) = tools::hrtf_profile(&s.settings.hrtf_profile);
+        params
+            .entry("head_width".into())
+            .or_insert(s.settings.head_width_cm.clamp(12.0, 22.0));
+        params.entry("depth".into()).or_insert(depth);
+    }
     let label = format!("{name} added to {}", chain_label(s.project()?, &target));
     let r = s.commit(&label, |p| {
         let e = make_effect(p, &kind, &params, of(v, "mix"), os(v, "group"))?;
@@ -2214,17 +2222,16 @@ fn h_audio_test_tone(api: &Api, v: &Value) -> Result<Value> {
     if !["left", "right", "moving"].contains(&kind.as_str()) {
         bail!(err("bad_params", "kind must be left, right or moving"));
     }
-    // a temporary project that plays the tone, then the real plan is restored
+    // a temporary plan that plays the tone; afterwards the project's plan is restored, or with no project open
+    // (first-run setup) the engine is stopped again
     let mut s = api.lock();
-    let created = s.project.is_none();
-    if created {
-        bail!(err(
-            "no_project",
-            "Open a project first; the test tone plays through its output"
-        ));
-    }
-    let sr = s.project()?.sample_rate;
-    let (l, r) = tools::test_tone(&kind, sr as f32);
+    let sr = s.project.as_ref().map(|p| p.sample_rate).unwrap_or(48000);
+    let (l, r) = tools::test_tone(
+        &kind,
+        sr as f32,
+        s.settings.head_width_cm,
+        &s.settings.hrtf_profile,
+    );
     let mut tp = Project::new("tone", sr);
     let t = tp.add_track("tone");
     let mut pool = crate::media::Pool::new();
@@ -2253,7 +2260,11 @@ fn h_audio_test_tone(api: &Api, v: &Value) -> Result<Value> {
             e.send(render::Msg::Play(false));
             e.send(render::Msg::Seek(0));
         }
-        s.sync_engine(None);
+        if s.project.is_none() {
+            s.stop_engine();
+        } else {
+            s.sync_engine(None);
+        }
     });
     Ok(json!({"playing": kind, "seconds": n as f64 / sr as f64}))
 }

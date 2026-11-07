@@ -264,7 +264,11 @@ impl Session {
 
     pub fn ensure_engine(&mut self) -> Result<&mut AudioEngine> {
         if self.engine.is_none() {
-            let p = self.project()?.clone();
+            // With no project open (first-run sound checks) the engine starts on an empty project.
+            let p = self
+                .project
+                .clone()
+                .unwrap_or_else(|| Project::new("", 48000));
             let pool = self.pool.clone();
             let mut prefs = self.prefs();
             if self.headless && std::env::var_os("FLUX_HEADLESS_AUDIO").is_none() {
