@@ -49,6 +49,7 @@
     root.querySelectorAll('.seg').forEach(s => { const ind = s.querySelector('.ind'); if (ind) ind.style.transition = 'none'; placeInd(s); if (ind) { ind.getBoundingClientRect(); ind.style.transition = ''; } });
     root.querySelectorAll('.in').forEach(el => [...el.children].forEach((c, i) => c.style.setProperty('--n', Math.min(i, 14))));
     Viz.mount(root);
+    if (Flux.applyTips) Flux.applyTips(root);
     splitType(root);
     const ct = THEMES.find(t => t[0] === theme()) || THEMES[0];
     root.querySelectorAll('[data-set-theme]').forEach(b => b.setAttribute('aria-pressed', b.dataset.setTheme === ct[0]));

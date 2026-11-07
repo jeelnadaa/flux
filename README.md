@@ -28,6 +28,8 @@ AI agents can drive every feature.
   anything from 39 effects in parallel lanes and a post chain, moved by modulators (LFOs, random, step sequencer,
   envelope follower, tempo sync) and macros; export and import `.fluxlive` files. A built-in preset is never
   changed: the first edit makes your own copy. Every control has a tooltip.
+- **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
+  checked by the end-to-end test).
 - **Command API.** 154 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).

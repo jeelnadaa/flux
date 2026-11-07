@@ -48,7 +48,7 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R7.4 31 `live.*` methods = 31 MCP tools, including `live.render` so agents can audition presets offline
 - [x] R7.5 Live page in the app (composed from the kit; added to design/LIVE.md), with tooltips on every control
 - [x] R7.6 Tooltips: every effect and parameter (`fx.catalog`, `live.kinds`), enforced by a test
-- [ ] R7.7 Tooltips shown on every control in the UI
+- [x] R7.7 Tooltips shown on every control in the UI (tips.js; engine tips for effects and parameters)
 - [ ] R7.8 Voice cloning with a local model chosen for the computer: research, consent design, gate
 
 ### R4 Site (`site/`, deployed by Cloudflare Pages from `dist-static/`)
@@ -91,6 +91,8 @@ None.
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-07: R7.7: tooltips on every control. tests/e2e/test_live.py now 15 checks; all 2784 controls on all 92 screens have a tooltip (failed with 3 bare before the fix). Effect and parameter tips come from the engine; actions, screens and settings from apps/desktop/ui/tips.js.
 
 - 2026-11-07: R7.5: Live page (live.js) + tooltip component. tests/e2e/test_live.py (Playwright, real engine): 14 checks green - both routes run on test sources (out -10.2 / -18.1 dB RMS, 0 dropouts), bypass, built-in edit makes a copy and the live route follows, modules/steps modulator/macro built through the UI, preview render, export/import identical, 156 controls all named and tooltipped, no overflow at 1440/820/390 and in all 13 themes x 6 fonts, all 92 screens render without errors. Fails when the slider binding is removed.
 

@@ -252,16 +252,21 @@ def main():
 
             # 12. Every screen of the app renders without a page error.
             ids = ev("Flux.S.map(s => s.id)")
-            bad = []
+            bad, untipped, total_ctl = [], [], 0
             for sid in ids:
                 errors.clear()
                 ev(f"Flux.render('{sid}')")
                 wait(page, 120)
                 if errors:
                     bad.append((sid, errors[:2]))
+                bare = ev("[...document.querySelectorAll('#stage button, #stage a[href], #stage select, #stage input, #stage textarea, #stage [role=slider]')].filter(e => !e.closest('[data-tip]')).map(e => e.outerHTML.slice(0, 80))")
+                untipped.extend((sid, x) for x in bare)
+                total_ctl += ev("document.querySelectorAll('#stage button, #stage a[href], #stage select, #stage input, #stage textarea, #stage [role=slider]').length")
             ev("Flux.render('live')")
             assert not bad, bad
             ok(f"all {len(ids)} screens render without errors")
+            assert not untipped, untipped[:8]
+            ok(f"tooltips: all {total_ctl} controls on all {len(ids)} screens have one")
             b.close()
     finally:
         srv.terminate()
