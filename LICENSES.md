@@ -34,24 +34,30 @@ Bundled in `design/fonts/` for complete offline functionality without third-part
 
 ---
 
-## 3. Rust Engine & DSP Crates
+## 3. Rust Engine Crates
 
-Scanned and verified by `cargo-deny`.
+Scanned and verified by `cargo deny check licenses` ([deny.toml](deny.toml)). Direct dependencies only; the
+scanner covers the full tree.
 
-| Crate / Component | Role | Licence | Status | Notes |
-|---|---|---|---|---|
-| `flux-dsp` | Internal core DSP library | MIT OR Apache-2.0 | First-party | Sample-accurate 32-bit float DSP |
-| `flux-engine` | Playback orchestration and graph | MIT OR Apache-2.0 | First-party | AudioWorklet and engine abstraction |
-| `flux-ml` | Machine learning runtime glue | MIT OR Apache-2.0 | First-party | Model management and chunked inference |
-| `flux-wasm` | WebAssembly bindings | MIT OR Apache-2.0 | First-party | Web target exports |
-| `flux-testkit` | Signal generators & DSP test harness | MIT OR Apache-2.0 | First-party | Verification fixtures and invariants |
-| `proptest` | Property-based testing framework | MIT OR Apache-2.0 | Allowed | Development and test runner |
-| `symphonia` | Multi-format audio container and decoder | MPL-2.0 | Allowed | Permissive media decoding (FLAC, MP3, AAC, Vorbis, MP4, MKV) |
-| `opus1` | RFC 6716 Opus audio codec decoder | BSD-3-Clause | Allowed | Pure-Rust Opus decoding |
-| `wasm-bindgen` | WASM interop | MIT OR Apache-2.0 | Allowed | Standard WebAssembly binding toolchain |
-| `signalsmith-stretch` *(Planned P3)* | Pitch-shift and time-stretch | MIT | Allowed | Avoids GPL-restricted Rubber Band |
-| `rubato` *(Planned P1)* | High-quality resampling | MIT | Allowed | Bandlimited interpolation |
-| `realfft` / `rustfft` *(Planned P4)* | Partitioned convolution / FFT | MIT OR Apache-2.0 | Allowed | Ambisonics and impulse response processing |
+| Crate | Role | Licence | Status |
+|---|---|---|---|
+| `flux-core`, `flux-mcp`, `flux-desktop` | First-party engine, MCP server, desktop shell | MIT OR Apache-2.0 | First-party |
+| `symphonia` 0.6 | Decoding WAV, AIFF, FLAC, MP3, OGG, M4A/AAC, ALAC | MPL-2.0 | Allowed (file-level copyleft; used unmodified) |
+| `hound` 3.5 | WAV writing and test fixtures | Apache-2.0 | Allowed |
+| `flacenc` 0.5 | FLAC encoding | Apache-2.0 | Allowed |
+| `rusty_mp3` 1.0 | MP3 encoding (pure Rust) | Apache-2.0 | Allowed |
+| `vorbis_rs` 0.5 (+ `aotuv_lancer_vorbis_sys`, `ogg_next_sys`) | Ogg Vorbis encoding | BSD-3-Clause | Allowed |
+| `rustfft` 6.4 | FFT for spectra, convolution, pitch, stems | MIT OR Apache-2.0 | Allowed |
+| `rtrb` 0.3 | Lock-free queues to the audio thread | MIT OR Apache-2.0 | Allowed |
+| `cpal` 0.18 | Audio devices (WASAPI, CoreAudio, ALSA) | Apache-2.0 | Allowed |
+| `tiny_http` 0.12 | Localhost control server for MCP attach | MIT OR Apache-2.0 | Allowed |
+| `zip` 9 | `.flux` project packages | MIT | Allowed |
+| `dirs` 6 | Platform data and music folders | MIT OR Apache-2.0 | Allowed |
+| `serde`, `serde_json`, `anyhow` | Serialization and errors | MIT OR Apache-2.0 | Allowed |
+
+External tools Flux *calls* when present but does not ship: `ffmpeg` (AAC, M4R, Opus export) and the operating
+system's speech engine (System.Speech on Windows, `say` on macOS, `espeak-ng` on Linux). They run as separate
+processes, so their licences do not apply to Flux's code.
 
 ---
 

@@ -1,0 +1,26 @@
+[package]
+name = "flux-core"
+description = "Flux audio engine: project model, edits, DSP, playback, analysis, export and the command API"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["device"]
+device = ["dep:cpal"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+symphonia = { version = "0.6.1", features = ["all"] }
+hound = "3.5"
+flacenc = "0.5"
+rusty_mp3 = "1.0"
+vorbis_rs = "0.5"
+rustfft = "6.4"
+rtrb = "0.3"
+tiny_http = "0.12"
+dirs = "6"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+cpal = { version = "0.18", optional = true }

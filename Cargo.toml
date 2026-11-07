@@ -1,21 +1,25 @@
 [workspace]
 resolver = "2"
-members = [
-    "crates/flux-dsp",
-    "crates/flux-engine",
-    "crates/flux-ml",
-    "crates/flux-wasm",
-    "crates/flux-testkit",
-]
+members = ["crates/flux-core", "crates/flux-mcp"]
+default-members = ["crates/flux-core", "crates/flux-mcp"]
 
 [workspace.package]
-version = "0.1.0"
+version = "2.0.0"
 edition = "2021"
 authors = ["Flux Contributors"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/jeelnadaa/flux"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "thin"
 codegen-units = 1
-panic = "abort"
+strip = true
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,19 @@
+[package]
+name = "flux-mcp"
+description = "Flux MCP server: every Flux command as an MCP tool, headless or attached to the running app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "flux-mcp"
+path = "src/main.rs"
+
+[dependencies]
+flux-core = { path = "../flux-core" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+hound = "3.5"
