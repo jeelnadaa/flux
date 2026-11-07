@@ -53,6 +53,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Spelling
         run: typos
+      - name: Desktop sidecar (Tauri needs flux-mcp next to the app before it compiles)
+        run: node scripts/sidecar.mjs
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Licences and advisories
@@ -100,5 +102,7 @@ jobs:
         with:
           shared-key: ci-${{ matrix.os }}
           cache-on-failure: true
+      - name: Desktop sidecar (Tauri needs flux-mcp next to the app before it compiles)
+        run: node scripts/sidecar.mjs
       - name: Rust tests
         run: cargo test --workspace
