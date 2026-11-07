@@ -4,8 +4,9 @@ A non-destructive audio editor for Windows, macOS (Apple silicon and Intel) and 
 AI agents can drive every feature.
 
 > **Status: v2 agent-complete.** The desktop app (engine, every screen, Live, MCP, auto-update), the website and
-> the release pipeline are built and tested on this machine. Not yet done: running the voice cloning model (waits
-> for permission to download it), the first GitHub release run (waits for a push), and listening checks. See
+> the release pipeline are built and tested on this machine. Voice models download and run from the app, tested against a local
+> mirror and a stub engine. Not yet done: a real model download and listening checks (queued), and the first GitHub
+> release run (waits for a push). See
 > [PLAN.md](PLAN.md) and [PROGRESS.md](PROGRESS.md).
 
 ## What works today
@@ -32,20 +33,27 @@ AI agents can drive every feature.
   changed: the first edit makes your own copy. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
-- **Command API.** 162 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Command API.** 168 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 
-- **Voice cloning, with consent.** Flux checks the computer (graphics chip, video memory, memory) and picks a local
-  model: Chatterbox Turbo (MIT), which performs `[laugh]`, `[sigh]`, `[cough]` and other sounds written in a script
-  and says hesitations in the cloned voice; Chatterbox (MIT) to turn your own recording into the voice, keeping your
-  timing, laughs and hesitations exactly;
-  OpenVoice V2 (MIT) where memory is tight. A voice is only made with the owner's consent recording and a clip, kept
-  on this computer. Scripts take three kinds of placeholder, inserted by typing or from chips: sounds (`[laugh]`,
-  `(sighs)`, `*chuckles*`), hesitations said in the voice (`[hmm]`, `[um]`, `[uh]`, or plain words) and exact
-  silences (`[pause]`, `[long pause]`, `[pause 2s]`). `clone.script` shows the pieces the generator will speak and the
-  silences between them. **Speaking in the voice is not working yet:** the model download waits for permission, so
-  `clone.speak` and `clone.convert` say exactly what they would use and why they can't yet.
+- **Voice cloning, with consent.** Four local models, all MIT (Resemble AI): Chatterbox Turbo (2.99 GB), which
+  performs `[laugh]`, `[sigh]`, `[cough]` and other sounds written in a script and says hesitations in the cloned
+  voice; Chatterbox (3.19 GB, English, with an emotion control); Chatterbox Multilingual (3.21 GB, 23 languages); and
+  the Chatterbox voice converter (1.06 GB), which turns your own recording into the voice, keeping your timing, laughs
+  and hesitations exactly. Flux checks the computer (graphics chip, video memory, memory) and suggests one.
+  **Download in the app:** the Download dialog shows the size, licence, source and folder first; the first download
+  also installs the voice engine (portable Python 3.11, PyTorch 2.6 for NVIDIA, Apple or processor, and Chatterbox
+  0.1.7, all pinned). Downloads show progress, can be cancelled and resume where they stopped, and every file is
+  checked against its SHA-256 before use. Delete keeps files another model shares.
+  **Your choice:** any downloaded model for speech or conversion, the device, the language, a seed for repeatable
+  takes, each model's own settings (sliders), or a folder of your own compatible model.
+  A voice is only made with the owner's consent recording and a clip, kept on this computer. Scripts take three
+  kinds of placeholder, inserted by typing or from chips: sounds (`[laugh]`, `(sighs)`, `*chuckles*`), hesitations
+  said in the voice (`[hmm]`, `[um]`, `[uh]`, or plain words) and exact silences (`[pause]`, `[long pause]`,
+  `[pause 2s]`). Speech lands on a "Generated speech" track (one undo step), or in the export folder with no project
+  open, and the WAV says it is synthetic, whose voice, and which model made it. Models run with the Hugging Face Hub
+  switched off; nothing is sent anywhere.
 
 - **Website (`site/`).** A landing page and a download page with no web app. The download page reads the latest
   GitHub release in the visitor's browser and offers the right installer for their computer. `npm run build:static`

@@ -56,6 +56,11 @@ scanner covers the full tree.
 | `serde`, `serde_json`, `anyhow` | Serialization and errors | MIT OR Apache-2.0 | Allowed |
 | `tauri` 2, `tauri-build` 2 | Desktop shell: native window and webview | MIT OR Apache-2.0 | Allowed |
 | `tauri-plugin-dialog`, `-opener`, `-updater`, `-process` 2 | File dialogs, reveal and links, signed auto-update, restart | MIT OR Apache-2.0 | Allowed |
+| `reqwest` 0.13 (rustls, no default features) | Voice model downloads over HTTPS, with resume | MIT OR Apache-2.0 | Allowed |
+| `rustls` 0.23 (`ring` provider) | TLS for model downloads | Apache-2.0 OR ISC OR MIT (`ring`: Apache-2.0 AND ISC) | Allowed |
+| `sha2` 0.10 | Checking every downloaded file's SHA-256 | MIT OR Apache-2.0 | Allowed |
+| `fs4` 0.13 | Free disk space before a download | MIT OR Apache-2.0 | Allowed |
+| `flate2` 1, `tar` 0.4 | Unpacking the portable Python archive | MIT OR Apache-2.0 | Allowed |
 
 External tools Flux *calls* when present but does not ship: `ffmpeg` (AAC, M4R, Opus export) and the operating
 system's speech engine (System.Speech on Windows, `say` on macOS, `espeak-ng` on Linux). They run as separate
@@ -81,11 +86,22 @@ Model code and trained weights have distinct licenses and must be audited separa
 
 | Model | Use in Flux | Code and weights licence | Status |
 |---|---|---|---|
-| Chatterbox Turbo (Resemble AI) | Voice cloning default; sound tags in scripts; watermark | MIT | Chosen; weights not downloaded (needs the user's permission) |
-| Chatterbox (Resemble AI) | Voice conversion of the user's own recording; 23 languages | MIT | Chosen; weights not downloaded |
-| OpenVoice V2 (MyShell) | Lightest voice cloning fallback | MIT | Chosen; weights not downloaded |
+| Chatterbox Turbo (Resemble AI), `ResembleAI/chatterbox-turbo` | Default speech model: performs [laugh], [sigh] and other script sounds; watermark | MIT | Downloadable in the app (2.99 GB), pinned to a commit with SHA-256 per file |
+| Chatterbox (Resemble AI), `ResembleAI/chatterbox` | English speech with an emotion control | MIT | Downloadable (3.19 GB), pinned |
+| Chatterbox Multilingual (Resemble AI), same repository | Speech in 23 languages | MIT | Downloadable (3.21 GB), pinned; shares files with the converter |
+| Chatterbox voice converter (Resemble AI), same repository | Turns the user's own recording into the voice | MIT | Downloadable (1.06 GB), pinned |
+| OpenVoice V2 (MyShell) | Was the light fallback | MIT | Dropped: its MeloTTS front end needs a second runtime; Chatterbox runs on a processor instead (ADR 0003) |
 | Dia (Nari Labs) | Not used | Its README limits use to research and education | Rejected |
 | Coqui XTTS | Not used | Coqui Public Model Licence (non-commercial) | Rejected |
+
+**Voice engine (downloaded on the user's computer when they first download a model; not shipped in the installer):**
+
+| Component | Role | Licence | Status |
+|---|---|---|---|
+| CPython 3.11 (python-build-standalone builds) | Runs the models | PSF-2.0 (permissive); build scripts MPL-2.0 / BSD | Allowed; pinned archive with SHA-256 |
+| PyTorch 2.6.0, torchaudio 2.6.0 | Model runtime (CUDA 12.4, CPU or Apple builds) | BSD-3-Clause / BSD-2-Clause | Allowed; pinned |
+| `chatterbox-tts` 0.1.7 | Model code | MIT | Allowed; pinned |
+| Their pip dependencies (transformers, diffusers, librosa, numpy, safetensors, the Perth watermarker and others) | Installed by pip at their versions | Mostly Apache-2.0 / BSD / MIT / ISC | **Review queued**: a full audit of the resolved set is in the human queue |
 
 Stems, clean-up and text to speech use Flux's own DSP and the system speech engine; no model weights ship with Flux.
 Weights are never committed to git. Check each model card again before downloading.

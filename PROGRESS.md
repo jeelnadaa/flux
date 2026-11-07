@@ -51,7 +51,7 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R7.7 Tooltips shown on every control in the UI (tips.js; engine tips for effects and parameters)
 - [x] R7.8 Voice cloning, part 1: model picked for the computer (Chatterbox Turbo MIT first: performs [laugh], [sigh] and other script sounds; Chatterbox MIT for converting your own recording; OpenVoice V2 MIT lightest), hardware probe, consent-gated voice profiles, script parser for sounds and hesitations, clone screen, 8 MCP tools
 - [x] R7.10 Cloning scripts: hesitation placeholders ([hmm], [um], [uh], [mm-hmm] and more, said in the voice) and exact pauses ([pause], [long pause], [pause 2s]); the script splits into spoken pieces and silences; chips for all three kinds (user request 2026-11-08)
-- [!] R7.9 Voice cloning, part 2: download the model (with the user's permission) and run it, so clone.speak and clone.convert produce audio. Blocked: needs the user's OK to download about 1.4 GB (Chatterbox Turbo) plus 3.2 GB (Chatterbox) of weights and a PyTorch or ONNX runtime to test against
+- [x] R7.9 Voice cloning, part 2: in-app model downloader and runner. 4 Chatterbox models (MIT) pinned with SHA-256 per file, plus a voice engine (portable Python 3.11, PyTorch 2.6, chatterbox-tts 0.1.7) installed on first download; confirm dialog with size, licence and folder; progress, cancel, resume (Range), checksum, free-space check, shared files, delete; choose any model for speech or conversion, device, language, seed and each model's settings; add your own model folder; clone.speak and clone.convert run as jobs, label the WAV synthetic and add it to the project. 6 new MCP tools (168). Tested against a local mirror and stub runtime; the real download and listening are queued
 
 ### R4 Site (`site/`, deployed by Cloudflare Pages from `dist-static/`)
 - [x] R4.1 Landing improved for the desktop app (no web app; Live and agents sections; OS-aware download button)
@@ -70,7 +70,8 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 
 - First CI and Release runs on GitHub (needs the user to push). Add secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty) first, or releases ship without self-update files. Installers are not code-signed for Windows SmartScreen or macOS Gatekeeper (needs paid certificates).
 
-- Voice cloning model download and inference (R7.9): needs the user's permission to download weights; then listening checks of cloned speech, laughs and sighs (agents can't judge sound).
+- Voice cloning with the real models (R7.9): download the voice engine and Chatterbox Turbo in the app (about 3 GB engine with CUDA plus 2.99 GB) on a real machine with the user's OK, then run clone.speak and clone.convert; check CUDA, Apple and processor builds; listening checks of cloned speech, laughs, sighs and hesitations (agents can't judge sound).
+- Licence audit of the voice engine's resolved pip dependency set (transformers, diffusers, librosa, the Perth watermarker and the rest).
 
 - Listen to all 41 built-in live presets on headphones and speakers (agents can't judge sound).
 - Live on macOS (14.6+ system audio permission) and Linux (PipeWire/Pulse monitor inputs): only built in CI so far.
@@ -100,6 +101,7 @@ None.
 
 ## Session log
 
+- 2026-11-08: R7.9: model downloader and runner. 2 new Rust tests against a mock server and stub Python packages (voice_models.rs): confirm before download, resume after a cut connection (2nd request is a Range) and after cancel (resumed from the .part), bad checksum thrown away, shared files kept on delete, pip asked for pinned packages with the CPU index, runner spoke [say, 1.5 s silence, say] with settings applied and the voice given once, WAV labelled synthetic, runner errors carry no script text; the assertions failed before fixes (kept_shared counted 3 not 1). New E2E tests/e2e/test_clone_models.py: 9 checks (dialog, progress, install, device/slider/seed saved, spoke onto the project, 50 controls named and tipped, 1440/820/390 fit, delete). test_live.py 16/16. Totals: 86 Rust tests.
 - 2026-11-08: R0.2, R6.1-R6.2: PLAN.md written for v2 (Live and voice cloning specs), 4 ADRs, MCP guide covers live_* and clone_*, LICENSES cleaned. Full run: 85 Rust tests, 16 E2E checks, 3 site tests, check-js 16 files, clippy, typos, cargo deny all green.
 
 - 2026-11-08: R5.1-R5.3: CI and Release workflows rewritten for the desktop app (old ones built the removed web app). Checked locally: YAML parses, version stamping dry run (2.0.77 into Cargo.toml and tauri.conf.json, updater files off without the key), typos clean (6 identifier words allowed), cargo deny ok. Not yet run on GitHub.

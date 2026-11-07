@@ -91,6 +91,7 @@
   function bindTip(b) {
     const [ns, a, c] = b.split(':');
     if (ns === 'fx' || ns === 'fxk') return paramTip(ns === 'fx' ? (F.findFx(+a) || {}).kind : a, c);
+    if (ns === 'cl') return (Flux.cloneTip && Flux.cloneTip(b)) || '';
     if (ns === 'fxmix' || ns === 'fxkmix') return 'Balance between the original and the effect.';
     if (ns === 'clip') return a === 'gain_db' ? 'This clip\'s level.' : 'This clip\'s ' + String(c || a).replace(/_/g, ' ') + '.';
     if (ns === 'track') return 'This track\'s level.';

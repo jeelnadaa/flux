@@ -35,3 +35,26 @@ Composed from the kit inside `wiz` (wide): a `box col` holding the script `inp` 
 parts read inline: words as text, sounds as `pill sig`, hesitations as `pill ok`, pauses as a plain `pill` with the
 length ("0.5 s pause"), and a mono summary line (sounds, hesitations, seconds of pauses, pieces). No new CSS.
 Checked at 1440 and 390 px with no sideways scrolling.
+
+## Voice cloning: Models, How it speaks, and the Download dialog
+
+**Models** is a `lst box`: the voice engine first, then one row per model. A row is the kit list row: an `act`
+icon (`voice` for speech, `swap` for conversion, `chip` for the engine), a `ti` with the name in bold and the note,
+then a row of `pill`s (what it does, `pill sig` for sounds, languages, `pill ok` for "Suggested here" and for a
+graphics chip fit, `pill warn` when it can't run). On the right: licence and size in mono, then the action:
+Download or Resume (`btn`, primary when suggested), or when installed Use to speak / Use to convert (`btn p` with
+`aria-pressed` when chosen) and a ghost trash `btn`. While downloading, the row wraps a full-width `prog` with the
+percent and stage in mono and a ghost Cancel. Under the list, a `box col` with a `sel` for the kind of model and a
+Choose folder `btn`, then the models folder path in mono, dim, 12.5 px.
+
+**How it speaks** is a `box col`: the chosen model's name, a `seg` for the device (Auto, NVIDIA, Apple,
+Processor), one `sl` per model setting (bound `cl:<model>:<key>`, value in mono), a `sel` for the language when the
+model has several, a Seed `inp`, and a ghost Defaults `btn`.
+
+**Download dialog** (`clone-get`) is the kit `dlg` over the clone page, shaped like Split into stems: a `lst box`
+with the model (licence, source in mono, size) and the voice engine when it isn't installed (note, size), a
+`callout ac` with the lock icon saying what downloads, how big and where, a dim 12.5 px line on permission, and a
+foot with ghost Cancel and primary Download. No new CSS.
+
+**Checked:** 1440, 820 and 390 px with no sideways scrolling; every control named and inside a `data-tip`
+(`tests/e2e/test_clone_models.py`, screenshots `target/e2e/clone-*.png`).

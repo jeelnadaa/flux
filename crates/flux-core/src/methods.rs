@@ -2964,40 +2964,87 @@ fn h_tts_speak(api: &Api, v: &Value) -> Result<Value> {
         (p.id.clone(), s.store.media_dir(&p.id))
     };
     let a = api.clone();
-    let job = api.jobs.spawn("tts", "Generating speech", &["Synthesizing", "Adding to project"], move |ctx| {
-        ctx.stage("Synthesizing", "active");
-        let id = format!("m{}", new_id());
-        let path = dir.join(format!("{id}.wav"));
-        tools::speak(&text, &voice, rate, &path)?;
-        ctx.stage("Synthesizing", "done");
-        ctx.stage("Adding to project", "active");
-        let d = crate::media::decode_file(&path)?;
-        let m = Media::new(&id, d.data, d.rate, sr);
-        let frames = m.frames as i64;
-        let mut s = a.lock();
-        if s.project()?.id != pid {
-            bail!("the project was closed");
-        }
-        s.add_media(m);
-        let pos = at.unwrap_or_else(|| s.engine.as_ref().map(|e| e.meters(0).pos).unwrap_or(0));
-        let short: String = text.chars().take(40).collect();
-        s.commit("Generate speech", |p| {
-            p.media.push(MediaRef { id: id.clone(), name: format!("Synthetic speech: {short}"), path: path.display().to_string(), frames, channels: 1, source_rate: d.rate, format: "wav".into(), bits: 16, synthetic: true, tags: [("synthetic".to_string(), voice.clone())].into_iter().collect(), ..Default::default() });
-            let tid = match p.tracks.iter().find(|t| t.name == "Generated speech") {
-                Some(t) => t.id,
-                None => {
-                    let c = p.tracks.len();
-                    let t = p.add_track("Generated speech");
-                    p.track_mut(t)?.color = (c % 8 + 1) as u8;
-                    t
-                }
-            };
-            let cid = p.add_clip(tid, &id, pos, 0, None)?;
-            p.clip_mut(cid)?.name = format!("Synthetic · {short}");
-            Ok(json!({"clip": cid, "track": tid, "seconds": frames as f64 / sr as f64, "synthetic": true}))
-        })
-    });
+    let job = api.jobs.spawn(
+        "tts",
+        "Generating speech",
+        &["Synthesizing", "Adding to project"],
+        move |ctx| {
+            ctx.stage("Synthesizing", "active");
+            let id = format!("m{}", new_id());
+            let path = dir.join(format!("{id}.wav"));
+            tools::speak(&text, &voice, rate, &path)?;
+            ctx.stage("Synthesizing", "done");
+            ctx.stage("Adding to project", "active");
+            let short: String = text.chars().take(40).collect();
+            add_generated(
+                &a,
+                Place {
+                    project: &pid,
+                    sr,
+                    at,
+                },
+                &id,
+                &path,
+                &short,
+                &voice,
+            )
+        },
+    );
     Ok(json!({"job": job}))
+}
+
+/// Which project generated speech goes into, at what sample rate, and where on the timeline (default: the playhead).
+pub(crate) struct Place<'a> {
+    pub project: &'a str,
+    pub sr: u32,
+    pub at: Option<i64>,
+}
+
+/// Put a generated speech file on the "Generated speech" track as one undoable step, labelled synthetic.
+pub(crate) fn add_generated(
+    a: &Api,
+    place: Place,
+    id: &str,
+    path: &Path,
+    short: &str,
+    voice: &str,
+) -> Result<Value> {
+    let Place {
+        project: pid,
+        sr,
+        at,
+    } = place;
+    let d = crate::media::decode_file(path)?;
+    let m = Media::new(id, d.data, d.rate, sr);
+    let frames = m.frames as i64;
+    let mut s = a.lock();
+    if s.project()?.id != pid {
+        bail!("the project was closed");
+    }
+    s.add_media(m);
+    let pos = at.unwrap_or_else(|| s.engine.as_ref().map(|e| e.meters(0).pos).unwrap_or(0));
+    s.commit("Generate speech", |p| {
+        p.media.push(MediaRef { id: id.to_string(), name: format!("Synthetic speech: {short}"), path: path.display().to_string(), frames, channels: 1, source_rate: d.rate, format: "wav".into(), bits: 16, synthetic: true, tags: [("synthetic".to_string(), voice.to_string())].into_iter().collect(), ..Default::default() });
+        let tid = match p.tracks.iter().find(|t| t.name == "Generated speech") {
+            Some(t) => t.id,
+            None => {
+                let c = p.tracks.len();
+                let t = p.add_track("Generated speech");
+                p.track_mut(t)?.color = (c % 8 + 1) as u8;
+                t
+            }
+        };
+        let cid = p.add_clip(tid, id, pos, 0, None)?;
+        p.clip_mut(cid)?.name = format!("Synthetic · {short}");
+        Ok(json!({"clip": cid, "track": tid, "seconds": frames as f64 / sr as f64, "synthetic": true}))
+    })
+}
+
+/// Where generated speech goes: the open project's media folder, with its id and sample rate.
+pub(crate) fn speech_target(a: &Api) -> Option<(String, PathBuf, u32)> {
+    let s = a.lock();
+    let p = s.project().ok()?;
+    Some((p.id.clone(), s.store.media_dir(&p.id), p.sample_rate))
 }
 
 // ---------------------------------------------------------------- export, convert, batch, ringtone
@@ -3747,12 +3794,18 @@ pub static METHODS: &[MethodSpec] = &[
     m!("transcript.fillers", "Find filler words (needs a transcript; not in this build).", "", false, h_unavailable_transcript),
     m!("dub.start", "Translate and dub (needs speech and translation models; not in this build).", "language:string:Target language", false, h_unavailable_dub),
     m!("clone.status", "Voice cloning on this computer: its hardware, the local model Flux picks for it and why, whether it is ready, and the consent statement.", "", false, crate::voiceclone::h_status),
-    m!("clone.models", "The local voice cloning models Flux can use (permissive licences only), with size, needs, and the pick for this computer.", "", false, crate::voiceclone::h_models),
+    m!("clone.models", "Every voice cloning model Flux can download or use (permissive licences only): role (speech or convert), exact size, licence, source, languages, whether it performs [laugh] and other sounds, how it fits this computer, its generation settings, and whether it is downloaded or downloading. Also the voice engine, the hardware, the pick for this computer, the current settings and the models folder.", "", false, crate::voiceclone::h_models),
+    m!("clone.model.download", "Download a voice model into Flux's models folder, installing the voice engine (Python, PyTorch, Chatterbox at pinned versions) the first time. Pass `model: \"voice-engine\"` to install only the engine. Without `confirm: true` it changes nothing and says what would be downloaded, how big and where: ask the person first. Every file is checked against its SHA-256; a cancelled or broken download resumes. Job.", "!model:string:Model id from clone.models, or voice-engine|confirm:boolean:True once the person agreed to the download size|device_kind:string:Engine build: cuda, cpu or mps (default: what this computer has)|wait:boolean:Wait for it to finish", false, crate::voicemodels::h_download),
+    m!("clone.model.delete", "Delete a downloaded voice model's files (files another downloaded model shares are kept), or the voice engine with `model: \"voice-engine\"`. Voice profiles are not touched.", "!model:string:Model id, or voice-engine", false, crate::voicemodels::h_delete),
+    m!("clone.model.add_local", "Use a model folder already on this computer, for example a fine-tuned Chatterbox. It must hold the files of one of the supported kinds.", "!path:string:The folder|!loader:string:turbo, english, multilingual or vc|name:string:A name to show", false, crate::voicemodels::h_add_local),
+    m!("clone.model.remove_local", "Stop using an added model folder. Its files are left where they are.", "!id:string:Id from clone.models", false, crate::voicemodels::h_remove_local),
+    m!("clone.settings.get", "The voice cloning choices: speech model, conversion model, device, language, seed, and every model's generation settings with the values in use.", "", false, crate::voicemodels::h_settings_get),
+    m!("clone.settings.set", "Change the voice cloning choices. Any downloaded or added model can be used for speech or conversion. Settings are clamped to each model's range; set one to null to go back to its default.", "speech:string:Speech model id|convert:string:Conversion model id|device:string:auto, cuda, mps or cpu|language:string:Language code, for the multilingual model|seed:integer:Same seed and script give the same take|params:object:{model id: {setting: number}}", false, crate::voicemodels::h_settings_set),
     m!("clone.profiles", "Voice profiles made with consent.", "", false, crate::voiceclone::h_profiles),
     m!("clone.profile.create", "Make a voice profile. Needs the owner's consent: their recording reading the consent statement from clone.status, and a 5 to 60 second clip of the voice. Stays on this computer.", "!name:string:Whose voice|owner:string:me or someone-else|consent:boolean:True only if the voice owner agreed|consent_audio:string:Recording of the owner reading the consent statement|!reference:string:5 to 60 second clip of the voice", false, crate::voiceclone::h_profile_create),
     m!("clone.profile.delete", "Delete a voice profile and its recordings.", "!id:string:Voice id", false, crate::voiceclone::h_profile_delete),
-    m!("clone.speak", "Speak a script in a consented voice. Write sounds as [laugh], (sighs), *chuckles* or {cough}; hesitations as [hmm], [um], [uh] or plain words; pauses as [pause] or [pause 2s]. Output is labelled synthetic. Says why if the model isn't ready.", "!voice:string:Voice id|!text:string:The script", false, crate::voiceclone::h_speak),
-    m!("clone.convert", "Turn your own spoken recording into a consented cloned voice, keeping its timing, laughs and hesitations exactly. Output is labelled synthetic.", "!voice:string:Voice id|!path:string:Your recording", false, crate::voiceclone::h_convert),
+    m!("clone.speak", "Speak a script in a consented voice with the chosen speech model, onto a Generated speech track when a project is open, otherwise into the export folder. Write sounds as [laugh], (sighs), *chuckles* or {cough}; hesitations as [hmm], [um], [uh] or plain words; pauses as [pause] or [pause 2s]. Models that can't perform sounds leave them out and say how many. Output is labelled synthetic. Job.", "!voice:string:Voice id|!text:string:The script|model:string:Speech model id (default: the chosen one)|at:pos:Timeline position|wait:boolean:Wait for it to finish", false, crate::voiceclone::h_speak),
+    m!("clone.convert", "Turn your own spoken recording into a consented cloned voice, keeping its timing, laughs and hesitations exactly, with the chosen conversion model. Output is labelled synthetic. Job.", "!voice:string:Voice id|!path:string:Your recording|model:string:Conversion model id (default: the chosen one)|at:pos:Timeline position|wait:boolean:Wait for it to finish", false, crate::voiceclone::h_convert),
     m!("clone.tags", "The placeholders a cloning script can use: sounds the voice performs ([laugh], [sigh], [cough] and more), hesitations it says ([hmm], [um], [uh]) and pauses ([pause], [pause 2s]), with the other ways to write them and an example.", "", false, crate::voiceclone::h_tags),
     m!("clone.script", "Check a cloning script without speaking it: the words, hesitations, sounds and pauses in order, the text the model reads, and the pieces and silences it will be generated as.", "!text:string:The script", false, crate::voiceclone::h_script),
     m!("export.formats", "Export formats and whether each is available on this computer.", "", false, h_export_formats),

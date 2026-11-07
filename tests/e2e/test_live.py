@@ -302,14 +302,10 @@ def main():
             page.click('[data-cact="check"]')
             wait(page, 500)
             assert "yodel" in page.inner_text(".callout.warn")
-            page.click('[data-cact="speak"]')
-            wait(page, 500)
-            assert "yodel" in page.inner_text(".callout.warn")
-            page.fill('[data-cin="script"]', "hello [laugh]")
-            page.click('[data-cact="speak"]')
-            wait(page, 800)
-            msg = page.inner_text(".callout.warn")
-            assert "Chatterbox" in msg or "memory" in msg, msg
+            # With no model downloaded, Speak is off and the page says what to download.
+            assert page.is_disabled('[data-cact="speak"]')
+            msg = page.inner_text('#stage .callout:has-text("downloaded"), #stage .callout:has-text("memory"), #stage .callout:has-text("Intel")')
+            assert "Chatterbox" in msg or "memory" in msg or "Intel" in msg, msg
             ev("window.confirm = () => true")
             page.click('[data-cact="del"]')
             wait(page, 800)

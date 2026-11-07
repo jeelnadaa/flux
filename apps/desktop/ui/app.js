@@ -31,7 +31,7 @@
     analysis: ['tempokey'], master: ['loudness'], tts: ['voices'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
     macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
     live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
-    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags'], 'stems-setup': ['ai'], 'prefs-privacy': [],
+    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags', 'csettings'], 'clone-get': ['cstatus'], 'stems-setup': ['ai'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
   const ENTER = {
@@ -378,6 +378,7 @@
   async function bindApply(b, pct, end) {
     const parts = b.split(':'), ns = parts[0];
     if (ns === 'lv') return Flux.liveBind(parts.slice(1), pct, end);
+    if (ns === 'cl') return Flux.cloneBind(parts.slice(1), pct, end);
     if (ns === 'fx' || ns === 'fxk') {
       let id = ns === 'fx' ? +parts[1] : created; const key = parts[2], kind = ns === 'fxk' ? parts[1] : (F.findFx(id) || {}).kind, p = Flux.pspec(kind, key); if (!p) return '';
       const v = F.unpct(p, pct);

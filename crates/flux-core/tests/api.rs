@@ -631,7 +631,7 @@ fn voice_cloning_needs_consent_and_reports_the_model_for_this_computer() {
     );
     assert_eq!(
         code(&a, "clone.speak", json!({"voice": "sam", "text": "hi"})),
-        "unavailable"
+        "not_installed"
     );
     assert_eq!(
         code(&a, "clone.profile.delete", json!({"id": "../x"})),
@@ -686,7 +686,7 @@ fn voice_cloning_needs_consent_and_reports_the_model_for_this_computer() {
     );
     assert_eq!(
         code(&a, "clone.convert", json!({"voice": "sam", "path": rp})),
-        "unavailable"
+        "not_installed"
     );
     assert_eq!(
         code(&a, "clone.convert", json!({"voice": "nobody", "path": rp})),

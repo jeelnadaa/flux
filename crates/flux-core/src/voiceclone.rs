@@ -1,12 +1,9 @@
-//! Voice cloning: which local model suits this computer, consent-gated voice profiles, and the gate itself.
+//! Voice cloning: which local model suits this computer, consent-gated voice profiles, scripts, and speaking.
 //!
 //! Flux only clones a voice with recorded consent. A profile holds the consent statement, a recording of the
 //! voice owner saying it, and a reference clip, all on this computer (`<data>/Voices/<id>/`). Nothing is sent
-//! anywhere. Speaking in a cloned voice needs a model installed under `<data>/Models/<model>/`; this build does
-//! not download one, so `clone.speak` says exactly what it would use and why it can't yet.
-//!
-//! Models are limited to permissive licences (PLAN.md section 4): Chatterbox (MIT) and OpenVoice V2 with MeloTTS
-//! (MIT). Which one is chosen depends on the graphics chip and memory of the computer.
+//! anywhere. Models (Chatterbox, MIT) are downloaded, chosen and run by `voicemodels.rs`; `clone.speak` and
+//! `clone.convert` hand it the script pieces or the recording and label what comes back as synthetic.
 
 use crate::api::{err, Api};
 use anyhow::{bail, Result};
@@ -29,52 +26,6 @@ pub struct Hardware {
     pub vram_gb: f32,
 }
 
-/// A local model Flux can clone voices with.
-pub struct Model {
-    pub id: &'static str,
-    pub name: &'static str,
-    pub licence: &'static str,
-    pub source: &'static str,
-    /// Approximate download, in GB. The exact size is shown before any download.
-    pub size_gb: f32,
-    pub languages: u32,
-    pub needs: &'static str,
-    pub note: &'static str,
-}
-
-pub const MODELS: &[Model] = &[
-    Model {
-        id: "chatterbox-turbo",
-        name: "Chatterbox Turbo",
-        licence: "MIT",
-        source: "https://huggingface.co/ResembleAI/chatterbox-turbo",
-        size_gb: 1.4,
-        languages: 1,
-        needs: "Best on an NVIDIA graphics chip with 4 GB of video memory or Apple silicon; also runs on a processor with 8 GB of memory, more slowly.",
-        note: "The most expressive: clones a voice from one 5 to 20 second clip and performs [laugh], [chuckle], [sigh], [gasp], [cough] and other sounds written in the script, and says hmm, um and uh in the cloned voice, written as words or as [hmm] placeholders. A reference clip with laughter in it carries that laugh into the clone. English. Adds an inaudible watermark marking speech as synthetic.",
-    },
-    Model {
-        id: "chatterbox",
-        name: "Chatterbox Multilingual (with voice conversion)",
-        licence: "MIT",
-        source: "https://huggingface.co/ResembleAI/chatterbox",
-        size_gb: 3.2,
-        languages: 23,
-        needs: "An NVIDIA graphics chip with 6 GB of video memory, or Apple silicon with 16 GB of memory.",
-        note: "23 languages and an emotion control. Its voice converter turns your own spoken take into the cloned voice, keeping every hmm, laugh and pause exactly where you made it.",
-    },
-    Model {
-        id: "openvoice-v2",
-        name: "OpenVoice V2 with MeloTTS",
-        licence: "MIT",
-        source: "https://huggingface.co/myshell-ai/OpenVoiceV2",
-        size_gb: 0.6,
-        languages: 6,
-        needs: "Any 64-bit processor with 8 GB of memory. No graphics chip needed.",
-        note: "The lightest. Copies the tone of a voice onto clear base speech. No laugh or sigh sounds.",
-    },
-];
-
 /// The model for a computer, how it would run, and why.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Pick {
@@ -92,6 +43,15 @@ pub struct Pick {
 /// Chatterbox Turbo is the first choice wherever it fits, because it performs laughs, sighs and hesitations.
 pub fn recommend(h: &Hardware) -> Pick {
     let apple = h.os == "macos" && h.arch == "aarch64";
+    if h.os == "macos" && !apple {
+        return Pick {
+            model: None,
+            device: "cpu",
+            speed: "slow",
+            convert: None,
+            reason: "Voice cloning needs PyTorch 2.6, which isn't made for Intel Macs.".into(),
+        };
+    }
     if h.ram_gb > 0.0 && h.ram_gb < 7.5 {
         return Pick {
             model: None,
@@ -105,7 +65,7 @@ pub fn recommend(h: &Hardware) -> Pick {
         };
     }
     let big = (h.gpu_vendor == "nvidia" && h.vram_gb >= 5.5) || (apple && h.ram_gb >= 15.5);
-    let convert = big.then_some("chatterbox");
+    let convert = big.then_some("chatterbox-vc");
     if h.gpu_vendor == "nvidia" && h.vram_gb >= 3.5 {
         return Pick {
             model: Some("chatterbox-turbo"),
@@ -619,46 +579,28 @@ pub fn profiles(api: &Api) -> Vec<Profile> {
     out
 }
 
-fn installed(api: &Api, model: &str) -> bool {
-    api.lock()
-        .store
-        .root
-        .join("Models")
-        .join(model)
-        .join("manifest.json")
-        .exists()
-}
-
 // ---------------------------------------------------------------- methods
-
-fn model_json(m: &Model) -> Value {
-    json!({"id": m.id, "name": m.name, "licence": m.licence, "source": m.source, "size_gb": m.size_gb, "languages": m.languages, "needs": m.needs, "note": m.note})
-}
 
 pub fn h_status(api: &Api, _: &Value) -> Result<Value> {
     let h = hardware();
     let pick = recommend(h);
-    let ready = pick.model.map(|m| installed(api, m)).unwrap_or(false);
-    let why = match (pick.model, ready) {
-        (None, _) => pick.reason.clone(),
-        (Some(_), true) => "Ready.".to_string(),
-        (Some(m), false) => {
-            let mm = MODELS.iter().find(|x| x.id == m).unwrap();
-            format!("Flux would use {} ({} licence, about {:.1} GB). This build doesn't download models yet, so cloned speech isn't available. Your voice profiles and consent recordings are kept and will work once it is.", mm.name, mm.licence, mm.size_gb)
-        }
+    let ready = crate::voicemodels::ready_for(api, "speech", None);
+    let why = match (&ready, pick.model) {
+        (Ok(r), _) => format!("Ready: {}.", r.model.name),
+        (Err(_), None) => pick.reason.clone(),
+        (Err(e), Some(_)) => e.to_string(),
     };
+    let models = crate::voicemodels::h_models(api, &Value::Null)?;
     Ok(json!({
-        "available": ready, "why": why, "hardware": h, "pick": pick,
-        "models": MODELS.iter().map(model_json).collect::<Vec<_>>(),
+        "available": ready.is_ok(), "why": why, "hardware": h, "pick": pick,
+        "models": models["models"], "runtime": models["runtime"], "settings": models["settings"],
         "profiles": profiles(api).len(),
         "statement_example": consent_statement("your name"),
     }))
 }
 
-pub fn h_models(_: &Api, _: &Value) -> Result<Value> {
-    Ok(
-        json!({"models": MODELS.iter().map(model_json).collect::<Vec<_>>(), "pick": recommend(hardware()), "hardware": hardware()}),
-    )
+pub fn h_models(api: &Api, v: &Value) -> Result<Value> {
+    crate::voicemodels::h_models(api, v)
 }
 
 pub fn h_profiles(api: &Api, _: &Value) -> Result<Value> {
@@ -785,33 +727,165 @@ fn need_voice(api: &Api, v: &Value) -> Result<String> {
     Ok(id)
 }
 
-fn not_ready(api: &Api, model: Option<&str>) -> anyhow::Error {
-    match model {
-        Some(m) if installed(api, m) => err(
-            "unavailable",
-            "The model is installed, but this build can't run it yet.",
-        ),
-        _ => err(
-            "unavailable",
-            h_status(api, &Value::Null)
-                .ok()
-                .and_then(|s| s["why"].as_str().map(String::from))
-                .unwrap_or_else(|| "Voice cloning isn't available.".into()),
-        ),
+/// Sounds only some models can perform: for the others they are left out (and counted), never read aloud.
+fn drop_sounds(text: &str) -> (String, usize) {
+    let mut t = text.to_string();
+    let mut n = 0;
+    for (tag, _) in TAGS {
+        let k = format!("[{tag}]");
+        n += t.matches(&k).count();
+        t = t.replace(&k, " ");
     }
+    (t.split_whitespace().collect::<Vec<_>>().join(" "), n)
 }
 
-/// Speak a script in a consented voice. The script is checked first, so mistakes show even before a model is ready.
+/// Where a generated file goes: onto the open project, or into the export folder.
+struct Dest {
+    project: Option<(String, u32)>,
+    path: PathBuf,
+    id: String,
+    at: Option<i64>,
+}
+
+fn dest(api: &Api, v: &Value) -> Result<Dest> {
+    let id = format!("m{}", crate::store::new_id());
+    if let Some((pid, dir, sr)) = crate::methods::speech_target(api) {
+        std::fs::create_dir_all(&dir)?;
+        return Ok(Dest {
+            project: Some((pid, sr)),
+            path: dir.join(format!("{id}.wav")),
+            at: crate::api::opos(v, "at", sr),
+            id,
+        });
+    }
+    let dir = api
+        .lock()
+        .settings
+        .export_dir
+        .clone()
+        .map(PathBuf::from)
+        .unwrap_or_else(crate::store::default_export_dir);
+    std::fs::create_dir_all(&dir)?;
+    Ok(Dest {
+        project: None,
+        path: dir.join(format!("Synthetic speech {id}.wav")),
+        at: None,
+        id,
+    })
+}
+
+fn finish(api: &Api, d: &Dest, short: &str, voice: &str, mut res: Value) -> Result<Value> {
+    if let Some((pid, sr)) = &d.project {
+        let added = crate::methods::add_generated(
+            api,
+            crate::methods::Place {
+                project: pid,
+                sr: *sr,
+                at: d.at,
+            },
+            &d.id,
+            &d.path,
+            short,
+            voice,
+        )?;
+        for (k, x) in added.as_object().into_iter().flatten() {
+            res[k] = x.clone();
+        }
+    } else {
+        res["path"] = json!(d.path.display().to_string());
+    }
+    res["synthetic"] = json!(true);
+    Ok(res)
+}
+
+fn wait_or_job(api: &Api, v: &Value, job: String) -> Result<Value> {
+    if v.get("wait").and_then(|x| x.as_bool()).unwrap_or(false) {
+        let j = api
+            .jobs
+            .wait(&job, std::time::Duration::from_secs(3600))
+            .unwrap();
+        if j.state != "done" {
+            bail!(err(
+                if j.state == "cancelled" {
+                    "cancelled"
+                } else {
+                    "failed"
+                },
+                j.error.unwrap_or_else(|| "Cancelled.".into())
+            ));
+        }
+        return Ok(json!({"job": job, "result": j.result}));
+    }
+    Ok(json!({"job": job}))
+}
+
+fn label(name: &str, model: &str) -> String {
+    format!("Synthetic speech in the voice of {name}, made with their recorded consent by Flux using {model}.")
+}
+
+fn voice_name(api: &Api, voice: &str) -> String {
+    profiles(api)
+        .into_iter()
+        .find(|p| p.id == voice)
+        .map(|p| p.name)
+        .unwrap_or_default()
+}
+
+/// Speak a script in a consented voice with the chosen speech model. The script is checked first.
 pub fn h_speak(api: &Api, v: &Value) -> Result<Value> {
-    need_voice(api, v)?;
+    let voice = need_voice(api, v)?;
     let text = os(v, "text").ok_or_else(|| err("bad_params", "`text` is required"))?;
-    parse_script(&text)?;
-    Err(not_ready(api, recommend(hardware()).model))
+    let parts = parse_script(&text)?;
+    let r = crate::voicemodels::ready_for(api, "speech", v.get("model").and_then(|x| x.as_str()))?;
+    let name = voice_name(api, &voice);
+    let reference = voices_dir(api).join(&voice).join("reference.wav");
+    let mut dropped = 0;
+    let segs: Vec<Value> = segments(&parts)
+        .into_iter()
+        .filter_map(|s| match s {
+            Segment::Silence(ms) => Some(json!({"type": "silence", "value": ms})),
+            Segment::Say(t) => {
+                let (t, n) = if r.model.sounds {
+                    (t, 0)
+                } else {
+                    drop_sounds(&t)
+                };
+                dropped += n;
+                (!t.is_empty()).then(|| json!({"type": "say", "value": t}))
+            }
+        })
+        .collect();
+    let d = dest(api, v)?;
+    let a = api.clone();
+    let short: String = text.chars().take(40).collect();
+    let next = if d.project.is_some() {
+        "Adding to project"
+    } else {
+        "Saving"
+    };
+    let job = api.jobs.spawn(
+        "clone-speak",
+        &format!("Speaking as {name}"),
+        &["Speaking", next],
+        move |ctx| {
+            ctx.stage("Speaking", "active");
+            let mut req = crate::voicemodels::request(&r, "speak", &reference, &d.path);
+            req["segments"] = json!(segs);
+            let mut res = crate::voicemodels::run_model(&r, req, ctx)?;
+            crate::voicemodels::label_wav(&d.path, &label(&name, &r.model.name))?;
+            ctx.stage("Speaking", "done");
+            ctx.stage(next, "active");
+            res["model"] = json!(r.model.id);
+            res["sounds_left_out"] = json!(dropped);
+            finish(&a, &d, &short, &voice, res)
+        },
+    );
+    wait_or_job(api, v, job)
 }
 
 /// Turn your own spoken take into the cloned voice, keeping its timing, laughs and hesitations.
 pub fn h_convert(api: &Api, v: &Value) -> Result<Value> {
-    need_voice(api, v)?;
+    let voice = need_voice(api, v)?;
     let path = os(v, "path").ok_or_else(|| {
         err(
             "bad_params",
@@ -819,11 +893,33 @@ pub fn h_convert(api: &Api, v: &Value) -> Result<Value> {
         )
     })?;
     load_clip(&path, "recording", 0.5, 600.0)?;
-    let pick = recommend(hardware());
-    if pick.convert.is_none() {
-        bail!(err("unavailable", "Turning a recording into the voice needs an NVIDIA graphics chip with 6 GB of video memory or Apple silicon with 16 GB of memory. Write a script with [laugh] and other sounds instead."));
-    }
-    Err(not_ready(api, pick.convert))
+    let r = crate::voicemodels::ready_for(api, "convert", v.get("model").and_then(|x| x.as_str()))?;
+    let name = voice_name(api, &voice);
+    let reference = voices_dir(api).join(&voice).join("reference.wav");
+    let d = dest(api, v)?;
+    let a = api.clone();
+    let next = if d.project.is_some() {
+        "Adding to project"
+    } else {
+        "Saving"
+    };
+    let job = api.jobs.spawn(
+        "clone-convert",
+        &format!("Turning your take into {name}"),
+        &["Converting", next],
+        move |ctx| {
+            ctx.stage("Converting", "active");
+            let mut req = crate::voicemodels::request(&r, "convert", &reference, &d.path);
+            req["input"] = json!(path);
+            let mut res = crate::voicemodels::run_model(&r, req, ctx)?;
+            crate::voicemodels::label_wav(&d.path, &label(&name, &r.model.name))?;
+            ctx.stage("Converting", "done");
+            ctx.stage(next, "active");
+            res["model"] = json!(r.model.id);
+            finish(&a, &d, "converted take", &voice, res)
+        },
+    );
+    wait_or_job(api, v, job)
 }
 
 #[cfg(test)]
@@ -847,7 +943,12 @@ mod tests {
         let p = recommend(&hw("windows", "x86_64", 32.0, "nvidia", 8.0));
         assert_eq!(
             (p.model, p.device, p.speed, p.convert),
-            (Some("chatterbox-turbo"), "cuda", "fast", Some("chatterbox"))
+            (
+                Some("chatterbox-turbo"),
+                "cuda",
+                "fast",
+                Some("chatterbox-vc")
+            )
         );
         let p = recommend(&hw("windows", "x86_64", 16.0, "nvidia", 4.0));
         assert_eq!(
@@ -858,13 +959,12 @@ mod tests {
         assert_eq!((p.model, p.device), (Some("chatterbox-turbo"), "cpu"));
         assert!(p.reason.contains("2 GB"));
         let p = recommend(&hw("macos", "aarch64", 16.0, "apple", 0.0));
-        assert_eq!((p.device, p.convert), ("mps", Some("chatterbox")));
+        assert_eq!((p.device, p.convert), ("mps", Some("chatterbox-vc")));
         let p = recommend(&hw("macos", "aarch64", 8.0, "apple", 0.0));
         assert_eq!((p.device, p.convert), ("mps", None));
-        assert_eq!(
-            recommend(&hw("macos", "x86_64", 16.0, "intel", 0.0)).device,
-            "cpu"
-        );
+        let p = recommend(&hw("macos", "x86_64", 16.0, "intel", 0.0));
+        assert_eq!(p.model, None);
+        assert!(p.reason.contains("Intel"));
         assert_eq!(
             recommend(&hw("linux", "x86_64", 16.0, "amd", 0.0)).device,
             "cpu"
@@ -873,9 +973,6 @@ mod tests {
         assert!(recommend(&hw("linux", "x86_64", 4.0, "", 0.0))
             .reason
             .contains("4 GB"));
-        assert!(MODELS
-            .iter()
-            .all(|m| m.licence == "MIT" || m.licence == "Apache-2.0"));
     }
 
     #[test]

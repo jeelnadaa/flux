@@ -67,15 +67,24 @@ parameter and modulator shape with a description.
 ## Voice cloning
 
 `clone_*` tools need a consented voice. `clone_status` says which model this computer gets and whether it is
-installed. Scripts use placeholders: sounds (`[laugh]`, `(sighs)`, `*chuckles*`), hesitations said in the voice
+ready; `clone_models` lists every model with its size, licence, role and whether it is downloaded. Downloads need
+the person's yes: without `confirm: true`, `clone_model_download` changes nothing and returns `confirm_required`
+with the size, licence and folder to show them. Scripts use placeholders: sounds (`[laugh]`, `(sighs)`, `*chuckles*`), hesitations said in the voice
 (`[hmm]`, `[um]`, or plain words) and pauses (`[pause]`, `[long pause]`, `[pause 2s]`). Check a script first:
 
 ```text
 clone_tags {}
 clone_script {text: "[hmm] So I opened it [laugh] [pause] and it was empty."}
-clone_speak {voice: "robin", text: "..."}           # unavailable until the model is installed
-clone_convert {voice: "robin", path: "C:/me.wav"}   # your take, re-voiced, timing kept
+clone_model_download {model: "chatterbox-turbo"}                 # confirm_required: ask the person first
+clone_model_download {model: "chatterbox-turbo", confirm: true}  # job; installs the voice engine too
+clone_settings_set {speech: "chatterbox-turbo", device: "auto", seed: 7, params: {"chatterbox-turbo": {temperature: 0.7}}}
+clone_speak {voice: "robin", text: "...", wait: true}               # onto the Generated speech track
+clone_convert {voice: "robin", path: "C:/me.wav", model: "chatterbox-vc"}   # your take, re-voiced, timing kept
+clone_model_add_local {path: "D:/my-finetune", loader: "turbo"}      # a compatible folder of your own
+clone_model_delete {model: "chatterbox"}                            # keeps files another model shares
 ```
+
+`not_installed` says what to download; `cancelled` downloads resume when started again.
 
 `consent_required` means the voice doesn't exist or the consent recording is missing.
 

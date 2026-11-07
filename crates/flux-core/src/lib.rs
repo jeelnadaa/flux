@@ -18,3 +18,4 @@ pub mod server;
 pub mod store;
 pub mod tools;
 pub mod voiceclone;
+pub mod voicemodels;

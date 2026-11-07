@@ -87,10 +87,18 @@ desktop shell, MCP, site, CI). Their checklist is in PROGRESS.md. The two featur
 **Goal.** Make a voice from a short clip of someone who agreed, and speak scripts in it, with laughs, hesitations
 and pauses where the script puts them. Or re-voice your own recording, keeping its timing exactly.
 
-- **Model picked for the computer.** A probe reads memory, graphics chip and video memory. Chatterbox Turbo (MIT,
-  about 1.4 GB) is the default: it clones from 5 to 20 s and performs paralinguistic tags. Chatterbox (MIT, about
-  3.2 GB, 23 languages) does voice conversion when there is an NVIDIA chip with ≥ 6 GB or Apple silicon with
-  ≥ 16 GB. OpenVoice V2 (MIT) is the lightest. Below 7.5 GB of memory nothing is offered.
+- **Models, downloaded in the app (ADR 0003).** All MIT, pinned to a commit with every file's SHA-256: Chatterbox
+  Turbo (2.99 GB; performs paralinguistic tags; suggested first), Chatterbox (3.19 GB, English, emotion control),
+  Chatterbox Multilingual (3.21 GB, 23 languages), and the Chatterbox voice converter (1.06 GB). A probe reads
+  memory, graphics chip and video memory and suggests one; below 7.5 GB of memory, or on an Intel Mac (no PyTorch
+  2.6), nothing is offered. OpenVoice V2 was dropped on 2026-11-08: it needs a second runtime, and Chatterbox runs on
+  a processor anyway.
+- **Download and voice engine.** One voice engine (portable Python 3.11, PyTorch 2.6 for CUDA, CPU or Apple,
+  chatterbox-tts 0.1.7, all pinned) installs with the first model. Downloads need a yes (`confirm: true`) after the
+  size, licence and folder are shown; they show progress, cancel, resume, check SHA-256 and free space, and share
+  files between models. Delete keeps shared files.
+- **Choice.** Any downloaded model for speech or conversion, device (auto, NVIDIA, Apple, processor), language, seed
+  and each model's own settings; a folder of a compatible model can be added; a per-call `model` overrides.
 - **Consent.** A voice needs the owner (you, or someone with permission), a recording of them reading a consent
   statement, a reference clip, and a ticked agreement. Clips are checked for length and level. Voices stay in the
   data folder and can be deleted with everything they hold.
@@ -103,11 +111,15 @@ and pauses where the script puts them. Or re-voice your own recording, keeping i
 - **Your own voice as input.** `clone.convert` turns your recording into the cloned voice and keeps every laugh,
   hmm and pause where you made it.
 - **Labelling.** Output is marked synthetic; Chatterbox adds an inaudible watermark.
-- **Status.** Part 1 (picker, consent, profiles, parser, screen, 9 tools) is done. Part 2 (R7.9: download the
-  weights with the user's permission and run them) is blocked on that permission.
+- **Output.** A labelled WAV on a "Generated speech" track (one undo step), or in the export folder with no project.
+- **Status.** Part 1 (picker, consent, profiles, parser, screen, 9 tools) and part 2 (R7.9: downloader, engine,
+  choices, speak and convert as jobs, 6 more tools) are done and tested against a local mirror and stub engine.
 - **Tests.** Picker for 9 hardware cases; consent refusals; parser cases incl. hesitations, pauses, clamping and
   refusals (fail when broken on purpose); E2E makes a voice through the UI and checks the script read-out.
-- **Human queue.** Listening checks of cloned speech, laughs, sighs and hesitations once the model runs.
+- **Tests (part 2).** Mock server: confirm, resume after a cut and after cancel, bad checksum, shared files, delete,
+  pip steps and index; stub engine: segments, settings, seed, labels, errors; E2E drives the dialog and download.
+- **Human queue.** The real download and inference on NVIDIA, Apple and processor; listening checks of cloned
+  speech, laughs, sighs and hesitations; licence audit of the engine's pip dependencies.
 
 ## 4. Licences
 
