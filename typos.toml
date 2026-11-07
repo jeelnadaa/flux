@@ -6,9 +6,18 @@ extend-exclude = [
     "Cargo.lock",
     "package-lock.json",
     "*.woff2",
+    "apps/desktop/ui/fonts/licenses/",
+    "scratch_tmp/",
+    "dist-static/",
 ]
 
 [default.extend-words]
+ot = "ot"
+expct = "expct"
+wdth = "wdth"
+thr = "thr"
+MCH = "MCH"
+caf = "caf"
 ANE = "ANE"
 ane = "ane"
 sstem = "sstem"

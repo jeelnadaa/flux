@@ -1,299 +1,184 @@
-name: Release Native Packages
+name: Release
+
+# Every push to main that changes the app builds Flux for Windows, macOS (Apple silicon and Intel) and Linux and
+# publishes a GitHub release, v2.0.<run number>. The download page and the in-app updater read the latest release.
+# Pushes that only touch docs, the website or tests don't make a release.
+#
+# Caches: rust-cache keeps dependencies per target, sccache keeps every compiled crate, npm is cached, so a push
+# rebuilds only the crates that changed.
+#
+# Signing the updater: add the repository secret TAURI_SIGNING_PRIVATE_KEY (the key made with `tauri signer
+# generate`) and TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key has none). Without the key the installers are
+# still built and published, but no updater files are made, so installed copies won't update themselves.
 
 on:
   push:
-    tags:
-      - "v*"
-    branches:
-      - main
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "site/**"
+      - "tests/**"
+      - "design/**"
+      - ".github/workflows/ci.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUSTC_WRAPPER: sccache
+  SCCACHE_GHA_ENABLED: "true"
+
 jobs:
-  build-windows:
-    name: Build Windows x64 Portable Package
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Build Flux UI web bundle
-        run: |
-          npm ci || npm install
-          npm run build
-
-      - name: Build native release binaries
-        run: cargo build --release --workspace --bins
-
-      - name: Prepare Windows standalone package
-        shell: powershell
-        run: |
-          $Version = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF -replace 'refs/tags/v', '' } else { '1.0.0' }
-          $PkgDir = "Flux-$Version-win-x64"
-          New-Item -ItemType Directory -Force -Path $PkgDir
-          New-Item -ItemType Directory -Force -Path "$PkgDir/licenses"
-          New-Item -ItemType Directory -Force -Path "$PkgDir/tools"
-          New-Item -ItemType Directory -Force -Path "$PkgDir/apps/web"
-
-          # Copy binary
-          if (Test-Path "target/release/flux.exe") {
-            Copy-Item "target/release/flux.exe" -Destination "$PkgDir/Flux.exe"
-          } else {
-            $Found = Get-ChildItem -Recurse -Filter "flux.exe" target | Select-Object -First 1
-            if ($Found) {
-              Copy-Item $Found.FullName -Destination "$PkgDir/Flux.exe"
-            } else {
-              Write-Error "Native flux.exe binary not found!"
-              exit 1
-            }
-          }
-
-          # Copy complete Flux UI and assets into package
-          Copy-Item -Recurse "apps/web/dist" "$PkgDir/apps/web/"
-          Copy-Item -Recurse "apps/web/fonts" "$PkgDir/apps/web/"
-          Copy-Item -Recurse "apps/web/icons" "$PkgDir/apps/web/"
-          Copy-Item "apps/web/index.html" "$PkgDir/apps/web/"
-          Copy-Item "apps/web/app.css" "$PkgDir/apps/web/"
-          Copy-Item "apps/web/themes.css" "$PkgDir/apps/web/"
-          Copy-Item "apps/web/fonts.css" "$PkgDir/apps/web/"
-          Copy-Item "apps/web/manifest.webmanifest" "$PkgDir/apps/web/"
-
-          # Copy documents and notices
-          Copy-Item "LICENSES.md" -Destination "$PkgDir/licenses/NOTICES.txt"
-          Copy-Item "README.md" -Destination "$PkgDir/README.txt"
-
-          # Create portable flag file
-          New-Item -ItemType File -Force -Path "$PkgDir/portable.flag"
-
-          # Create zip package
-          Compress-Archive -Path "$PkgDir/*" -DestinationPath "$PkgDir.zip" -Force
-          Write-Output "PACKAGE_ZIP=$PkgDir.zip" >> $env:GITHUB_ENV
-          Get-FileHash "$PkgDir.zip" -Algorithm SHA256 | Out-File "$PkgDir.zip.sha256"
-
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-portable-zip
-          path: Flux-*-win-x64.zip*
-
-  build-macos:
-    name: Build macOS Universal Package
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Build Flux UI web bundle
-        run: |
-          npm ci || npm install
-          npm run build
-
-      - name: Build native release binary
-        run: |
-          cargo build --release --bin flux
-
-      - name: Prepare macOS standalone package
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          [ "$VERSION" = "$GITHUB_REF" ] && VERSION="1.0.0"
-          PKG_NAME="Flux-v${VERSION}-macos-universal"
-          mkdir -p "$PKG_NAME/Flux.app/Contents/MacOS"
-          mkdir -p "$PKG_NAME/Flux.app/Contents/Resources/apps/web"
-
-          # Choose Universal or host binary
-          if [ -f target/aarch64-apple-darwin/release/flux ] && [ -f target/x86_64-apple-darwin/release/flux ]; then
-            echo "[*] Creating Universal 2 binary with lipo..."
-            lipo -create -output "$PKG_NAME/Flux.app/Contents/MacOS/Flux" \
-              target/aarch64-apple-darwin/release/flux \
-              target/x86_64-apple-darwin/release/flux
-          elif [ -f target/release/flux ]; then
-            cp target/release/flux "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
-          elif [ -f target/aarch64-apple-darwin/release/flux ]; then
-            cp target/aarch64-apple-darwin/release/flux "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
-          else
-            FOUND_BIN=$(find target -name "flux" -type f | head -n 1)
-            if [ -n "$FOUND_BIN" ] && [ -f "$FOUND_BIN" ]; then
-              cp "$FOUND_BIN" "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
-            else
-              echo "Error: Native flux binary not found in target directories."
-              exit 1
-            fi
-          fi
-          chmod +x "$PKG_NAME/Flux.app/Contents/MacOS/Flux"
-
-          # Copy complete Flux UI and assets into macOS bundle
-          cp -r apps/web/dist "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp -r apps/web/fonts "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp -r apps/web/icons "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp apps/web/index.html "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp apps/web/app.css "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp apps/web/themes.css "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp apps/web/fonts.css "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-          cp apps/web/manifest.webmanifest "$PKG_NAME/Flux.app/Contents/Resources/apps/web/"
-
-          # Create macOS Info.plist bundle descriptor
-          cat << 'EOF' > "$PKG_NAME/Flux.app/Contents/Info.plist"
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>Flux</string>
-              <key>CFBundleIconFile</key>
-              <string>AppIcon</string>
-              <key>CFBundleIdentifier</key>
-              <string>in.solarquack.flux</string>
-              <key>CFBundleName</key>
-              <string>Flux</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0.0</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>11.0</string>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
-
-          cp README.md "$PKG_NAME/README.txt"
-          cp LICENSES.md "$PKG_NAME/LICENSES.txt"
-
-          zip -r "${PKG_NAME}.zip" "$PKG_NAME"
-          shasum -a 256 "${PKG_NAME}.zip" > "${PKG_NAME}.zip.sha256"
-
-      - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-portable-zip
-          path: Flux-*-macos-universal.zip*
-
-  build-linux:
-    name: Build Linux x64 Portable Package
+  draft:
+    name: Draft the release
     runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.make.outputs.id }}
+      version: ${{ steps.make.outputs.version }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - id: make
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = `2.0.${context.runNumber}`;
+            const tag = `v${version}`;
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner, repo: context.repo.repo,
+              tag_name: tag, target_commitish: context.sha, name: `Flux ${version}`, draft: true,
+              body: [
+                `Flux ${version}, built from ${context.sha.slice(0, 7)}.`,
+                '',
+                '**Windows:** `*_x64-setup.exe` (or the `.msi`). **macOS:** `*_aarch64.dmg` for Apple silicon, `*_x64.dmg` for Intel. **Linux:** `.AppImage`, `.deb` or `.rpm`.',
+                '',
+                'Installed copies update themselves. `flux-mcp-*` files are the MCP server on its own, for agents on computers without the app.',
+              ].join('\n'),
+            });
+            core.setOutput('id', String(data.id));
+            core.setOutput('version', version);
 
-      - name: Install system build dependencies
+  build:
+    name: ${{ matrix.name }}
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+          - name: macOS Apple silicon
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - name: macOS Intel
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+          - name: Linux x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb,rpm
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.draft.outputs.version }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux libraries
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libgtk-3-dev libwebkit2gtk-4.1-dev || sudo apt-get install -y libasound2-dev libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev libasound2-dev patchelf
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-${{ matrix.target }}
+          cache-on-failure: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
 
-      - name: Build Flux UI and Static Site
+      - name: Stamp the version
+        shell: bash
         run: |
-          npm ci || npm install
-          npm run build
-          npm run build:static
+          node -e '
+            const fs = require("fs"), v = process.env.VERSION;
+            const conf = "apps/desktop/src-tauri/tauri.conf.json", c = JSON.parse(fs.readFileSync(conf, "utf8"));
+            c.version = v;
+            // Updater files need the signing key; without it, build the installers alone.
+            if (!process.env.TAURI_SIGNING_PRIVATE_KEY) c.bundle.createUpdaterArtifacts = false;
+            fs.writeFileSync(conf, JSON.stringify(c, null, 2));
+            const cargo = fs.readFileSync("Cargo.toml", "utf8").replace(/(\[workspace\.package\][^\[]*?version = ")[^"]+"/, `$1${v}"`);
+            fs.writeFileSync("Cargo.toml", cargo);
+          '
+          grep -n '^version' Cargo.toml
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: no updater files, installed copies won't update themselves."; fi
 
-      - name: Build Native Linux Binaries
-        run: cargo build --release --workspace --bins
+      - name: Build the MCP server (bundled with the app)
+        run: node scripts/sidecar.mjs --target ${{ matrix.target }}
 
-      - name: Package Linux tarball
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          [ "$VERSION" = "$GITHUB_REF" ] && VERSION="1.0.0"
-          PKG_NAME="Flux-v${VERSION}-linux-x64"
-          mkdir -p "$PKG_NAME/apps/web"
-          cp target/release/flux "$PKG_NAME/"
-          cp -r apps/web/dist "$PKG_NAME/apps/web/"
-          cp -r apps/web/fonts "$PKG_NAME/apps/web/"
-          cp -r apps/web/icons "$PKG_NAME/apps/web/"
-          cp apps/web/index.html "$PKG_NAME/apps/web/"
-          cp apps/web/app.css "$PKG_NAME/apps/web/"
-          cp apps/web/themes.css "$PKG_NAME/apps/web/"
-          cp apps/web/fonts.css "$PKG_NAME/apps/web/"
-          cp apps/web/manifest.webmanifest "$PKG_NAME/apps/web/"
-          cp README.md "$PKG_NAME/README.txt"
-          cp LICENSES.md "$PKG_NAME/LICENSES.txt"
-          tar -czf "${PKG_NAME}.tar.gz" "$PKG_NAME"
-          sha256sum "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256"
-
-      - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-portable-tarball
-          path: Flux-*-linux-x64.tar.gz*
-
-  release:
-    name: Publish to GitHub Releases
-    needs: [build-windows, build-macos, build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Determine release version
-        id: rel_ver
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            TAG="${{ github.ref_name }}"
-            VER="${TAG#v}"
-          else
-            TAG="v1.0.0"
-            VER="1.0.0"
-          fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VER" >> $GITHUB_OUTPUT
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Display downloaded assets
-        run: ls -laR release-assets
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.rel_ver.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          name: Flux v${{ steps.rel_ver.outputs.version }} — Native Standalone
-          make_latest: true
-          overwrite_files: true
-          files: release-assets/*
-          body: |
-            ## Flux Native Audio Editor v${{ steps.rel_ver.outputs.version }}
-
-            Standalone, self-contained native builds for Windows and macOS with all audio codecs and DSP primitives bundled.
-
-            ### Downloads
-            - **Windows (x64 Portable):** `Flux-${{ steps.rel_ver.outputs.version }}-win-x64.zip` — unpack anywhere and run `Flux.exe`
-            - **macOS (Universal):** `Flux-v${{ steps.rel_ver.outputs.version }}-macos-universal.zip` — unpack and run `Flux.app`
-            - **Linux (x64 Portable):** `Flux-v${{ steps.rel_ver.outputs.version }}-linux-x64.tar.gz` — unpack and run `./flux`, or build from source with `make && sudo make install`
-
-            ### Verification
-            Verify downloads using the provided `.sha256` checksum files.
-          draft: false
-          prerelease: false
+      - name: Build and upload the app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.draft.outputs.id }}
+          tauriScript: npx tauri
+          args: --config apps/desktop/src-tauri/tauri.conf.json --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+          includeUpdaterJson: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          updaterJsonPreferNsis: true
+
+      - name: Upload the MCP server on its own
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ext=""; [ "${{ runner.os }}" = "Windows" ] && ext=".exe"
+          name="flux-mcp-${{ matrix.target }}$ext"
+          cp "target/${{ matrix.target }}/release/flux-mcp$ext" "$name"
+          # By release id: the draft has no tag until it's published.
+          gh api --method POST -H "Content-Type: application/octet-stream"             "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ needs.draft.outputs.id }}/assets?name=$name"             --input "$name" > /dev/null
+
+  publish:
+    name: Publish
+    needs: [draft, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner, repo: context.repo.repo,
+              release_id: Number('${{ needs.draft.outputs.id }}'), draft: false, make_latest: 'true',
+            });
+
+  clean-up:
+    name: Remove the draft if a build failed
+    needs: [draft, build]
+    if: failure() && needs.draft.outputs.id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner, repo: context.repo.repo, release_id: Number('${{ needs.draft.outputs.id }}'),
+            });

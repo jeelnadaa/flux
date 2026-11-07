@@ -58,15 +58,17 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R4.2 Download page reads the latest GitHub release (release.js; `npm run build:static` writes dist-static with CSP `_headers` and `_redirects`)
 
 ### R5 CI/CD
-- [ ] R5.1 CI: fmt, clippy, tests, UI E2E
-- [ ] R5.2 Release on every push to main: Windows, macOS arm64 + x64, Linux; flux-mcp binaries
-- [ ] R5.3 Build caches (rust-cache + sccache + npm) so a push only rebuilds what changed (user request 2026-11-07)
+- [x] R5.1 CI: fmt, typos, clippy, cargo deny, Rust tests on Linux/Windows/macOS, check:js, site tests, UI E2E with screenshots
+- [x] R5.2 Release on every push to main that changes the app: draft v2.0.<run>, Windows (NSIS, MSI), macOS arm64 + x64 (dmg), Linux (AppImage, deb, rpm), flux-mcp per target, latest.json when signed; published only when every build passes
+- [x] R5.3 Build caches (rust-cache + sccache + npm) so a push only rebuilds what changed (user request 2026-11-07)
 
 ### R6 Verification and docs
 - [ ] R6.1 Full local test run, screenshots checked
 - [ ] R6.2 README, MCP guide, in-app agent guide, LICENSES
 
 ## Human and hardware queue
+
+- First CI and Release runs on GitHub (needs the user to push). Add secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty) first, or releases ship without self-update files. Installers are not code-signed for Windows SmartScreen or macOS Gatekeeper (needs paid certificates).
 
 - Voice cloning model download and inference (R7.9): needs the user's permission to download weights; then listening checks of cloned speech, laughs and sighs (agents can't judge sound).
 
@@ -97,6 +99,8 @@ None.
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-08: R5.1-R5.3: CI and Release workflows rewritten for the desktop app (old ones built the removed web app). Checked locally: YAML parses, version stamping dry run (2.0.77 into Cargo.toml and tauri.conf.json, updater files off without the key), typos clean (6 identifier words allowed), cargo deny ok. Not yet run on GitHub.
 
 - 2026-11-08: R7.10: hesitation and pause placeholders. New unit test fails when the hesitation comma rule is removed; API test checks segments [say, silence 1500, say]; E2E inserts [hmm] from a chip and sees 1 sound, 2 hesitations, 1.5 s of pauses. 85 Rust tests, 16 E2E checks green; no overflow at 1440/390.
 
