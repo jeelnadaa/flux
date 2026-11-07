@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <title>Download Flux — Native Audio Editor for Windows, macOS & Linux</title>
+    <title>Download Flux for Windows, macOS and Linux</title>
     <meta
       name="description"
-      content="Download Flux, a 100% native, non-destructive audio editor for Windows, macOS and Linux. 32-bit float, sample-accurate editing, 8D spatial sound, on-device AI. Zero install."
+      content="Download Flux, a non-destructive audio editor for Windows, macOS and Linux. Free and open source, updates itself, and works with AI agents over MCP."
     />
     <meta name="claude:viewport-fit-sides" content="cover" />
     <link rel="stylesheet" href="fonts.css" />
@@ -537,7 +537,9 @@
       }
       .specs {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        width: 100%;
+        min-width: 0;
         gap: clamp(24px, 3.2vw, 56px);
         margin: 0 auto 60px;
         max-width: 1100px;
@@ -636,334 +638,206 @@
           text-align: center;
         }
       }
+
+      /* release wiring (release.js) */
+      .chapter.yours .eyebrow::after { content: " · YOUR COMPUTER"; color: var(--mint); }
+      .dl-hero-btn[data-missing] { opacity: 0.82; }
+      .dl-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+      .dl-note { opacity: 0.7; max-width: 46em; line-height: 1.45; margin: 0; }
+      #files { padding-block: clamp(80px, 14svh, 150px); }
+      #files h2 { margin: 6px 0 clamp(20px, 3svh, 36px); }
+      .filelist { display: grid; border-top: 1px solid currentColor; }
+      .filelist .file { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 16px; padding: 16px 4px; border-bottom: 1px solid color-mix(in srgb, currentColor 22%, transparent); color: inherit; text-decoration: none; transition: background 0.25s, padding 0.25s; }
+      .filelist p { margin: 0; padding: 16px 4px; opacity: 0.7; }
+      .filelist .file span:first-child { overflow-wrap: anywhere; }
+      .filelist .file span:nth-child(2) { opacity: 0.65; }
+      .filelist .file:hover, .filelist .file:focus-visible { background: color-mix(in srgb, currentColor 8%, transparent); padding-inline: 14px; }
+      @media (max-width: 640px) { .navr { gap: 8px; } .navr .btn[href="/"], #sndl { display: none; } .herofoot { max-width: 100%; } .dl-hero-btn { max-width: 100%; height: auto; min-height: 46px; flex-wrap: wrap; } }
+      @media (max-width: 640px) { .filelist .file { grid-template-columns: 1fr auto; } .filelist .file span:nth-child(2) { display: none; } }
     </style>
   </head>
   <body>
-    <!-- Top Nav with Difference Blend -->
     <nav class="nav">
-      <a class="wm" href="/" aria-label="Flux">f<i id="navl"></i>ux</a>
+      <a class="wm" href="/" aria-label="Flux home">f<i id="navl"></i>ux</a>
       <div class="navr">
-        <button
-          class="btn snd"
-          id="snd"
-          type="button"
-          aria-pressed="false"
-          aria-label="Toggle sound"
-        >
+        <button class="btn snd" id="snd" type="button" aria-pressed="false" aria-label="Toggle sound">
           <span class="bars" aria-hidden="true"><b></b><b></b><b></b><b></b></span>
           <span id="sndl">sound off</span>
         </button>
-        <a class="btn" href="/app">Launch Web App</a>
-        <a class="btn" href="/#scenes">Tour</a>
-        <a class="btn" href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener"
-          >GitHub</a
-        >
-        <a class="btn solid" href="#dl-win">Get Flux</a>
+        <a class="btn" href="/">Tour</a>
+        <a class="btn" href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn solid" href="#dl-win" data-os-href="">Get Flux</a>
       </div>
     </nav>
 
     <main id="main">
-      <!-- Hero Section: Centered Kinetic Headline -->
       <section class="hero" id="hero" data-g="#090A12" data-f="#F6F4EC">
         <canvas id="field" aria-hidden="true"></canvas>
         <h1 aria-label="Download Flux.">
-          <span class="ln up" aria-hidden="true">
-            <span class="c">D</span><span class="c">O</span><span class="c">W</span
-            ><span class="c">N</span><span class="c">L</span><span class="c">O</span
-            ><span class="c">A</span><span class="c">D</span>
-          </span>
-          <span class="ln dn" aria-hidden="true">
-            <span class="c">F</span><span class="c">L</span><span class="c">U</span
-            ><span class="c">X</span><span class="c">.</span>
-          </span>
+          <span class="ln up" aria-hidden="true"><span class="c">D</span><span class="c">O</span><span class="c">W</span><span class="c">N</span><span class="c">L</span><span class="c">O</span><span class="c">A</span><span class="c">D</span></span>
+          <span class="ln dn" aria-hidden="true"><span class="c">F</span><span class="c">L</span><span class="c">U</span><span class="c">X</span><span class="c">.</span></span>
         </h1>
         <div class="seam" id="seam" aria-hidden="true"></div>
         <div class="herofoot wrap">
-          <p>
-            100% native audio editor. 32-bit floating point, sample-accurate editing, true 8D
-            spatial sound, and on-device AI. Zero web views. Zero browser overhead.
-          </p>
+          <div style="display: grid; gap: 18px">
+            <p>
+              A non-destructive audio editor for Windows, macOS and Linux. Free and open source.
+              It updates itself when a new version ships, and your agent can drive it too.
+            </p>
+            <div class="dl-row">
+              <a class="btn solid dl-hero-btn" data-asset="auto" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span data-os-label="Download Flux">Download Flux</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
+              <a class="btn" href="#files">Every file</a>
+            </div>
+          </div>
           <div class="mono">
-            <span>FLUX V1.0.0 NATIVE RELEASE</span><br />
-            <span>WINDOWS · MACOS · LINUX</span>
+            <span data-rel="version">LATEST RELEASE</span><br />
+            <span data-rel="date">WINDOWS · MACOS · LINUX</span>
           </div>
         </div>
       </section>
 
-      <!-- CHAPTER 01: WINDOWS STANDALONE ZIP -->
-      <section class="chapter wrap" id="dl-win" data-g="#090A12" data-f="#F6F4EC">
+      <section class="chapter wrap" id="dl-win" data-os="win" data-g="#090A12" data-f="#F6F4EC">
         <div class="watermark" aria-hidden="true">WIN</div>
         <div class="chapter-inner">
-          <span class="eyebrow mono">// 01 · STANDALONE PORTABLE ZIP</span>
-          <h2 class="big">Windows Portable.</h2>
+          <span class="eyebrow mono">// 01 · WINDOWS 10 AND 11 · 64-BIT</span>
+          <h2 class="big">Windows.</h2>
           <p class="chapter-pitch">
-            Self-contained 64-bit release package. Zero installer required, zero registry entries,
-            zero background telemetry. Includes all native C++ and Rust DSP dependencies,
-            low-latency WASAPI & ASIO drivers, and DirectML hardware acceleration.
+            One installer, no admin rights. Flux installs for you alone, adds itself to the Start
+            menu, and keeps itself up to date in the background.
           </p>
-
           <div class="badge-strip">
-            <span class="spec-pill"><span class="dot"></span>WASAPI Exclusive & ASIO</span>
-            <span class="spec-pill"><span class="dot"></span>DirectML GPU / NPU</span>
-            <span class="spec-pill"><span class="dot"></span>32-Bit Float Internal</span>
-            <span class="spec-pill"><span class="dot"></span>x86_64 Native</span>
-            <span class="spec-pill"><span class="dot"></span>Zero Install</span>
+            <span class="spec-pill"><span class="dot"></span>Installer (.exe)</span>
+            <span class="spec-pill"><span class="dot"></span>MSI for managed PCs</span>
+            <span class="spec-pill"><span class="dot"></span>x64</span>
+            <span class="spec-pill"><span class="dot"></span>Signed updates</span>
+            <span class="spec-pill"><span class="dot"></span>WASAPI audio</span>
           </div>
-
-          <div class="action-row">
-            <a
-              class="btn solid dl-hero-btn"
-              href="https://github.com/jeelnadaa/flux/releases/latest/download/Flux-1.0.0-win-x64.zip"
-              download
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Download flux-windows-x64.zip</span>
-              <span class="mono dl-size">48 MB</span>
-            </a>
+          <div class="action-row dl-row">
+            <a class="btn solid dl-hero-btn" data-asset="win-exe" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>Windows installer</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
+            <a class="btn dl-hero-btn" data-asset="win-msi" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>MSI package</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
           </div>
-
           <div class="terminal-card">
             <div class="terminal-code">
-              <span class="prompt">1.</span> Extract flux-windows-x64.zip to any folder<br />
-              <span class="prompt">2.</span> Double-click flux.exe to start editing
+              <span class="prompt">1.</span> Run the installer<br />
+              <span class="prompt">2.</span> If SmartScreen appears, choose More info, then Run anyway
             </div>
-            <span class="mono" style="opacity: 0.6">NO INSTALLER NEEDED</span>
+            <span class="mono" style="opacity: 0.6">NOT YET CODE-SIGNED</span>
           </div>
         </div>
       </section>
 
-      <!-- CHAPTER 02: MACOS UNIVERSAL ZIP -->
-      <section class="chapter wrap" id="dl-mac" data-g="#25103D" data-f="#F6F4EC">
+      <section class="chapter wrap" id="dl-mac" data-os="mac" data-g="#25103D" data-f="#F6F4EC">
         <div class="watermark" aria-hidden="true">MAC</div>
         <div class="chapter-inner">
-          <span class="eyebrow mono">// 02 · APPLE SILICON & INTEL</span>
-          <h2 class="big">macOS Universal.</h2>
+          <span class="eyebrow mono">// 02 · APPLE SILICON AND INTEL · MACOS 11+</span>
+          <h2 class="big">macOS.</h2>
           <p class="chapter-pitch">
-            Single universal ZIP package optimized natively for Apple Silicon (M1/M2/M3/M4) and
-            Intel x64. Built on native CoreAudio for sub-millisecond audio buffers, with local AI
-            acceleration powered directly by Metal Performance Shaders and the Apple Neural Engine.
+            A disk image for each kind of Mac. Drag Flux to Applications. New versions download in
+            the background and install when you quit.
           </p>
-
           <div class="badge-strip">
-            <span class="spec-pill"><span class="dot"></span>CoreAudio (0.8 ms Round-Trip)</span>
-            <span class="spec-pill"><span class="dot"></span>Metal & Apple Neural Engine</span>
-            <span class="spec-pill"
-              ><span class="dot"></span>Universal Binary (ARM64 & x86_64)</span
-            >
-            <span class="spec-pill"><span class="dot"></span>Retina Display P3 Native</span>
+            <span class="spec-pill"><span class="dot"></span>Apple silicon (arm64)</span>
+            <span class="spec-pill"><span class="dot"></span>Intel (x64)</span>
+            <span class="spec-pill"><span class="dot"></span>CoreAudio</span>
+            <span class="spec-pill"><span class="dot"></span>Signed updates</span>
           </div>
-
-          <div class="action-row">
-            <a
-              class="btn solid dl-hero-btn"
-              href="https://github.com/jeelnadaa/flux/releases/latest/download/Flux-v1.0.0-macos-universal.zip"
-              download
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Download Flux-macos-universal.zip</span>
-              <span class="mono dl-size">52 MB</span>
-            </a>
+          <div class="action-row dl-row">
+            <a class="btn solid dl-hero-btn" data-asset="mac-arm" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>Apple silicon (.dmg)</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
+            <a class="btn dl-hero-btn" data-asset="mac-intel" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>Intel (.dmg)</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
           </div>
-
           <div class="terminal-card">
-            <div class="terminal-code"><span class="prompt">$</span> xattr -cr Flux.app</div>
-            <button class="btn-copy" type="button" data-copy="xattr -cr Flux.app">
-              Copy Command
-            </button>
+            <div class="terminal-code"><span class="prompt">$</span> xattr -dr com.apple.quarantine /Applications/Flux.app</div>
+            <button class="btn-copy" type="button" data-copy="xattr -dr com.apple.quarantine /Applications/Flux.app">Copy</button>
           </div>
+          <p class="dl-note mono">Not yet notarized by Apple. If macOS says Flux is damaged or can't be checked, run this once in Terminal, then open Flux again.</p>
         </div>
       </section>
 
-      <!-- CHAPTER 03: LINUX BUILD FROM SOURCE -->
-      <section class="chapter wrap" id="dl-linux" data-g="#ECE9DE" data-f="#090A12">
-        <div class="watermark" aria-hidden="true">SRC</div>
+      <section class="chapter wrap" id="dl-linux" data-os="linux" data-g="#ECE9DE" data-f="#090A12">
+        <div class="watermark" aria-hidden="true">LNX</div>
         <div class="chapter-inner">
-          <span class="eyebrow mono">// 03 · GNU MAKEFILE AUTOMATION</span>
-          <h2 class="big">Build From Source.</h2>
+          <span class="eyebrow mono">// 03 · X86_64 · ANY MODERN DISTRO</span>
+          <h2 class="big">Linux.</h2>
           <p class="chapter-pitch">
-            Compile the complete native desktop app directly from source using our root Makefile.
-            Native PipeWire and ALSA low-latency audio drivers, AVX-512 SIMD vectorization, and
-            OpenVINO hardware acceleration. Zero proprietary blobs, zero telemetry.
+            An AppImage that runs anywhere and updates itself, plus packages for apt and dnf if you
+            prefer your package manager.
           </p>
-
           <div class="badge-strip">
-            <span class="spec-pill"><span class="dot"></span>PipeWire & ALSA Low-Latency</span>
-            <span class="spec-pill"><span class="dot"></span>AVX-512 & OpenVINO Vectorized</span>
-            <span class="spec-pill"><span class="dot"></span>Clean GNU Makefile</span>
-            <span class="spec-pill"><span class="dot"></span>Permissive Open Source</span>
+            <span class="spec-pill"><span class="dot"></span>AppImage</span>
+            <span class="spec-pill"><span class="dot"></span>Debian and Ubuntu (.deb)</span>
+            <span class="spec-pill"><span class="dot"></span>Fedora and openSUSE (.rpm)</span>
+            <span class="spec-pill"><span class="dot"></span>ALSA and PipeWire</span>
           </div>
-
-          <div class="action-row" style="gap: 12px; flex-wrap: wrap">
-            <a
-              class="btn solid dl-hero-btn"
-              href="https://github.com/jeelnadaa/flux/releases/latest/download/Flux-v1.0.0-linux-x64.tar.gz"
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Download Linux x64 (.tar.gz)</span>
-              <span class="mono">~28 MB</span>
-            </a>
-            <a
-              class="btn dl-hero-btn"
-              href="https://github.com/jeelnadaa/flux"
-              target="_blank"
-              rel="noopener"
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"
-                />
-              </svg>
-              <span>Build with Makefile</span>
-              <span class="mono">↗</span>
-            </a>
+          <div class="action-row dl-row">
+            <a class="btn solid dl-hero-btn" data-asset="linux-appimage" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>AppImage</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
+            <a class="btn dl-hero-btn" data-asset="linux-deb" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>.deb</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
+            <a class="btn dl-hero-btn" data-asset="linux-rpm" href="https://github.com/jeelnadaa/flux/releases/latest"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg><span>.rpm</span><span class="mono dl-size" data-size>GitHub ↗</span></a>
           </div>
-
           <div class="terminal-card">
-            <div class="terminal-code">
-              <span class="prompt">$</span> git clone https://github.com/jeelnadaa/flux.git<br />
-              <span class="prompt">$</span> cd flux && make && ./bin/flux
-            </div>
-            <button
-              class="btn-copy"
-              type="button"
-              data-copy="git clone https://github.com/jeelnadaa/flux.git && cd flux && make && ./bin/flux"
-            >
-              Copy Commands
-            </button>
+            <div class="terminal-code"><span class="prompt">$</span> chmod +x Flux_*.AppImage &amp;&amp; ./Flux_*.AppImage</div>
+            <button class="btn-copy" type="button" data-copy="chmod +x Flux_*.AppImage &amp;&amp; ./Flux_*.AppImage">Copy</button>
           </div>
         </div>
       </section>
 
-      <!-- CHAPTER 04: ARCHITECTURE SPECIFICATIONS -->
-      <section class="wrap" id="spec" data-g="#1621E0" data-f="#F6F4EC">
-        <p class="huge">0% Web View</p>
-        <p class="lede">
-          Flux is engineered as a true OS-native application. Direct audio hardware buffers,
-          lock-free real-time DSP threads, and native windowing.
-        </p>
+      <section class="chapter wrap" id="dl-mcp" data-g="#1621E0" data-f="#F6F4EC">
+        <div class="watermark" aria-hidden="true">MCP</div>
+        <div class="chapter-inner">
+          <span class="eyebrow mono">// 04 · FOR AI AGENTS</span>
+          <h2 class="big">Bring your agent.</h2>
+          <p class="chapter-pitch">
+            Every download includes flux-mcp. Connect Claude, or any MCP client, and it can do
+            everything you can: import, edit, add effects, master and export. It drives the open
+            app, or runs on its own when Flux is closed.
+          </p>
+          <div class="badge-strip">
+            <span class="spec-pill"><span class="dot"></span>Every feature is a tool</span>
+            <span class="spec-pill"><span class="dot"></span>stdio MCP</span>
+            <span class="spec-pill"><span class="dot"></span>Works headless</span>
+            <span class="spec-pill"><span class="dot"></span>Stays on this computer</span>
+          </div>
+          <div class="terminal-card">
+            <div class="terminal-code"><span class="prompt">$</span> claude mcp add flux -- "&lt;path to flux-mcp&gt;"</div>
+            <button class="btn-copy" type="button" data-copy="claude mcp add flux -- flux-mcp">Copy</button>
+          </div>
+          <p class="dl-note mono">Settings, Agents in the app shows the exact command for your computer, with the path filled in.</p>
+        </div>
+      </section>
 
+      <section class="wrap" id="spec" data-g="#090A12" data-f="#F6F4EC">
+        <p class="huge">0 bytes</p>
+        <p class="lede">of your audio leave your computer. No account, no cloud, no tracking.</p>
         <div class="specs">
-          <div class="spec">
-            <b>Lock-Free Audio</b>
-            <span
-              >The real-time DSP thread runs with zero memory allocations and zero mutex locks.
-              Smooth audio at lowest latency.</span
-            >
-          </div>
-          <div class="spec">
-            <b>32-Bit Float</b>
-            <span
-              >Continuous 32-bit floating point precision end-to-end. Dither is applied only at
-              final export.</span
-            >
-          </div>
-          <div class="spec">
-            <b>Zero-Install</b>
-            <span
-              >Standalone portable ZIP packages for Windows and macOS. Unpack anywhere, run
-              instantly.</span
-            >
-          </div>
-          <div class="spec">
-            <b>Air-Gapped AI</b>
-            <span
-              >Demucs 4-stem separation and Whisper speech recognition run 100% on your local
-              GPU/NPU. Zero network calls.</span
-            >
-          </div>
-          <div class="spec">
-            <b>Sample-Accurate</b>
-            <span
-              >Every cut, splice, and automation point evaluates to discrete sample frames, never
-              milliseconds or pixels.</span
-            >
-          </div>
-          <div class="spec">
-            <b>Clean Makefile</b>
-            <span
-              >Single top-level Makefile on Linux. Automated dependency detection, test
-              verification, and native compilation.</span
-            >
-          </div>
+          <div class="spec"><b>Updates itself</b><span>Checks GitHub for a new release, downloads it in the background, verifies its signature and installs when you restart. Turn it off in Settings.</span></div>
+          <div class="spec"><b>Non-destructive</b><span>Your source files are never changed. Every edit is one undo step, all the way back to the first.</span></div>
+          <div class="spec"><b>32-bit float</b><span>All the way through the signal path. Dither is applied only when you export to a lower bit depth.</span></div>
+          <div class="spec"><b>1 sample</b><span>Edit precision. Cuts, fades and automation land on samples, never on pixels.</span></div>
+          <div class="spec"><b>Open source</b><span>MIT or Apache-2.0. Read every line, build it yourself, or send a fix.</span></div>
+          <div class="spec"><b>Built on every change</b><span>Each change to Flux is tested and built for all three systems automatically, and published here.</span></div>
         </div>
       </section>
 
-      <!-- CLOSING & BIGMARK FOOTER -->
+      <section class="wrap" id="files" data-g="#ECE9DE" data-f="#090A12">
+        <span class="eyebrow mono" data-rel="version">LATEST RELEASE</span>
+        <h2 class="big">Every file.</h2>
+        <div class="filelist mono" id="filelist" aria-live="polite"><p>Asking GitHub for the latest release…</p></div>
+      </section>
+
       <section class="end" data-g="#090A12" data-f="#F6F4EC">
         <div class="wrap">
-          <h2 class="say">Sound, in flux. Native on your machine.</h2>
-          <div class="action-row">
-            <a
-              class="btn solid"
-              href="#dl-win"
-              style="height: 58px; padding: 0 32px; font-size: 18px"
-              >Back to Top ↑</a
-            >
-            <a class="btn" href="/#scenes" style="height: 58px; padding: 0 32px; font-size: 18px"
-              >Feature Tour →</a
-            >
+          <h2 class="say">Sound, in flux. On your computer.</h2>
+          <div class="action-row dl-row">
+            <a class="btn solid" data-asset="auto" href="https://github.com/jeelnadaa/flux/releases/latest" style="height: 58px; padding: 0 32px; font-size: 18px"><span data-os-label="Download Flux">Download Flux</span></a>
+            <a class="btn" href="/" style="height: 58px; padding: 0 32px; font-size: 18px">See what it does</a>
           </div>
-          <div class="bigmark" id="bigmark" aria-hidden="true">
-            <span class="c">f</span><span class="bar"></span><span class="c">u</span
-            ><span class="c">x</span>
-          </div>
+          <div class="bigmark" id="bigmark" aria-hidden="true"><span class="c">f</span><span class="bar"></span><span class="c">u</span><span class="c">x</span></div>
         </div>
         <footer class="foot wrap mono">
-          <span>FLUX NATIVE AUDIO EDITOR · V1.0.0</span>
+          <span data-rel="version">FLUX</span>
           <nav aria-label="Footer">
-            <a href="/">Landing</a>
+            <a href="/">Home</a>
             <a href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener">GitHub</a>
-            <a href="https://github.com/jeelnadaa/flux/releases" target="_blank" rel="noopener"
-              >Releases</a
-            >
+            <a href="https://github.com/jeelnadaa/flux/releases" target="_blank" rel="noopener">All releases</a>
           </nav>
         </footer>
       </section>
@@ -972,6 +846,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script src="release.js"></script>
     <script src="download.js"></script>
   </body>
 </html>

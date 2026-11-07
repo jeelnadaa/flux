@@ -41,6 +41,10 @@ AI agents can drive every feature.
   on this computer. **Speaking in the voice is not working yet:** the model download waits for permission, so
   `clone.speak` and `clone.convert` say exactly what they would use and why they can't yet.
 
+- **Website (`site/`).** A landing page and a download page with no web app. The download page reads the latest
+  GitHub release in the visitor's browser and offers the right installer for their computer. `npm run build:static`
+  writes `dist-static/` for Cloudflare Pages, with a content security policy.
+
 Not available without bundled models: transcript editing, filler-word removal and dubbing. These methods return
 `unavailable` instead of fake results.
 
@@ -56,6 +60,10 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 ```bash
 cargo run -p flux-mcp -- --help
+```
+
+```bash
+npm run test:site
 ```
 
 ## Privacy

@@ -1174,8 +1174,8 @@
           ><span id="sndt">Sound on</span>
         </button>
         <span class="sndh mono" id="sndh" hidden>Click or tap anywhere to start the sound</span>
-        <a class="btn" href="/app">Open Web App</a>
-        <a class="btn solid" href="/download">Download Native</a>
+        <a class="btn" href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn solid" href="/download" data-os-href="/download">Download</a>
       </div>
     </header>
 
@@ -1188,12 +1188,13 @@
         </h1>
         <div class="herofoot wrap">
           <p>
-            A professional native audio editor. Cut it, spin it around your head, pull it apart into
-            stems, edit it like a document. Your audio stays on your machine.
+            An audio editor for Windows, macOS and Linux. Cut it, spin it around your head, put a
+            preset on everything your computer plays, and let an AI agent drive it. Your audio stays
+            on your computer.
           </p>
           <div class="row" style="gap: 12px; flex-wrap: wrap">
-            <a class="btn solid" href="/download">Download Native App</a>
-            <a class="btn" href="/app">Launch Web App</a>
+            <a class="btn solid" href="/download" data-asset="auto"><span data-os-label>Download Flux</span></a>
+            <a class="btn" href="/download">Every download</a>
           </div>
         </div>
       </section>
@@ -1254,7 +1255,7 @@
       </section>
 
       <section class="scene wrap" id="stext" data-g="#ECE9DE" data-f="#090A12">
-        <div class="tag mono"><span>Transcript, speaker 1</span><span id="dur">00:08.40</span></div>
+        <div class="tag mono"><span>A script, edited</span><span id="dur">00:08.40</span></div>
         <p
           class="para"
           id="para"
@@ -1333,7 +1334,7 @@
             Pull the vocal out. Keep the band.
           </h2>
           <p class="mono" style="margin-top: 12px">
-            Stems run on your device. Vocals, drums, bass, other.
+            A spectral split, on your computer. Vocals, drums, bass and the rest.
           </p>
         </div>
       </section>
@@ -1355,48 +1356,35 @@
       <section class="wrap" id="spec" data-g="#1621E0" data-f="#F6F4EC">
         <p class="huge" id="zero">0 bytes</p>
         <p class="lede">
-          leave your machine unless you say so. AI runs on your device, and cloud processing is
-          opt-in, per feature.
+          leave your computer. Flux has no cloud features: every tool runs here, and nothing is
+          uploaded.
         </p>
         <div class="specs">
           <div class="spec">
             <b>32-bit float</b
-            ><span
-              >All the way through the signal path. Dither is applied only when you export to a
-              lower bit depth.</span
-            >
+            ><span>All the way through. Dither only when you export to fewer bits.</span>
           </div>
           <div class="spec">
-            <b>±0.1 LU</b
-            ><span
-              >Loudness accuracy against the EBU conformance signals, so −14 LUFS means −14
-              LUFS.</span
-            >
-          </div>
-          <div class="spec">
-            <b>−100 dBFS</b
-            ><span
-              >Maximum difference between what you preview and what you export. Same engine, same
-              output.</span
-            >
-          </div>
-          <div class="spec">
-            <b>±3 cents</b><span>Pitch accuracy across a full octave of shifting up or down.</span>
+            <b>−100 dB</b
+            ><span>Most difference between what you hear and what you export. One engine for both.</span>
           </div>
           <div class="spec">
             <b>1 sample</b
-            ><span
-              >Edit precision. Cuts, fades and automation resolve to samples, never to pixels.</span
-            >
+            ><span>Edit precision. Cuts, fades and automation land on samples, never pixels.</span>
           </div>
           <div class="spec">
-            <b>No account</b
-            ><span>Everything on-device works without signing in, and keeps working offline.</span>
+            <b>162 tools</b
+            ><span>Every feature is an MCP tool, so an AI agent can do anything you can.</span>
+          </div>
+          <div class="spec">
+            <b>41 live presets</b
+            ><span>For your computer's sound and your microphone, and a designer to build your own.</span>
+          </div>
+          <div class="spec">
+            <b>No account</b><span>Nothing to sign in to. Updates itself in the background.</span>
           </div>
         </div>
-        <p class="mono note">
-          Engineering targets. Flux tests each one automatically on every build.
-        </p>
+        <p class="mono note">Measured by Flux's own tests on every build.</p>
       </section>
 
       <section
@@ -1411,25 +1399,64 @@
         </div>
       </section>
 
-      <section class="wrap" id="splat" data-g="#090A12" data-f="#F6F4EC">
+      <section class="wrap" id="slive" data-g="#FF5A1C" data-f="#090A12">
         <h2 class="big" style="font-size: clamp(36px, 6vw, 104px)">
-          Starts in a tab. Unzips on Windows.
+          Put a preset on everything you hear.
         </h2>
         <div class="plats">
           <div class="plat">
-            <span class="mono">In your browser</span>
-            <h3>Web</h3>
+            <span class="mono">Computer sound</span>
+            <h3>Live</h3>
             <p>
-              Open a link and start editing. Install it as an app, and it keeps working with no
-              connection. Pinch the waveform on a phone too.
+              Pick a preset, and whatever your computer plays comes out of your headphones through it:
+              8D, slowed, underwater, a cathedral. Bypass to compare.
             </p>
           </div>
           <div class="plat">
-            <span class="mono">Later, for Windows</span>
-            <h3>One zip</h3>
+            <span class="mono">Microphone</span>
+            <h3>Your voice</h3>
             <p>
-              Unpack it and run Flux.exe. Every DLL and tool is already inside, so there is nothing
-              to install. Native audio engine, real project folders, pro audio devices.
+              Broadcast voice, radio, robot, a huge hall. Hear yourself through it, or send it on through a
+              virtual cable to a call.
+            </p>
+          </div>
+          <div class="plat">
+            <span class="mono">Designer</span>
+            <h3>Anything</h3>
+            <p>
+              Parallel lanes of 39 effects, LFOs, step sequencers, envelope followers and macros. Every
+              control explains itself. Share presets as files.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap" id="splat" data-g="#090A12" data-f="#F6F4EC">
+        <h2 class="big" style="font-size: clamp(36px, 6vw, 104px)">
+          Windows. macOS. Linux.
+        </h2>
+        <div class="plats">
+          <div class="plat">
+            <span class="mono">Installer or MSI</span>
+            <h3>Windows</h3>
+            <p>Windows 10 and 11, 64-bit. Captures any output's sound for Live.</p>
+          </div>
+          <div class="plat">
+            <span class="mono">Apple silicon and Intel</span>
+            <h3>macOS</h3>
+            <p>macOS 11 or later. Live captures system sound on macOS 14.6 and later.</p>
+          </div>
+          <div class="plat">
+            <span class="mono">AppImage, deb or rpm</span>
+            <h3>Linux</h3>
+            <p>64-bit, PipeWire or PulseAudio. Live listens through Monitor inputs.</p>
+          </div>
+          <div class="plat">
+            <span class="mono">MCP</span>
+            <h3>Your agent</h3>
+            <p>
+              Connect Claude or any MCP client. It drives the open app, or works without it. Setup is in
+              Settings, Agents.
             </p>
           </div>
         </div>
@@ -1453,9 +1480,9 @@
         <footer class="foot wrap mono">
           <span>Flux</span>
           <nav aria-label="Footer">
-            <a href="index.html#help">Help</a><a href="index.html#legal">Privacy</a
-            ><a href="index.html#legal-terms">Terms</a
-            ><a href="index.html#legal-credits">Attributions</a>
+            <a href="/download">Download</a><a href="https://github.com/jeelnadaa/flux" target="_blank" rel="noopener">GitHub</a
+            ><a href="https://github.com/jeelnadaa/flux/blob/main/docs/MCP.md" target="_blank" rel="noopener">Agents (MCP)</a
+            ><a href="https://github.com/jeelnadaa/flux/blob/main/LICENSES.md" target="_blank" rel="noopener">Attributions</a>
           </nav>
         </footer>
       </section>
@@ -1464,6 +1491,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script src="release.js"></script>
     <script src="landing.js"></script>
   </body>
 </html>
