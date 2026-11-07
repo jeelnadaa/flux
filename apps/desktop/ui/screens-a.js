@@ -28,8 +28,10 @@
     </div>
     <div class="between"><a class="dim" href="#home" data-go="home" data-act="onboarded">Skip setup</a>${btn('Continue', { k: 'p', lg: 1, go: 'hpcheck' })}</div>`));
 
+  /* After first run, the sound steps open from Settings or a 3D screen and go back there when done. */
+  const redo = () => !D.ui.firstRun, back = () => D.ui.soundFrom || 'prefs-audio';
   const HP = [['ok', 'Sounds right'], ['swapped', 'Left and right are swapped'], ['flat', 'Sounds flat, inside my head'], ['speakers', 'I\'m using speakers']];
-  reg('hpcheck', 'First run', 'Headphone check', () => wiz(2, 4, `
+  reg('hpcheck', 'First run', 'Headphone check', () => wiz(redo() ? 1 : 2, redo() ? 2 : 4, `
     <h1 class="h1">Are your headphones the right way round?</h1>
     <p class="lede">3D and 8D audio depend on it. Press each button, then tell us what you heard.</p>
     <div class="g2">
@@ -39,15 +41,15 @@
     <div class="box col"><b>Next, a sound will jump around your head.</b><span class="dim">Front, left, right, then behind you.</span>${btn('Play the moving sound', { i: 'play', x: 'data-act="tone" data-kind="move"' })}</div>
     <div class="row">${HP.map(([k, t], i) => chip(t, (D.ui.hp || 'ok') === k, '', `data-act="hp-answer" data-v="${k}"`)).join('')}</div>
     ${cal('info', 'Flux can\'t tell whether headphones are plugged in, so this only checks what you hear. If it sounds flat, try the next step: picking a head shape usually fixes it.')}
-    <div class="between"><a class="btn g" href="#welcome" data-go="welcome">Back</a><div class="row">${btn('Skip', { k: 'g', go: 'storage-ask' })}${btn('Continue', { k: 'p', lg: 1, go: 'hrtf' })}</div></div>`));
+    <div class="between"><a class="btn g" href="#${redo() ? back() : 'welcome'}" data-go="${redo() ? back() : 'welcome'}">Back</a><div class="row">${btn('Skip', { k: 'g', go: redo() ? back() : 'storage-ask' })}${btn('Continue', { k: 'p', lg: 1, go: 'hrtf' })}</div></div>`));
 
   const PROF = [['A', 'Wide head, bright', 19.5], ['B', 'Medium, neutral', 17.5], ['C', 'Medium, strong rear cue', 17.5], ['D', 'Narrow, bright', 15.5], ['E', 'Wide, warm', 19.5], ['F', 'Narrow, warm', 15.5]];
-  reg('hrtf', 'First run', 'Pick your head shape', () => { const cur = (D.settings && D.settings.hrtf_profile) || 'C', hw = (D.settings && D.settings.head_width_cm) || 17.5; return wiz(3, 4, `
+  reg('hrtf', 'First run', 'Pick your head shape', () => { const cur = (D.settings && D.settings.hrtf_profile) || 'C', hw = (D.settings && D.settings.head_width_cm) || 17.5; return wiz(redo() ? 2 : 3, redo() ? 2 : 4, `
     <h1 class="h1">Which one sounds outside your head?</h1>
     <p class="lede">Everyone's ears differ. Play each profile and pick the one where the sound seems furthest from you, especially behind.</p>
     <div class="g3">${PROF.map(([n, d, w]) => `<button class="tile ${n === cur ? 'on' : ''}" type="button" data-act="hrtf" data-v="${n}" data-w="${w}"><div class="between"><b>Profile ${n}</b>${ic('play', 16)}</div><span>${d}</span></button>`).join('')}</div>
     ${sl('Head width', (hw - 12) / 10 * 100, hw.toFixed(1) + ' cm', { bind: 'set:head_width_cm:12:22:cm' })}
-    <div class="between"><a class="btn g" href="#hpcheck" data-go="hpcheck">Back</a>${btn('Use Profile ' + cur, { k: 'p', lg: 1, go: 'storage-ask' })}</div>`); });
+    <div class="between"><a class="btn g" href="#hpcheck" data-go="hpcheck">Back</a>${btn('Use Profile ' + cur, { k: 'p', lg: 1, go: redo() ? back() : 'storage-ask' })}</div>`); });
 
   reg('storage-ask', 'First run', 'Keep work safe', () => { const s = D.settings || {}; return wiz(4, 4, `
     <h1 class="h1">Where should your exports go?</h1>

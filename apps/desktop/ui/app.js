@@ -110,6 +110,7 @@
     const seq = ++navSeq;
     await F.need(ALWAYS.concat(NEED[id] || []));
     if (seq !== navSeq) return;
+    if (id === 'hpcheck' && cur !== 'hrtf' && cur !== 'hpcheck') D.ui.soundFrom = cur && M[cur] && M[cur].group !== 'First run' ? cur : null;
     const go = () => { stage.innerHTML = M[id].fn(); const prev = cur; cur = id; hydrate(stage); document.title = (P() ? P().name + ' · ' : '') + 'Flux'; const m = stage.querySelector('#m'); if (m && prev !== id) m.scrollTop = 0; };
     if (canVT() && cur && cur !== id) quiet(document.startViewTransition(go)); else go();
     if (push !== false) { try { history.replaceState(null, '', '#' + id); } catch (e) { location.hash = id; } }
@@ -610,6 +611,11 @@
     lastRev = D.project ? D.project.rev : -1;
     const id = location.hash.slice(1);
     const first = M[id] && id !== 'error' ? id : !D.settings.onboarded ? 'boot' : (D.recovery || []).length ? 'recovery' : D.project ? (D.settings.mode === 'simple' ? 'task' : 'edit') : 'home';
+    if (first === 'boot') {
+      // First run shows once: it counts as seen from the moment it opens, even if Flux closes halfway.
+      D.ui.firstRun = true;
+      ACT.onboarded();
+    }
     await render(first, false);
     requestAnimationFrame(tick);
     if (F.updater) {

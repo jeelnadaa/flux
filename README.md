@@ -25,6 +25,8 @@ AI agents can drive every feature.
     removal, spectral repair, match EQ, and text to speech with system voices (always labelled synthetic).
   - Projects are saved atomically and journaled, with crash recovery, `.flux` packages, presets, recorded actions,
     batch, convert and ringtone.
+- **First run.** A short setup shows once: mode, headphone check, a head shape for 3D sound, and where exports go.
+  Settings > Audio > Sound profile runs the headphone and head-shape steps again.
 - **Live (desktop app, Live page).** Put a preset on everything the computer plays (Windows and macOS capture an
   output device; Linux uses Monitor inputs) or on a microphone, and play the result to any output, with in and out
   meters and a bypass. 41 built-in live presets (21 for computer sound, 20 for a microphone). The designer builds
