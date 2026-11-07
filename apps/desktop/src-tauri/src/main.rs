@@ -116,6 +116,7 @@ fn filters(kind: &str) -> (&'static str, &'static [&'static str]) {
         "flux" => ("Flux project package", &["flux"]),
         "preset" => ("Flux preset", &["fluxpreset", "json"]),
         "json" => ("JSON", &["json"]),
+        "live" => ("Flux live preset", &["fluxlive", "json"]),
         _ => (
             "Audio",
             &[

@@ -22,7 +22,13 @@ AI agents can drive every feature.
     removal, spectral repair, match EQ, and text to speech with system voices (always labelled synthetic).
   - Projects are saved atomically and journaled, with crash recovery, `.flux` packages, presets, recorded actions,
     batch, convert and ringtone.
-- **Command API.** 123 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Live (desktop app, Live page).** Put a preset on everything the computer plays (Windows and macOS capture an
+  output device; Linux uses Monitor inputs) or on a microphone, and play the result to any output, with in and out
+  meters and a bypass. 41 built-in live presets (21 for computer sound, 20 for a microphone). The designer builds
+  anything from 39 effects in parallel lanes and a post chain, moved by modulators (LFOs, random, step sequencer,
+  envelope follower, tempo sync) and macros; export and import `.fluxlive` files. A built-in preset is never
+  changed: the first edit makes your own copy. Every control has a tooltip.
+- **Command API.** 154 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 

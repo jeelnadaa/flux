@@ -46,7 +46,7 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R7.2 Modular live presets: parallel lanes + post chain of any of 39 live effects, 10 modulator shapes (LFOs, random, steps, envelope follower) with tempo sync, macros with ranges and curves, safety limiter
 - [x] R7.3 41 built-in live presets (21 for computer sound, 20 for a microphone); create, copy, edit, randomize, export/import (.fluxlive), hostile-input checks
 - [x] R7.4 31 `live.*` methods = 31 MCP tools, including `live.render` so agents can audition presets offline
-- [ ] R7.5 Live page in the app (composed from the kit; not in design/), with tooltips on every control
+- [x] R7.5 Live page in the app (composed from the kit; added to design/LIVE.md), with tooltips on every control
 - [x] R7.6 Tooltips: every effect and parameter (`fx.catalog`, `live.kinds`), enforced by a test
 - [ ] R7.7 Tooltips shown on every control in the UI
 - [ ] R7.8 Voice cloning with a local model chosen for the computer: research, consent design, gate
@@ -91,6 +91,8 @@ None.
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-07: R7.5: Live page (live.js) + tooltip component. tests/e2e/test_live.py (Playwright, real engine): 14 checks green - both routes run on test sources (out -10.2 / -18.1 dB RMS, 0 dropouts), bypass, built-in edit makes a copy and the live route follows, modules/steps modulator/macro built through the UI, preview render, export/import identical, 156 controls all named and tooltipped, no overflow at 1440/820/390 and in all 13 themes x 6 fonts, all 92 screens render without errors. Fails when the slider binding is removed.
 
 - 2026-11-07: R7.1-R7.4, R7.6: live engine + presets + 31 MCP tools + tooltips. 82 Rust tests green (14 new live unit tests, 1 end-to-end API test, tooltip coverage test); tests fail when modulation or in-place updates are broken on purpose. Real hardware on this Windows machine: WASAPI loopback of the headphones read -33.0 dB RMS for a -30 dBFS sine (expected -33.0), 0 dropouts; microphone route ran; a route played into the Bluetooth headphones and switched presets live; capture-and-play on one device refused as feedback.
 - 2026-11-07: R3.3-R3.4: Tauri shell; signed NSIS (8.2 MB) and MSI (11.4 MB) built; release app launched and flux-mcp attached (headless=false).

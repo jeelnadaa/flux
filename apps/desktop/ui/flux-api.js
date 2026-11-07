@@ -30,7 +30,7 @@ window.FD = (function () {
     if (native) return (await T.core.invoke('pick_files', { multiple: !!o.multiple, kind: o.kind || 'audio' })) || [];
     return new Promise(res => {
       const i = document.createElement('input'); i.type = 'file'; i.multiple = !!o.multiple;
-      i.accept = o.kind === 'flux' ? '.flux' : o.kind === 'preset' ? '.json,.fluxpreset' : 'audio/*,video/*,.flac,.m4a,.aiff,.aif,.ogg,.opus,.wav,.mp3';
+      i.accept = o.kind === 'flux' ? '.flux' : o.kind === 'preset' ? '.json,.fluxpreset' : o.kind === 'live' ? '.fluxlive,.json' : 'audio/*,video/*,.flac,.m4a,.aiff,.aif,.ogg,.opus,.wav,.mp3';
       i.onchange = async () => { const out = []; for (const f of i.files) out.push(await upload(f)); res(out); };
       i.click();
     });
@@ -72,6 +72,8 @@ window.FD = (function () {
     library: () => call('library.list', D.ui.libq || {}), jobs: () => call('job.list'), history: () => call('history.list'), snapshots: () => call('snapshot.list'),
     presets: () => call('preset.list', D.ui.presetKind ? { kind: D.ui.presetKind } : {}), actions: () => call('action.list'), styles: () => call('style.list'), catalog: () => call('fx.catalog'),
     devices: () => call('audio.devices'), voices: () => call('tts.voices'), formats: () => call('export.formats'), usage: () => call('storage.usage'), ai: () => call('ai.status'),
+    lkinds: () => call('live.kinds'), lpresets: () => call('live.presets'), lstatus: () => call('live.status'), ldevices: () => call('live.devices'),
+    lpreset: () => D.ui.live && D.ui.live.sel ? call('live.preset.get', { id: D.ui.live.sel }) : Promise.resolve(null),
     mcp: () => call('mcp.info'), recovery: () => call('recovery.list'), diag: () => call('system.diagnostics'),
     loudness: () => call('analysis.loudness'), tempokey: () => call('analysis.tempo_key'), problems: () => call('analysis.problems'),
   };
@@ -116,7 +118,7 @@ window.FD = (function () {
     const d = new Date(ms); return s < 7 * 86400 ? d.toLocaleDateString(undefined, { weekday: 'short' }) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
   const khz = r => (r % 1000 ? (r / 1000).toFixed(1) : r / 1000) + ' kHz';
-  const hz = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 0 : 1) + ' kHz' : Math.round(f) + ' Hz';
+  const hz = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 0 : 1) + ' kHz' : f < 10 ? (f < 1 ? f.toFixed(2) : f.toFixed(1)) + ' Hz' : Math.round(f) + ' Hz';
   const sr = () => (D.project && D.project.sample_rate) || 48000;
 
   /* ---- project helpers ---- */

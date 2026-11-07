@@ -30,6 +30,7 @@
     mix: ['loudness', 'problems'], meters: ['loudness', 'problems'], 'fx-eq': ['presets'], 'fx-clean': ['problems'], fxp: ['presets'], rooms: ['styles'], aitools: ['ai'], magic: ['ai'],
     analysis: ['tempokey'], master: ['loudness'], tts: ['voices'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
     macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
+    live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
     'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['ai'], 'stems-setup': ['ai'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
@@ -44,6 +45,7 @@
   /* ---------- rendering (from design/app.js) ---------- */
   function placeInd(seg) { const on = seg.querySelector('button.on'), ind = seg.querySelector('.ind'); if (!ind) return; if (!on) { ind.style.width = '0px'; return; } ind.style.width = on.offsetWidth + 'px'; ind.style.transform = `translateX(${on.offsetLeft}px)`; }
   function hydrate(root) {
+    if (Flux.hideTip) Flux.hideTip();
     root.querySelectorAll('.seg').forEach(s => { const ind = s.querySelector('.ind'); if (ind) ind.style.transition = 'none'; placeInd(s); if (ind) { ind.getBoundingClientRect(); ind.style.transition = ''; } });
     root.querySelectorAll('.in').forEach(el => [...el.children].forEach((c, i) => c.style.setProperty('--n', Math.min(i, 14))));
     Viz.mount(root);
@@ -374,6 +376,7 @@
   let bindQ = null, bindT = 0, bindG = null, created = null;
   async function bindApply(b, pct, end) {
     const parts = b.split(':'), ns = parts[0];
+    if (ns === 'lv') return Flux.liveBind(parts.slice(1), pct, end);
     if (ns === 'fx' || ns === 'fxk') {
       let id = ns === 'fx' ? +parts[1] : created; const key = parts[2], kind = ns === 'fxk' ? parts[1] : (F.findFx(id) || {}).kind, p = Flux.pspec(kind, key); if (!p) return '';
       const v = F.unpct(p, pct);
@@ -400,6 +403,26 @@
     const g = bindG; Promise.all(batch.map(c => call(c.m, Object.assign({ gesture: g }, c.p)))).then(() => { if (end) refresh(); }, e => fail(e));
     if (end) { bindG = null; created = null; }
   }
+
+  /* ---------- tooltips: any element with data-tip, on hover (after a short wait) or keyboard focus ---------- */
+  const tipEl = document.createElement('div'); tipEl.className = 'tipbox'; tipEl.id = 'tipbox'; tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl);
+  let tipT = 0, tipFor = null, tipDesc = null;
+  function showTip(el) {
+    const t = el.dataset.tip; if (!t || !document.contains(el)) return;
+    tipFor = el; tipEl.textContent = t; tipEl.classList.add('on');
+    const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    let y = r.top - h - 8; if (y < 8) y = r.bottom + 8;
+    tipEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px'; tipEl.style.top = Math.min(innerHeight - h - 8, y) + 'px';
+    const f = el.matches('a,button,input,select,textarea,[tabindex]') ? el : el.querySelector('a,button,input,select,textarea,[tabindex]');
+    if (f && !f.hasAttribute('aria-describedby')) { f.setAttribute('aria-describedby', 'tipbox'); tipDesc = f; }
+  }
+  function hideTip() { clearTimeout(tipT); tipEl.classList.remove('on'); if (tipDesc) { tipDesc.removeAttribute('aria-describedby'); tipDesc = null; } tipFor = null; }
+  Flux.hideTip = hideTip;
+  document.addEventListener('pointerover', e => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el === tipFor) return; hideTip(); if (el && !drag && e.pointerType !== 'touch') tipT = setTimeout(() => showTip(el), 420); });
+  document.addEventListener('focusin', e => { const el = e.target.closest && e.target.closest('[data-tip]'); hideTip(); if (el) { let fv = true; try { fv = e.target.matches(':focus-visible'); } catch (er) { } if (fv) showTip(el); } });
+  document.addEventListener('focusout', () => hideTip());
+  document.addEventListener('pointerdown', () => hideTip(), true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && tipFor) hideTip(); }, true);
 
   /* ---------- delegated interaction ---------- */
   document.addEventListener('click', async e => {
