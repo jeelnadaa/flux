@@ -78,3 +78,6 @@ tests/pixel_diff/artifacts/
 *.log
 tmp/
 temp/
+
+# Tauri generated schemas
+apps/desktop/src-tauri/gen/

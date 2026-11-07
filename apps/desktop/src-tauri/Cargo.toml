@@ -1,0 +1,24 @@
+[package]
+name = "flux-desktop"
+description = "Flux desktop app: the design UI in a native window, the engine in-process, MCP control and auto-update"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "flux"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+flux-core = { path = "../../../crates/flux-core" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/flux-core", "crates/flux-mcp"]
+members = ["crates/flux-core", "crates/flux-mcp", "apps/desktop/src-tauri"]
 default-members = ["crates/flux-core", "crates/flux-mcp"]
 
 [workspace.package]

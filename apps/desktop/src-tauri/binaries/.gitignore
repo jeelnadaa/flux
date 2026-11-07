@@ -1,0 +1,3 @@
+# flux-mcp sidecars are copied here at build time (scripts/sidecar.mjs)
+*
+!.gitignore

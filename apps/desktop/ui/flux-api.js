@@ -51,6 +51,13 @@ window.FD = (function () {
   }
   async function reveal(path) { if (native && path) return T.core.invoke('reveal', { path }); }
   async function openUrl(url) { if (native) return T.core.invoke('open_url', { url }); window.open(url, '_blank', 'noopener'); }
+  /* In-app updates (desktop only). The shell downloads new releases in the background. */
+  const updater = native ? {
+    status: () => T.core.invoke('update_status'),
+    check: () => T.core.invoke('update_check'),
+    install: () => T.core.invoke('update_install'),
+    on: fn => { if (T.event) { T.event.listen('flux://update-status', e => fn('status', e.payload)); T.event.listen('flux://update-ready', e => fn('ready', e.payload)); } }
+  } : null;
   function onDrop(fn) {
     if (native && T.event) { T.event.listen('tauri://drag-drop', e => { const p = e.payload && e.payload.paths; if (p && p.length) fn(p); }); return; }
     addEventListener('dragover', e => e.preventDefault());
@@ -60,7 +67,7 @@ window.FD = (function () {
   /* ---- state ---- */
   const D = { project: null, st: { rev: 0, pos: 0, seconds: 0, playing: false, peak: [0, 0], lufs_i: -70, lufs_s: -70, lufs_m: -70 }, sel: { clip: null, track: null, fx: null, target: null }, ui: {} };
   const LOAD = {
-    info: () => call('app.info'), caps: () => call('app.capabilities'), settings: () => call('settings.get'),
+    info: () => call('app.info'), update: () => updater ? updater.status() : Promise.resolve(null), caps: () => call('app.capabilities'), settings: () => call('settings.get'),
     project: async () => { try { return await call('project.get'); } catch (e) { return null; } },
     library: () => call('library.list', D.ui.libq || {}), jobs: () => call('job.list'), history: () => call('history.list'), snapshots: () => call('snapshot.list'),
     presets: () => call('preset.list', D.ui.presetKind ? { kind: D.ui.presetKind } : {}), actions: () => call('action.list'), styles: () => call('style.list'), catalog: () => call('fx.catalog'),
@@ -166,5 +173,5 @@ window.FD = (function () {
   }
   const kindName = k => { const s = spec(k); return s ? s.name : k; };
 
-  return { call, native, pickFiles, pickFolder, saveAs, reveal, openUrl, onDrop, D, need, stale, PROJECT_KEYS, peaks, spectrogram, esc, db, num, tc, len, pos, bytes, ago, khz, hz, sr, minus, tracks, clips, clip, track, chain, findFx, spec, fxOf, pval, pct, unpct, fmtp, kindName };
+  return { call, native, updater, pickFiles, pickFolder, saveAs, reveal, openUrl, onDrop, D, need, stale, PROJECT_KEYS, peaks, spectrogram, esc, db, num, tc, len, pos, bytes, ago, khz, hz, sr, minus, tracks, clips, clip, track, chain, findFx, spec, fxOf, pval, pct, unpct, fmtp, kindName };
 })();

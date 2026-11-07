@@ -30,7 +30,7 @@
     mix: ['loudness', 'problems'], meters: ['loudness', 'problems'], 'fx-eq': ['presets'], 'fx-clean': ['problems'], fxp: ['presets'], rooms: ['styles'], aitools: ['ai'], magic: ['ai'],
     analysis: ['tempokey'], master: ['loudness'], tts: ['voices'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
     macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
-    'prefs-about': ['info'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['ai'], 'stems-setup': ['ai'], 'prefs-privacy': [],
+    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['ai'], 'stems-setup': ['ai'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
   const ENTER = {
@@ -111,7 +111,14 @@
     if (canVT() && cur && cur !== id) quiet(document.startViewTransition(go)); else go();
     if (push !== false) { try { history.replaceState(null, '', '#' + id); } catch (e) { location.hash = id; } }
     if (ENTER[id]) ENTER[id]();
-    if (D.settings && D.settings.mode !== 'simple' && id.startsWith('task')) { /* simple screens are fine in pro mode */ }
+    if (D.ui.updatePending && !QUIET.has(id)) setTimeout(showUpdate, 600);
+  }
+  /* A downloaded update asks once, but never over a recording, an export or another dialog. */
+  const QUIET = new Set(['record', 'exporting', 'error', 'update', 'boot', 'recovery']);
+  function showUpdate() {
+    if (!D.update || !D.update.ready || D.ui.updateShown) return;
+    if (QUIET.has(cur) || (D.st && D.st.recording) || stage.querySelector('.ov')) { D.ui.updatePending = true; return; }
+    D.ui.updatePending = false; D.ui.updateShown = true; D.ui.updateBase = cur; render('update');
   }
   Flux.render = render;
   /* Re-render the current screen in place: keeps scroll, focus and caret. */
@@ -293,6 +300,13 @@
     'export-stems': async () => { const o = Flux.xo(); let r; try { r = await call('export.stems', { format: o.format, dir: exportDir(), options: exportOpts(o) }); } catch (e) { fail(e); return; } await follow(r.job, 'exporting', async res => { const f = (res.files || res.outputs || [])[0]; D.ui.exported = Object.assign({}, f || {}, { path: res.dir || (f && f.path) || '', encoder: (res.files || res.outputs || []).length + ' files', verified: true }); render('exported'); }); },
     reveal: el => ds(el).path && F.reveal(ds(el).path),
     'open-url': el => F.openUrl(ds(el).url),
+    'update-check': async () => {
+      if (!F.updater) return F.openUrl('https://github.com/jeelnadaa/flux/releases/latest');
+      D.update = Object.assign({}, D.update, { busy: true, error: null }); rr();
+      try { D.update = await F.updater.check(); } catch (e) { D.update = Object.assign({}, D.update, { busy: false }); return fail(e); }
+      if (D.update && D.update.ready) { D.ui.updateShown = false; showUpdate(); } else rr();
+    },
+    'update-install': async () => { try { await F.updater.install(); } catch (e) { fail(e); } },
     /* workflow */
     'conv-add': async () => { const fs = await F.pickFiles({ multiple: true, kind: 'audio' }); if (fs && fs.length) { const c = D.ui.conv = Object.assign({ files: [], format: 'mp3', bitrate: 245, sample_rate: 0 }, D.ui.conv || {}); c.files = c.files.concat(fs); D.ui.convJob = null; rr(); } },
     'conv-set': el => { D.ui.conv = Object.assign({ files: [], format: 'mp3', bitrate: 245, sample_rate: 0 }, D.ui.conv || {}, { [ds(el).k]: ds(el).v }); rr(); },
@@ -574,6 +588,10 @@
     const first = M[id] && id !== 'error' ? id : !D.settings.onboarded ? 'boot' : (D.recovery || []).length ? 'recovery' : D.project ? (D.settings.mode === 'simple' ? 'task' : 'edit') : 'home';
     await render(first, false);
     requestAnimationFrame(tick);
+    if (F.updater) {
+      F.updater.on((kind, v) => { if (kind === 'status') { D.update = v; if (cur === 'prefs-about') rr(); } else { D.update = Object.assign({}, D.update, { ready: v }); showUpdate(); } });
+      F.updater.status().then(v => { D.update = v; if (v && v.ready) showUpdate(); }).catch(() => { });
+    }
   }
   const want = () => { const n = fontRow()[1]; return Promise.all([document.fonts.load(`900 64px '${n}'`), document.fonts.load(`500 14px '${n}'`), document.fonts.load("400 12px 'Geist Mono'")]); };
   (document.fonts ? Promise.race([want(), new Promise(r => setTimeout(r, 1800))]).catch(() => { }) : Promise.resolve()).then(start);

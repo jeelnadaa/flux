@@ -36,3 +36,13 @@ wildcards = "allow"
 unknown-registry = "warn"
 unknown-git = "warn"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+[advisories]
+# Unmaintained (not vulnerable) crates pulled in by Tauri's Linux stack (GTK macros, D-Bus).
+# No upgrade exists upstream yet. Revisit when Tauri moves off them.
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error via gtk3-macros (Tauri on Linux); build-time only" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant folded into zbus; via Tauri's D-Bus deps" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names folded into zbus; via Tauri's D-Bus deps" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive folded into zbus; via Tauri's D-Bus deps" },
+]

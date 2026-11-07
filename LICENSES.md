@@ -54,6 +54,8 @@ scanner covers the full tree.
 | `zip` 9 | `.flux` project packages | MIT | Allowed |
 | `dirs` 6 | Platform data and music folders | MIT OR Apache-2.0 | Allowed |
 | `serde`, `serde_json`, `anyhow` | Serialization and errors | MIT OR Apache-2.0 | Allowed |
+| `tauri` 2, `tauri-build` 2 | Desktop shell: native window and webview | MIT OR Apache-2.0 | Allowed |
+| `tauri-plugin-dialog`, `-opener`, `-updater`, `-process` 2 | File dialogs, reveal and links, signed auto-update, restart | MIT OR Apache-2.0 | Allowed |
 
 External tools Flux *calls* when present but does not ship: `ffmpeg` (AAC, M4R, Opus export) and the operating
 system's speech engine (System.Speech on Windows, `say` on macOS, `espeak-ng` on Linux). They run as separate
@@ -63,10 +65,15 @@ processes, so their licences do not apply to Flux's code.
 
 ## 4. Web & UI Dependencies
 
-Scanned and verified by `license-checker-rseidelsohn`.
-
 | Package / Library | Role | Licence | Status | Notes |
 |---|---|---|---|---|
+| `@tauri-apps/cli` | Builds and bundles the desktop app (dev only) | MIT OR Apache-2.0 | Allowed | Not shipped |
+| `GSAP` 3.12 *(website only, from cdnjs)* | Scroll scenes on the landing and download pages | GreenSock standard licence | **Review Queued** | Not shipped in the app |
+| `Lenis` 1.1 *(website only, from jsDelivr)* | Smooth scrolling on the website | MIT | Allowed | Not shipped in the app |
+
+The desktop UI (`apps/desktop/ui`) has no third-party JavaScript.
+
+---|---|---|---|---|
 | `typescript` | Build tooling / compiler | Apache-2.0 | Allowed | Microsoft Corporation |
 | `esbuild` | Fast web bundler | MIT | Allowed | Evan Wallace |
 | `react` / `react-dom` | UI component runtime & DOM renderer | MIT | Allowed | Meta Platforms, Inc. |
