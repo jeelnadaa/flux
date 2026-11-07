@@ -5,7 +5,10 @@ dist-static/
 /Flux-*/
 /Flux-*.zip*
 *.wasm
-brag-output*/
+brag-output*/work/frames/
+brag-output*/work/stills/
+brag-output*/work/check/
+brag-output*/work/*.png
 build/
 coverage/
 .vite/
@@ -81,3 +84,4 @@ temp/
 
 # Tauri generated schemas
 apps/desktop/src-tauri/gen/
+brag-output*/work/*.wav

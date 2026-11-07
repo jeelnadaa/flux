@@ -1,0 +1,312 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Flux launch</title>
+<link rel="stylesheet" href="../../apps/desktop/ui/fonts.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#1E1A10}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:'Bricolage Grotesque',sans-serif;color:#1E1A10;-webkit-font-smoothing:antialiased}
+.sc{position:absolute;inset:0;overflow:hidden;display:none}
+.abs{position:absolute}
+.mono{font-family:'Geist Mono',monospace}
+.big{font-weight:800;letter-spacing:-.045em;line-height:.86;white-space:nowrap}
+.mask{overflow:hidden;padding:0 .08em .06em 0}
+.mask>span{display:inline-block;will-change:transform}
+.wm{display:inline-flex;align-items:flex-end;font-weight:900;letter-spacing:-.045em;line-height:.8}
+.wm i{display:inline-block;width:.15em;height:.74em;background:#B8350A;margin:0 .06em 0 .05em;transform-origin:bottom}
+.win{position:absolute;border-radius:18px;overflow:hidden;box-shadow:0 40px 90px rgba(30,26,16,.35),0 0 0 2px rgba(30,26,16,.85)}
+.win img{display:block;width:100%;height:100%}
+.pill{display:inline-block;border-radius:999px;border:2px solid currentColor;padding:.02em .42em .08em;line-height:1.05;font-weight:700;vertical-align:.08em}
+.ppill{display:inline-block;border-radius:999px;border:3px solid #1E1A10;padding:14px 34px 18px;font-weight:700;font-size:46px;letter-spacing:-.02em;white-space:nowrap;margin-right:22px}
+.word{display:inline-block;will-change:transform}
+.tl{font-family:'Geist Mono',monospace;font-size:28px;line-height:1.5;white-space:pre-wrap}
+</style></head>
+<body><div id="stage">
+
+  <!-- S1 hook -->
+  <div class="sc" id="s1" style="background:#DCCBA3">
+    <div class="abs mask big" id="l1" style="left:120px;top:120px;font-size:200px"><span>Your music.</span></div>
+    <div class="abs mask big" id="l2" style="left:120px;top:345px;font-size:200px"><span>Your calls.</span></div>
+    <div class="abs mask big" id="l3" style="left:120px;top:570px;font-size:200px"><span>Your mic.</span></div>
+    <div class="abs" id="dotback" style="width:80px;height:80px;border-radius:50%;background:#B8350A"></div>
+    <div class="abs big" id="live8d" style="left:0;width:1920px;top:395px;text-align:center;font-size:280px"><span class="word">Live,</span> <span class="word">in</span> <span class="word" style="color:#B8350A">8D.</span></div>
+    <div class="abs" id="dotfront" style="width:80px;height:80px;border-radius:50%;background:#B8350A"></div>
+    <div id="trail"></div>
+  </div>
+
+  <!-- S2 reveal -->
+  <div class="sc" id="s2" style="background:#1E1A10;color:#E6DBBF">
+    <svg class="abs" id="wave2" width="1920" height="1080" style="left:0;top:0"><path id="wp1" fill="none" stroke="#3A3426" stroke-width="3"/><path id="wp2" fill="none" stroke="#4A4231" stroke-width="2"/></svg>
+    <div class="abs wm" id="logo2" style="left:0;width:1920px;justify-content:center;top:250px;font-size:430px;height:360px"><span id="lf">f</span><i id="lbar"></i><span id="lux">ux</span></div>
+    <div class="abs" id="tag2" style="left:0;width:1920px;text-align:center;top:690px;font-size:64px;font-weight:600;letter-spacing:-.02em"></div>
+    <div class="abs mono" id="tag2b" style="left:0;width:1920px;text-align:center;top:800px;font-size:28px;color:#AEA180;letter-spacing:.02em">Non-destructive · 32-bit float · on your computer</div>
+  </div>
+
+  <!-- S3 Live -->
+  <div class="sc" id="s3" style="background:#DCCBA3">
+    <div class="abs mask big" id="liveT" style="left:110px;top:110px;font-size:250px"><span>Live.</span></div>
+    <div class="abs" id="liveSub" style="left:118px;top:380px;width:640px;font-size:50px;font-weight:600;line-height:1.12;letter-spacing:-.02em"></div>
+    <div class="abs mono" id="liveN" style="left:120px;top:590px;font-size:28px;color:#534C39">41 built-in presets · or build your own</div>
+    <div class="abs" id="persp" style="left:0;top:0;width:1920px;height:1080px;perspective:1900px">
+      <div class="win" id="w1" style="left:830px;top:110px;width:1000px;height:563px"><img src="shots/live.png"><div class="abs" id="mIn" style="left:22.4%;top:66.2%;height:.7%;background:#B8350A;border-radius:4px"></div><div class="abs" id="mOut" style="left:22.4%;top:68.3%;height:.7%;background:#B8350A;border-radius:4px"></div><div class="abs" id="ring" style="border:4px solid #B8350A;border-radius:50%"></div></div>
+      <div class="win" id="w2" style="left:830px;top:110px;width:1000px;height:563px"><img src="shots/stage.png"><svg class="abs" viewBox="0 0 1920 1080" style="left:0;top:0;width:100%;height:100%"><circle cx="829" cy="253" r="17" fill="#EEE5D1"/><path id="arc" fill="none" stroke="#B8350A" stroke-width="10" stroke-linecap="round" opacity=".35"/><circle id="src" r="22" fill="#87270D"/><text id="srcT" font-family="Bricolage Grotesque" font-weight="800" font-size="20" fill="#fff" text-anchor="middle">T</text></svg></div>
+    </div>
+    <div class="abs" id="marq" style="left:0;top:800px;white-space:nowrap"></div>
+  </div>
+
+  <!-- S4 Clone -->
+  <div class="sc" id="s4" style="background:#E6DBBF">
+    <div class="abs mask big" id="cloneT" style="left:110px;top:100px;font-size:170px"><span>Clone your voice.</span></div>
+    <div class="abs" id="script" style="left:116px;top:330px;width:1700px;font-size:68px;font-weight:600;line-height:1.35;letter-spacing:-.02em"></div>
+    <div class="abs" id="cloneSub" style="left:116px;top:640px;width:760px;font-size:54px;font-weight:700;line-height:1.1;letter-spacing:-.03em"></div>
+    <div class="abs mono" id="cloneM" style="left:120px;top:800px;width:720px;font-size:27px;color:#534C39;line-height:1.5">Only with their recorded consent.<br>Made on your computer.</div>
+    <div class="abs" id="persp4" style="left:0;top:0;width:1920px;height:1080px;perspective:1600px">
+      <div class="win" id="w4" style="left:930px;top:640px;width:900px;height:337px;background:url(shots/clone.png) no-repeat;background-size:1661px 935px;background-position:-372px -597px"></div>
+    </div>
+  </div>
+
+  <!-- S5 Agents -->
+  <div class="sc" id="s5" style="background:#1E1A10;color:#E6DBBF">
+    <div class="abs mono" id="names" style="left:960px;top:0;width:960px;font-size:21px;line-height:1.75;color:rgba(230,219,191,.1);column-count:3;column-gap:30px"></div>
+    <div class="abs big" id="count" style="left:100px;top:120px;font-size:400px;font-variant-numeric:tabular-nums">0</div>
+    <div class="abs" id="countL" style="left:116px;top:500px;font-size:60px;font-weight:700;letter-spacing:-.03em">tools for your agent.</div>
+    <div class="abs" id="term" style="left:990px;top:150px;width:830px;height:560px;background:#2B2619;border-radius:22px;box-shadow:0 0 0 2px #4A4231;padding:34px 40px">
+      <div class="mono" style="font-size:24px;color:#AEA180;margin-bottom:26px">agent → flux-mcp</div>
+      <div id="lines"></div>
+    </div>
+    <div class="abs" id="agentSub" style="left:116px;top:780px;font-size:76px;font-weight:800;letter-spacing:-.04em;line-height:1"></div>
+  </div>
+
+  <!-- S6 outro -->
+  <div class="sc" id="s6" style="background:#DCCBA3">
+    <div id="bands"></div>
+    <div class="abs" id="final" style="left:0;top:0;width:1920px;height:1080px;background:#DCCBA3">
+      <div class="abs wm" id="logo6" style="left:0;width:1920px;justify-content:center;top:240px;font-size:380px;height:320px">f<i id="lbar6"></i>ux</div>
+      <div class="abs" id="free" style="left:0;width:1920px;text-align:center;top:640px;font-size:66px;font-weight:700;letter-spacing:-.03em"></div>
+      <div class="abs" id="os" style="left:0;width:1920px;text-align:center;top:780px"></div>
+    </div>
+  </div>
+
+  <div class="abs" id="ph" style="top:0;width:8px;height:1080px;background:#B8350A;box-shadow:0 0 40px 8px rgba(184,53,10,.55);z-index:30;display:none"></div>
+  <div class="abs mono" id="tc" style="left:44px;bottom:30px;font-size:22px;opacity:.55;letter-spacing:.04em"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const C = x => Math.max(0, Math.min(1, x));
+const P = (t, a, b) => C((t - a) / (b - a));
+const eo = x => 1 - Math.pow(1 - x, 4);
+const ee = x => x === 1 ? 1 : 1 - Math.pow(2, -10 * x);
+const io = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, x) => a + (b - a) * x;
+const BEAT = .5;
+const pulse = t => Math.exp(-((t % BEAT) / BEAT) * 5);
+const THEMES = [["cassette","#DCCBA3","#1E1A10","#B8350A"],["slowed","#142A6E","#CFE0FF","#FFB84D"],["nightcore","#FF2E78","#17030B","#FFF04D"],["lofi","#C8A179","#2A1A0C","#7A2400"],["vinyl","#111013","#EDE6D6","#FF5A1C"],["underwater","#04424C","#9CF0E4","#FFB38A"],["radio","#E8A321","#1B1000","#A81C08"],["stutter","#F4F1E6","#0B0B10","#E63900"],["tapestop","#D4342A","#FFF6F1","#FFD84D"],["reverse","#E7E3FF","#21115C","#6B2CF5"],["cathedral","#17140F","#F2E7CF","#E8B04A"],["nextdoor","#8B8C86","#111210","#7A1400"],["robot","#0D2B21","#7CFFB2","#FFE14D"]];
+const PRESETS = "8D orbit|Slowed + reverb|Underwater|Cathedral|Broadcast voice|Robot|Nightcore|Lo-fi|Vinyl evening|Old radio|Concert seat|Next door|Space station|Hard tune|Ghost whisper|Trance gate|Phone call|Megaphone|Deep voice|Studio warmth".split('|');
+
+// Words that rise in one by one.
+function words(el, text, extra = '') { el.innerHTML = text.split(' ').map(w => `<span class="word" style="${extra}">${w}</span>`).join(' '); return [...el.children]; }
+const W2 = words($('tag2'), 'An audio editor for Windows, macOS and Linux.');
+const W3 = words($('liveSub'), "Your computer's sound, through any preset, as it plays.");
+const W4 = words($('cloneSub'), 'Laughs, hmms and pauses, in your voice.');
+const W5 = words($('agentSub'), 'Your agent can do anything you can.');
+const W6 = words($('free'), 'Free. On your computer. Updates itself.');
+$('os').innerHTML = ['Windows', 'macOS', 'Linux'].map(o => `<span class="ppill" style="background:#1E1A10;color:#DCCBA3;border-color:#1E1A10">${o}</span>`).join('');
+const OS = [...$('os').children];
+function rise(ws, t, t0, step = .06, dur = .5, dy = 60) {
+  ws.forEach((w, i) => { const x = eo(P(t, t0 + i * step, t0 + i * step + dur)); w.style.transform = `translateY(${(1 - x) * dy}px)`; w.style.opacity = x; });
+}
+function slam(el, t, t0, dur = .55) { // mask reveal with the width axis springing open
+  const s = el.firstElementChild, x = P(t, t0, t0 + dur);
+  s.style.transform = `translateY(${(1 - eo(x)) * 105}%)`;
+  el.style.fontStretch = lerp(75, 100, back(Math.min(1, x * 1.15))) + '%';
+}
+
+// Marquee of the real built-in live presets.
+$('marq').innerHTML = [...PRESETS, ...PRESETS].map((p, i) => { const th = THEMES[(i % 12) + 1]; return `<span class="ppill" style="background:${th[1]};color:${th[2]};border-color:#1E1A10">${p}</span>`; }).join('');
+
+// The script being typed in the clone scene.
+const TOK = [['tag', '[hmm]', 'hmm', 'h'], ['txt', ' So I opened the box '], ['tag', '[laugh]', 'laugh', 's'], ['txt', ' and, um, '], ['tag', '[pause]', '0.5 s pause', 'p'], ['txt', ' it was empty.']];
+const TOTAL = TOK.reduce((n, k) => n + k[1].length, 0);
+const PSTY = { h: 'color:#185B37;background:#DDEBDD', s: 'color:#B8350A;background:#F6DCCF', p: 'color:#1E1A10;background:#EEE5D1;font-family:Geist Mono;font-size:.72em;font-weight:500' };
+
+// The calls an agent makes in the agent scene. Real tool names.
+const CALLS = [['media_import', '{path: "Night Drive.wav"}', 'imported · 112 BPM · A minor'], ['live_start', '{route: "output", preset: "out-8d-orbit"}', 'running'], ['tool_master_apply', '{target: -14}', 'mastered to −14 LUFS'], ['export_start', '{format: "flac"}', 'Night Drive.flac']];
+const METHODS = (window.METHODS || '').split(' ');
+
+// Bands of the 13 themes for the outro, each with the logo clipped in that theme's colors.
+const BW = 320;
+$('bands').innerHTML = [...THEMES, ...THEMES.slice(0, 3)].map((th, i) => `<div class="abs band" style="top:0;height:1080px;width:${BW + 1}px;overflow:hidden;background:${th[1]};color:${th[2]}"><div class="abs mono" style="left:22px;bottom:26px;font-size:22px;letter-spacing:.06em">${th[0]}</div><div class="abs wm inner" style="width:1920px;justify-content:center;top:240px;font-size:380px;height:320px">f<i style="background:${th[3]}"></i>ux</div></div>`).join('');
+const BANDS = [...document.querySelectorAll('.band')];
+
+function show(id, on) { $(id).style.display = on ? 'block' : 'none'; }
+
+function render(t) {
+  // Scene visibility, with overlaps for the transitions.
+  $('ph').style.display = 'none';
+  show('s1', t < 3.3); show('s2', t >= 2.7 && t < 6.3); show('s3', t >= 5.7 && t < 10.3);
+  show('s4', t >= 9.95 && t < 14.3); show('s5', t >= 13.7 && t < 18.3); show('s6', t >= 17.7);
+  const tc = $('tc'); const fr = Math.floor(t * 30);
+  tc.textContent = `00:00:${String(Math.floor(t)).padStart(2, '0')}.${String(Math.floor((t % 1) * 1000)).padStart(3, '0')}  ·  120.0 BPM  ·  A minor`;
+  tc.style.color = (t > 2.95 && t < 6) || (t > 14 && t < 18) ? '#E6DBBF' : '#1E1A10';
+  tc.style.opacity = t > 20 ? .55 * (1 - P(t, 20, 20.5)) : .55;
+
+  // ---- S1 hook
+  if (t < 3.3) {
+    ['l1', 'l2', 'l3'].forEach((id, i) => {
+      const el = $(id); slam(el, t, i * .5);
+      const out = io(P(t, 1.72 + i * .05, 2.05 + i * .05));
+      el.style.transform = `translate(${t * (10 + i * 6)}px,${-out * 140}px)`; el.style.opacity = 1 - out;
+    });
+    const L = $('live8d'), ws = [...L.children];
+    ws.forEach((w, i) => { const x = P(t, 1.98 + i * .1, 2.42 + i * .1); w.style.transform = `translateY(${(1 - eo(x)) * 120}px) scale(${lerp(.8, 1, back(x))})`; w.style.opacity = C(x * 3); });
+    L.style.fontStretch = lerp(78, 100, eo(P(t, 2, 2.6))) + '%';
+    // A dot circles the words, behind and in front: 8D.
+    const a0 = (t - 1.9) * Math.PI * 2 * .75 - Math.PI / 2;
+    const dotOn = P(t, 1.95, 2.15);
+    const pos = a => { const z = Math.sin(a); return { x: 960 + Math.cos(a) * 760, y: 520 + z * 150, z }; };
+    const p = pos(a0), sz = lerp(40, 110, (p.z + 1) / 2) * dotOn;
+    const grow = io(P(t, 2.72, 3.25));
+    const R = lerp(sz / 2, 2400, grow);
+    const front = p.z > 0;
+    $('dotfront').style.display = front ? 'block' : 'none'; $('dotback').style.display = front ? 'none' : 'block';
+    [$('dotfront'), $('dotback')].forEach(d => { d.style.width = d.style.height = sz + 'px'; d.style.left = (p.x - sz / 2) + 'px'; d.style.top = (p.y - sz / 2) + 'px'; });
+    let tr = '';
+    for (let k = 1; k <= 10; k++) { const q = pos(a0 - k * .07), s = lerp(40, 110, (q.z + 1) / 2) * dotOn * (1 - k / 12); tr += `<div class="abs" style="left:${q.x - s / 2}px;top:${q.y - s / 2}px;width:${s}px;height:${s}px;border-radius:50%;background:#B8350A;opacity:${.32 * (1 - k / 11)};z-index:${q.z > 0 ? 3 : 0}"></div>`; }
+    $('trail').innerHTML = t < 2.8 ? tr : '';
+    $('dotback').style.zIndex = 0; $('live8d').style.zIndex = 1; $('dotfront').style.zIndex = 2;
+    // The iris: scene 2 opens out of the dot.
+    $('s2').style.clipPath = `circle(${R}px at ${p.x}px ${p.y}px)`;
+    $('s2').style.zIndex = 5;
+  }
+
+  // ---- S2 reveal
+  if (t >= 2.7 && t < 6.3) {
+    if (t >= 3.3) $('s2').style.clipPath = 'none';
+    const fx = eo(P(t, 3.0, 3.55)), ux = eo(P(t, 3.08, 3.63)), bx = P(t, 3.3, 3.75);
+    $('lf').style.transform = `translateX(${(1 - fx) * -700}px)`; $('lf').style.opacity = fx;
+    $('lux').style.transform = `translateX(${(1 - ux) * 700}px)`; $('lux').style.opacity = ux;
+    const logo = $('logo2'); logo.style.fontStretch = lerp(75, 100, back(P(t, 3.0, 3.7))) + '%';
+    $('lbar').style.transform = `translateY(${(1 - ee(bx)) * -900}px) scaleY(${bx < 1 ? 1 : 1 + .14 * pulse(t)})`;
+    const zoom = lerp(1, 1.06, P(t, 3.5, 6.2));
+    logo.style.transform = `scale(${zoom})`;
+    rise(W2, t, 3.7, .055, .55);
+    const sb = eo(P(t, 4.3, 4.8)); $('tag2b').style.opacity = sb; $('tag2b').style.transform = `translateY(${(1 - sb) * 20}px)`;
+    // Waveform texture that moves with the music.
+    const wv = (ph, amp, k) => { let d = ''; for (let x = 0; x <= 1920; x += 12) { const y = 960 + Math.sin(x / 90 + t * 3 * k + ph) * amp * (0.6 + 0.4 * Math.sin(x / 300 - t)) * (0.6 + .4 * pulse(t)); d += (x ? 'L' : 'M') + x + ' ' + y.toFixed(1); } return d; };
+    $('wp1').setAttribute('d', wv(0, 50, 1)); $('wp2').setAttribute('d', wv(2, 30, -1.3));
+    $('wave2').style.opacity = eo(P(t, 3.2, 3.8));
+  }
+
+  // ---- S3 Live, revealed by a playhead wipe
+  if (t >= 5.7 && t < 10.3) {
+    const w = io(P(t, 5.75, 6.25)) * 1920;
+    $('s3').style.clipPath = t < 6.25 ? `inset(0 ${1920 - w}px 0 0)` : 'none';
+    $('s3').style.zIndex = 6;
+    $('ph').style.display = t > 5.74 && t < 6.3 ? 'block' : 'none'; $('ph').style.left = (w - 4) + 'px'; $('ph').style.opacity = 1 - P(t, 6.2, 6.3);
+    slam($('liveT'), t, 6.05, .6);
+    rise(W3, t, 6.35, .05, .5, 40);
+    const n = eo(P(t, 6.9, 7.3)); $('liveN').style.opacity = n; $('liveN').style.transform = `translateY(${(1 - n) * 20}px)`;
+    // Window 1: the Live page, flying in on a tilt; then flips to the 8D stage.
+    const e1 = eo(P(t, 6.0, 6.8)), out1 = io(P(t, 7.85, 8.2)), in2 = eo(P(t, 8.1, 8.6));
+    const drift = (t - 6) * 2.2;
+    $('w1').style.transform = `translateX(${(1 - e1) * 900 - out1 * 120}px) rotateY(${lerp(-38, -14, e1) + drift - out1 * 75}deg) scale(${lerp(.9, 1, e1)})`;
+    $('w1').style.opacity = 1 - out1; $('w1').style.display = out1 >= 1 ? 'none' : 'block';
+    $('w2').style.display = t >= 8.1 ? 'block' : 'none';
+    $('w2').style.transform = `rotateY(${lerp(70, -10, in2) + (t - 8.1) * 2}deg) scale(${lerp(.92, 1.02, in2 + (t - 8.1) * .01)})`;
+    $('w2').style.opacity = C(in2 * 2);
+    // Start pressed: the meters run (the app's running state).
+    const run = P(t, 7.0, 7.2), lev = k => run * (.55 + .25 * Math.sin(t * 9 + k) * .5 + .3 * pulse(t + k * .1));
+    $('mIn').style.width = (lev(0) * 24) + '%'; $('mOut').style.width = (lev(1.3) * 24) + '%';
+    const rg = P(t, 6.75, 7.3), ring = $('ring');
+    ring.style.left = (439 / 19.2 - 4) + '%'; ring.style.top = (583 / 10.8 - 5.5) + '%'; ring.style.width = (rg < 1 ? 60 + rg * 120 : 0) + 'px'; ring.style.height = ring.style.width;
+    ring.style.transform = `translate(-${rg * 30}px,-${rg * 30}px)`; ring.style.opacity = 1 - rg;
+    // The source circles the head on the stage.
+    const ang = -Math.PI / 2 + Math.max(0, t - 8.2) * Math.PI * 2 * .55;
+    const sx = 829 + Math.cos(ang) * 259, sy = 512 + Math.sin(ang) * 259;
+    $('src').setAttribute('cx', sx); $('src').setAttribute('cy', sy); $('srcT').setAttribute('x', sx); $('srcT').setAttribute('y', sy + 7);
+    const a1 = ang - 1.6; const ax = 829 + Math.cos(a1) * 259, ay = 512 + Math.sin(a1) * 259;
+    $('arc').setAttribute('d', `M${ax} ${ay} A259 259 0 0 1 ${sx} ${sy}`);
+    // Preset marquee.
+    const mq = eo(P(t, 6.6, 7.2));
+    $('marq').style.transform = `translate(${-(t - 6) * 230 + 40}px,${(1 - mq) * 200}px)`;
+    $('marq').style.opacity = mq;
+  }
+
+  // ---- S4 Clone, revealed by bands of the themes
+  if (t >= 9.6 && t < 10.5) {
+    const B = $('bands4') || (() => { const d = document.createElement('div'); d.id = 'bands4'; d.className = 'abs'; d.style.cssText = 'left:0;top:0;width:1920px;height:1080px;z-index:20;pointer-events:none'; d.innerHTML = THEMES.map((th, i) => `<div class="abs" style="top:0;left:${i * 1920 / 13}px;width:${1920 / 13 + 1}px;height:1080px;background:${th[1]}"></div>`).join(''); $('stage').appendChild(d); return d; })();
+    B.style.display = 'block';
+    [...B.children].forEach((b, i) => { const a = io(P(t, 9.72 + i * .012, 9.98 + i * .012)), o = io(P(t, 10.0 + i * .015, 10.3 + i * .015)); b.style.transform = `translateY(${(1 - a) * 100 - o * 100}%)`; });
+  } else if ($('bands4')) $('bands4').style.display = 'none';
+  if (t >= 9.95 && t < 14.3) {
+    $('s4').style.zIndex = 7;
+    slam($('cloneT'), t, 10.2, .6);
+    const dr = Math.max(0, t - 10.2); $('cloneT').style.transform = `translateX(${-dr * 9}px)`; $('script').style.transform = `translateX(${-dr * 5}px)`; $('cloneSub').style.marginLeft = (-dr * 3) + 'px'; $('cloneM').style.marginLeft = (-dr * 3) + 'px';
+    // Typing, tags turning into the app's pills.
+    const typed = Math.floor(C((t - 10.55) / 1.55) * TOTAL);
+    let n = typed, html = '';
+    TOK.forEach(([k, raw, lab, sty], idx) => {
+      if (n <= 0) return;
+      const part = raw.slice(0, n); n -= raw.length;
+      if (k === 'tag' && part.length === raw.length) {
+        const done = (typed - (TOTAL - TOK.slice(idx).reduce((m, q) => m + q[1].length, 0)) - raw.length) / 40 * 1.55;
+        const s = back(C(done / .25 + .3));
+        html += `<span class="pill" style="${PSTY[sty]};transform:scale(${s});display:inline-block">${lab}</span>`;
+      } else html += `<span style="${k === 'tag' ? 'color:#8A2606' : ''}">${part.replace(/ /g, '&nbsp;').replace(/&nbsp;(?=\S)/g, ' ')}</span>`;
+    });
+    const caret = (t < 12.3 || Math.floor(t / .25) % 2 === 0) ? '<span style="display:inline-block;width:5px;height:.9em;background:#B8350A;vertical-align:-.1em;margin-left:4px"></span>' : '';
+    $('script').innerHTML = html + caret;
+    rise(W4, t, 11.95, .06, .5, 40);
+    const m = eo(P(t, 12.45, 12.9)); $('cloneM').style.opacity = m; $('cloneM').style.transform = `translateY(${(1 - m) * 16}px)`;
+    const c = eo(P(t, 12.55, 13.2));
+    $('w4').style.transform = `translateY(${(1 - c) * 500 - (t - 12.55) * 6}px) rotateX(${(1 - c) * 30 + 6}deg) rotateY(${-8 + (t - 12.55) * 2.4}deg)`;
+  }
+
+  // ---- S5 Agents, opening from the pause pill
+  if (t >= 13.7 && t < 18.3) {
+    const r = io(P(t, 13.75, 14.3)) * 2300;
+    $('s5').style.clipPath = t < 14.3 ? `circle(${r}px at 1120px 470px)` : 'none';
+    $('s5').style.zIndex = 8;
+    const k = eo(P(t, 14.15, 15.25)); $('count').textContent = Math.round(k * 162);
+    $('count').style.fontStretch = lerp(75, 100, k) + '%';
+    $('count').style.transform = `translateY(${(1 - eo(P(t, 14.1, 14.5))) * 120}px)`;
+    rise([$('countL')], t, 14.6, 0, .5, 30);
+    // Every method name, scrolling past as texture.
+    if (!$('names').dataset.on) { $('names').innerHTML = METHODS.concat(METHODS).join('<br>'); $('names').dataset.on = 1; }
+    $('names').style.transform = `translateY(${-(t - 13.7) * 90}px)`;
+    const tm = eo(P(t, 14.35, 14.85)); $('term').style.transform = `translateY(${(1 - tm) * 80}px) scale(${lerp(.94, 1, tm)})`; $('term').style.opacity = tm;
+    let out = '';
+    CALLS.forEach(([fn, args, res], i) => {
+      const t0 = 14.75 + i * .62, full = fn + ' ' + args;
+      const ch = Math.floor(C((t - t0) / .4) * full.length);
+      if (ch <= 0) return;
+      const shown = full.slice(0, ch);
+      const fnPart = shown.slice(0, fn.length), argPart = shown.slice(fn.length);
+      const ok = P(t, t0 + .45, t0 + .6);
+      out += `<div class="tl" style="margin-bottom:20px"><span style="color:#FD9470">${fnPart}</span><span style="color:#E6DBBF">${argPart}</span>${ok > 0 ? `\n<span style="color:#59D38C;opacity:${ok}">✓ ${res}</span>` : ''}</div>`;
+    });
+    $('lines').innerHTML = out;
+    rise(W5, t, 16.4, .06, .5, 40);
+  }
+
+  // ---- S6 outro: the 13 themes slide in under the logo, then settle on Cassette
+  if (t >= 17.7) {
+    $('s6').style.zIndex = 9;
+    const off = 1920 - io(P(t, 17.72, 18.3)) * 1920 - Math.max(0, t - 18.3) * 620;
+    BANDS.forEach((b, i) => { const x = off + i * BW; b.style.left = x + 'px'; b.querySelector('.inner').style.left = (-x) + 'px'; b.querySelector('.inner').style.transform = `scale(${lerp(.9, 1, P(t, 18, 19.6))})`; });
+    $('s6').style.background = 'transparent';
+    // Until the bands cover the screen, scene 5 shows through on the left.
+    $('s6').style.clipPath = t < 18.3 ? `inset(0 0 0 ${Math.max(0, off)}px)` : 'none';
+    const f = io(P(t, 19.55, 20.15));
+    $('final').style.clipPath = `circle(${f * 1320}px at 960px 400px)`;
+    const up = eo(P(t, 20.0, 20.5));
+    $('logo6').style.transform = `translateY(${-up * 40}px) scale(${lerp(1, .92, up) * (1 + Math.max(0, t - 20) * .018)})`;
+    const fd = -Math.max(0, t - 20.4) * 7; $('free').style.transform = `translateY(${fd}px)`; $('os').style.transform = `translateY(${fd}px)`;
+    $('lbar6').style.transform = `scaleY(${1 + .14 * pulse(t)})`;
+    rise(W6, t, 20.15, .06, .5, 40);
+    OS.forEach((o, i) => { const x = back(P(t, 20.5 + i * .09, 20.95 + i * .09)); o.style.transform = `scale(${x})`; o.style.opacity = C(x); });
+  }
+}
+window.render = render;
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map(i => i.complete ? 1 : new Promise(r => i.onload = r))]);
+</script></body></html>
