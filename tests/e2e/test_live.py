@@ -250,6 +250,59 @@ def main():
             assert all(p["id"] != mine for p in api(port, "live.presets")), ev("FD.D.ui.live.err")
             ok("a playing preset is protected; stop, then delete")
 
+            # 12a. Voice cloning: a voice is only made with consent, through real file picks; scripts with sounds parse.
+            def tone(path, secs):
+                import math, random, struct, wave
+                rnd = random.Random(3)
+                with wave.open(str(path), "wb") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(24000)
+                    w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(i * 0.05) + rnd.randint(-300, 300))) for i in range(int(24000 * secs))))
+                return str(path)
+            ref = tone(data / "ref.wav", 8)
+            con = tone(data / "consent.wav", 4)
+            page.goto(f"http://127.0.0.1:{port}/#clone")
+            page.wait_for_selector('[data-cact="create"]')
+            assert page.is_disabled('[data-cact="create"]')
+            page.fill('[data-cin="name"]', "Robin")
+            wait(page, 600)
+            for k, f in [("consent", con), ("reference", ref)]:
+                with page.expect_file_chooser() as fc:
+                    page.click(f'[data-cact="pick"][data-k="{k}"]')
+                fc.value.set_files(f)
+                wait(page, 600)
+            assert page.is_disabled('[data-cact="create"]'), "consent box not ticked yet"
+            page.click('[data-cact="agree"]')
+            wait(page, 300)
+            page.click('[data-cact="create"]')
+            wait(page, 1200)
+            profs = api(port, "clone.profiles")
+            assert len(profs) == 1 and profs[0]["name"] == "Robin" and profs[0]["owner"] == "me", profs
+            assert (data / "data" / "Voices" / profs[0]["id"] / "consent.wav").exists()
+            page.fill('[data-cin="script"]', "Okay [laugh] hmm, (sighs) fine.")
+            page.click('[data-cact="check"]')
+            wait(page, 500)
+            pills = ev("[...document.querySelectorAll('.box p .pill')].map(p => p.textContent)")
+            assert pills == ["laugh", "sigh"], pills
+            page.fill('[data-cin="script"]', "hello [yodel]")
+            page.click('[data-cact="check"]')
+            wait(page, 500)
+            assert "yodel" in page.inner_text(".callout.warn")
+            page.click('[data-cact="speak"]')
+            wait(page, 500)
+            assert "yodel" in page.inner_text(".callout.warn")
+            page.fill('[data-cin="script"]', "hello [laugh]")
+            page.click('[data-cact="speak"]')
+            wait(page, 800)
+            msg = page.inner_text(".callout.warn")
+            assert "Chatterbox" in msg or "memory" in msg, msg
+            ev("window.confirm = () => true")
+            page.click('[data-cact="del"]')
+            wait(page, 800)
+            assert api(port, "clone.profiles") == []
+            ok(f"voice made only with consent and both recordings; script sounds {pills}; speak says: {msg[:70]}...")
+
             # 12. Every screen of the app renders without a page error.
             ids = ev("Flux.S.map(s => s.id)")
             bad, untipped, total_ctl = [], [], 0

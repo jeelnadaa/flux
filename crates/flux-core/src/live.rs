@@ -2427,34 +2427,39 @@ mod tests {
             &p,
         )
         .unwrap();
-        std::thread::sleep(Duration::from_millis(400));
+        // Levels are measured over a window, so wait (up to 3 s on a busy machine) for it to fill.
+        let settle = |r: &Runner, want: f64, tol: f64| {
+            let mut last = (0.0, 0.0);
+            for _ in 0..60 {
+                std::thread::sleep(Duration::from_millis(50));
+                let s = r.status();
+                last = (
+                    s["in_rms_db"].as_f64().unwrap(),
+                    s["out_rms_db"].as_f64().unwrap(),
+                );
+                if s["frames"].as_u64().unwrap_or(0) > 9600
+                    && last.0 > -40.0
+                    && (last.1 - last.0 - want).abs() < tol
+                {
+                    break;
+                }
+            }
+            last
+        };
+        let (i, o) = settle(&r, -6.0, 1.0);
         let s = r.status();
         assert_eq!(s["running"], true);
         assert!(s["frames"].as_u64().unwrap() > 9000, "{s}");
-        let (i, o) = (
-            s["in_rms_db"].as_f64().unwrap(),
-            s["out_rms_db"].as_f64().unwrap(),
-        );
         assert!(i > -40.0, "input level {i}");
         assert!((o - i + 6.0).abs() < 1.0, "in {i} out {o}");
         // a live edit lands without a rebuild
         p.post[0].params.insert("gain".into(), -18.0);
         r.update(&p);
-        std::thread::sleep(Duration::from_millis(300));
-        let s = r.status();
-        let (i, o) = (
-            s["in_rms_db"].as_f64().unwrap(),
-            s["out_rms_db"].as_f64().unwrap(),
-        );
+        let (i, o) = settle(&r, -18.0, 1.0);
         assert!((o - i + 18.0).abs() < 1.0, "after edit: in {i} out {o}");
         // bypass returns the input
         r.set_bypass(true);
-        std::thread::sleep(Duration::from_millis(300));
-        let s = r.status();
-        let (i, o) = (
-            s["in_rms_db"].as_f64().unwrap(),
-            s["out_rms_db"].as_f64().unwrap(),
-        );
+        let (i, o) = settle(&r, 0.0, 0.5);
         assert!((o - i).abs() < 0.5, "bypass: in {i} out {o}");
         r.stop();
     }

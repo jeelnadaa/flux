@@ -651,7 +651,7 @@ fn ai_status() -> Value {
         {"id": "transcript", "available": false, "how": "model", "note": "Needs a speech recognition model, which this build does not include."},
         {"id": "fillers", "available": false, "how": "model", "note": "Needs a transcript."},
         {"id": "dub", "available": false, "how": "model", "note": "Needs speech recognition, translation and a voice model; none are in this build."},
-        {"id": "clone", "available": false, "how": "model", "note": "Voice cloning is not included."}
+        {"id": "clone", "available": false, "how": "model", "note": "Needs a local model chosen for this computer. Consent-gated voice profiles work now; speaking in a cloned voice waits for the model (see clone.status)."}
     ])
 }
 
@@ -663,9 +663,6 @@ fn h_unavailable_transcript(_: &Api, _: &Value) -> Result<Value> {
 }
 fn h_unavailable_dub(_: &Api, _: &Value) -> Result<Value> {
     Err(unavailable("Translate and dub"))
-}
-fn h_unavailable_clone(_: &Api, _: &Value) -> Result<Value> {
-    Err(unavailable("Voice cloning"))
 }
 
 fn h_ai_status(_: &Api, _: &Value) -> Result<Value> {
@@ -3749,7 +3746,15 @@ pub static METHODS: &[MethodSpec] = &[
     m!("transcript.get", "Transcript of the project (needs a speech model; not in this build).", "", false, h_unavailable_transcript),
     m!("transcript.fillers", "Find filler words (needs a transcript; not in this build).", "", false, h_unavailable_transcript),
     m!("dub.start", "Translate and dub (needs speech and translation models; not in this build).", "language:string:Target language", false, h_unavailable_dub),
-    m!("clone.start", "Voice cloning (not included).", "", false, h_unavailable_clone),
+    m!("clone.status", "Voice cloning on this computer: its hardware, the local model Flux picks for it and why, whether it is ready, and the consent statement.", "", false, crate::voiceclone::h_status),
+    m!("clone.models", "The local voice cloning models Flux can use (permissive licences only), with size, needs, and the pick for this computer.", "", false, crate::voiceclone::h_models),
+    m!("clone.profiles", "Voice profiles made with consent.", "", false, crate::voiceclone::h_profiles),
+    m!("clone.profile.create", "Make a voice profile. Needs the owner's consent: their recording reading the consent statement from clone.status, and a 5 to 60 second clip of the voice. Stays on this computer.", "!name:string:Whose voice|owner:string:me or someone-else|consent:boolean:True only if the voice owner agreed|consent_audio:string:Recording of the owner reading the consent statement|!reference:string:5 to 60 second clip of the voice", false, crate::voiceclone::h_profile_create),
+    m!("clone.profile.delete", "Delete a voice profile and its recordings.", "!id:string:Voice id", false, crate::voiceclone::h_profile_delete),
+    m!("clone.speak", "Speak a script in a consented voice. Write sounds as [laugh], (sighs), *chuckles* or {cough} and hesitations as words (hmm, um, uh). Output is labelled synthetic. Says why if the model isn't ready.", "!voice:string:Voice id|!text:string:The script", false, crate::voiceclone::h_speak),
+    m!("clone.convert", "Turn your own spoken recording into a consented cloned voice, keeping its timing, laughs and hesitations exactly. Output is labelled synthetic.", "!voice:string:Voice id|!path:string:Your recording", false, crate::voiceclone::h_convert),
+    m!("clone.tags", "The sounds a cloning script can ask for ([laugh], [sigh], [cough] and more), with the other ways to write them and an example.", "", false, crate::voiceclone::h_tags),
+    m!("clone.script", "Check a cloning script without speaking it: the words and sounds in order, and the text the model will read.", "!text:string:The script", false, crate::voiceclone::h_script),
     m!("export.formats", "Export formats and whether each is available on this computer.", "", false, h_export_formats),
     m!("export.start", "Export the mix to a file. Job; the result is measured from the written file.", "format:string:wav, flac, mp3, ogg, aac, m4r, opus|path:string:Output file|dir:string:Output folder|options:object:{bits, sample_rate, bitrate, quality, vbr, mono, normalize (none|lufs|peak), target, ceiling, dither, tags}|range:string:all, selection or loop|start:pos:Range start|end:pos:Range end|tail:boolean:Include effect tails|wait:boolean:Wait for the file", false, h_export_start),
     m!("export.stems", "Export each track as its own file. Job.", "format:string:Format|dir:string:Output folder|options:object:Export options", false, h_export_stems),

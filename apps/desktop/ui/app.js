@@ -31,7 +31,7 @@
     analysis: ['tempokey'], master: ['loudness'], tts: ['voices'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
     macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
     live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
-    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['ai'], 'stems-setup': ['ai'], 'prefs-privacy': [],
+    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags'], 'stems-setup': ['ai'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
   const ENTER = {

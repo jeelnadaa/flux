@@ -69,11 +69,6 @@
   reg('fillers', 'AI', 'Filler word review', () => unavail('script', 'Find um, uh and stutters.', 'Filler detection works from the transcript.', 'transcript'));
   reg('dub', 'AI', 'Translate and dub', () => unavail('aitools', 'Say it in another language.', 'Translate the script, check it, then replace the speech and keep the music and room.', 'dub', cal('lock', 'Flux has no cloud features. Nothing you make is uploaded.', 'ac')));
   reg('dubreview', 'AI', 'Dub review', () => unavail('aitools', 'Check each line.', 'Review every translated line before anything is rendered.', 'dub'));
-  reg('clone', 'AI', 'Voice clone consent', () => wiz(1, 3, `
-    <h1 class="h1">This has to be your voice, or you need their permission.</h1>
-    <p class="lede">Cloning someone without consent can be illegal and harmful.</p>
-    ${cal('warn', '<b>Voice cloning is not included in Flux.</b> ' + esc(AI('clone').note || '') + ' Text to speech uses your computer\'s own voices, and everything it makes is labelled synthetic.', 'warn')}
-    <div class="between">${btn('Back', { k: 'g', go: 'tts' })}<button class="btn lg" disabled style="opacity:.45;cursor:not-allowed">Continue</button></div>`));
   reg('consent', 'AI', 'Cloud consent', () => dlg('aitools', 'Nothing leaves this computer.', `
     <p class="dim" style="font-size:15px">Flux has no cloud features, so there is nothing to agree to.</p>
     <div class="lst">${[['exp', 'What is sent', 'Nothing. Flux makes no network requests with your audio.'], ['lock', 'Where it runs', 'Every tool runs on this computer.'], ['bug', 'Never', 'Audio, transcripts and file names are never logged or sent.']].map(r => `<div><span class="act">${ic(r[0], 18)}</span><div class="ti"><b>${r[1]}</b><span style="white-space:normal">${r[2]}</span></div></div>`).join('')}</div>`, btn('Got it', { k: 'p', go: 'aitools' })));

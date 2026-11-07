@@ -30,12 +30,19 @@ AI agents can drive every feature.
   changed: the first edit makes your own copy. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
-- **Command API.** 154 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Command API.** 162 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 
-Not available without bundled models: transcript editing, filler-word removal, dubbing and voice cloning. These
-methods return `unavailable` instead of fake results.
+- **Voice cloning, with consent.** Flux checks the computer (graphics chip, video memory, memory) and picks a local
+  model: Chatterbox Turbo (MIT), which performs `[laugh]`, `[sigh]`, `[cough]` and other sounds written in a script
+  and says hmm and um as written; Chatterbox (MIT) to turn your own recording into the voice, keeping your timing;
+  OpenVoice V2 (MIT) where memory is tight. A voice is only made with the owner's consent recording and a clip, kept
+  on this computer. **Speaking in the voice is not working yet:** the model download waits for permission, so
+  `clone.speak` and `clone.convert` say exactly what they would use and why they can't yet.
+
+Not available without bundled models: transcript editing, filler-word removal and dubbing. These methods return
+`unavailable` instead of fake results.
 
 ## Build and test
 

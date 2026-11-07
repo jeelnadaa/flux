@@ -427,8 +427,16 @@ fn live_presets_build_edit_route_render_export_and_import() {
         json!({"route": "output", "preset": id, "source": "demo-music", "output": "none"}),
     );
     assert_eq!(st["running"], true);
-    std::thread::sleep(Duration::from_millis(400));
-    let s1 = call(&a, "live.status", json!({}));
+    // Levels are measured over a window: wait (up to 3 s on a busy machine) for it to fill.
+    let out = |s: &Value| s["routes"]["output"]["out_rms_db"].as_f64().unwrap();
+    let mut s1 = Value::Null;
+    for _ in 0..60 {
+        std::thread::sleep(Duration::from_millis(50));
+        s1 = call(&a, "live.status", json!({}));
+        if s1["routes"]["output"]["frames"].as_u64().unwrap() > 9600 && out(&s1) > -40.0 {
+            break;
+        }
+    }
     assert!(s1["routes"]["output"]["frames"].as_u64().unwrap() > 9000);
     assert!(s1["routes"]["output"]["out_rms_db"].as_f64().unwrap() > -40.0);
     assert_eq!(code(&a, "live.preset.delete", json!({"id": id})), "busy");
@@ -437,10 +445,14 @@ fn live_presets_build_edit_route_render_export_and_import() {
         "live.preset.update",
         json!({"preset": id, "output_gain_db": -20}),
     );
-    std::thread::sleep(Duration::from_millis(400));
-    let s2 = call(&a, "live.status", json!({}));
-    let drop_db = s1["routes"]["output"]["out_rms_db"].as_f64().unwrap()
-        - s2["routes"]["output"]["out_rms_db"].as_f64().unwrap();
+    let mut drop_db = 0.0;
+    for _ in 0..60 {
+        std::thread::sleep(Duration::from_millis(50));
+        drop_db = out(&s1) - out(&call(&a, "live.status", json!({})));
+        if drop_db > 12.0 {
+            break;
+        }
+    }
     assert!(drop_db > 12.0, "output gain edit dropped only {drop_db} dB");
     call(&a, "live.set", json!({"route": "output", "bypass": true}));
     call(&a, "live.stop", json!({"route": "output"}));
@@ -530,4 +542,134 @@ fn live_presets_build_edit_route_render_export_and_import() {
         code(&a, "live.preset.get", json!({"id": imp["id"]})),
         "not_found"
     );
+}
+
+#[test]
+fn voice_cloning_needs_consent_and_reports_the_model_for_this_computer() {
+    let (a, d) = api("clone");
+    let st = call(&a, "clone.status", json!({}));
+    assert!(st["hardware"]["cores"].as_u64().unwrap() >= 1);
+    assert!(st["models"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|m| m["licence"] == "MIT"));
+    assert!(st["pick"]["reason"].as_str().unwrap().len() > 20);
+    assert_eq!(st["available"], false);
+    let r = wav(&d, "ref.wav", 48000, 8.0);
+    let c = wav(&d, "consent.wav", 44100, 4.0);
+    let short = wav(&d, "short.wav", 48000, 1.0);
+    let (rp, cp, sp) = (
+        r.display().to_string(),
+        c.display().to_string(),
+        short.display().to_string(),
+    );
+    // No consent, no profile.
+    assert_eq!(
+        code(
+            &a,
+            "clone.profile.create",
+            json!({"name": "Sam", "owner": "me", "consent": false, "consent_audio": cp, "reference": rp})
+        ),
+        "consent_required"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "clone.profile.create",
+            json!({"name": "Sam", "owner": "me", "consent": true, "reference": rp})
+        ),
+        "consent_required"
+    );
+    assert_eq!(
+        code(
+            &a,
+            "clone.profile.create",
+            json!({"name": "Sam", "owner": "nobody", "consent": true, "consent_audio": cp, "reference": rp})
+        ),
+        "consent_required"
+    );
+    // Hostile or unsuitable audio.
+    assert_eq!(
+        code(
+            &a,
+            "clone.profile.create",
+            json!({"name": "Sam", "owner": "me", "consent": true, "consent_audio": cp, "reference": sp})
+        ),
+        "bad_params"
+    );
+    let junk = d.join("junk.wav");
+    std::fs::write(&junk, b"RIFF nonsense").unwrap();
+    assert_eq!(
+        code(
+            &a,
+            "clone.profile.create",
+            json!({"name": "Sam", "owner": "me", "consent": true, "consent_audio": cp, "reference": junk.display().to_string()})
+        ),
+        "bad_file"
+    );
+    // With consent.
+    let p = call(
+        &a,
+        "clone.profile.create",
+        json!({"name": "Sam", "owner": "me", "consent": true, "consent_audio": cp, "reference": rp}),
+    );
+    assert_eq!(p["id"], "sam");
+    assert!((p["reference_seconds"].as_f64().unwrap() - 8.0).abs() < 0.1);
+    assert!(p["statement"].as_str().unwrap().contains("I am Sam"));
+    assert_eq!(
+        call(&a, "clone.profiles", json!({}))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    // Speaking says why it can't yet, and never for a voice without a profile.
+    assert_eq!(
+        code(&a, "clone.speak", json!({"voice": "nobody", "text": "hi"})),
+        "consent_required"
+    );
+    assert_eq!(
+        code(&a, "clone.speak", json!({"voice": "sam", "text": "hi"})),
+        "unavailable"
+    );
+    assert_eq!(
+        code(&a, "clone.profile.delete", json!({"id": "../x"})),
+        "bad_params"
+    );
+    let sc = call(
+        &a,
+        "clone.script",
+        json!({"text": "Well [laugh] hmm, (sighs) okay"}),
+    );
+    assert_eq!(sc["model_text"], "Well [laugh] hmm, [sigh] okay");
+    assert_eq!(sc["sounds"], 2);
+    assert_eq!(
+        code(
+            &a,
+            "clone.speak",
+            json!({"voice": "sam", "text": "hi [yodel]"})
+        ),
+        "bad_params"
+    );
+    assert!(
+        call(&a, "clone.tags", json!({}))["tags"]
+            .as_array()
+            .unwrap()
+            .len()
+            >= 9
+    );
+    assert_eq!(
+        code(&a, "clone.convert", json!({"voice": "sam", "path": rp})),
+        "unavailable"
+    );
+    assert_eq!(
+        code(&a, "clone.convert", json!({"voice": "nobody", "path": rp})),
+        "consent_required"
+    );
+    call(&a, "clone.profile.delete", json!({"id": "sam"}));
+    assert!(call(&a, "clone.profiles", json!({}))
+        .as_array()
+        .unwrap()
+        .is_empty());
 }

@@ -49,7 +49,8 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 - [x] R7.5 Live page in the app (composed from the kit; added to design/LIVE.md), with tooltips on every control
 - [x] R7.6 Tooltips: every effect and parameter (`fx.catalog`, `live.kinds`), enforced by a test
 - [x] R7.7 Tooltips shown on every control in the UI (tips.js; engine tips for effects and parameters)
-- [ ] R7.8 Voice cloning with a local model chosen for the computer: research, consent design, gate
+- [x] R7.8 Voice cloning, part 1: model picked for the computer (Chatterbox Turbo MIT first: performs [laugh], [sigh] and other script sounds; Chatterbox MIT for converting your own recording; OpenVoice V2 MIT lightest), hardware probe, consent-gated voice profiles, script parser for sounds and hesitations, clone screen, 8 MCP tools
+- [!] R7.9 Voice cloning, part 2: download the model (with the user's permission) and run it, so clone.speak and clone.convert produce audio. Blocked: needs the user's OK to download about 1.4 GB (Chatterbox Turbo) plus 3.2 GB (Chatterbox) of weights and a PyTorch or ONNX runtime to test against
 
 ### R4 Site (`site/`, deployed by Cloudflare Pages from `dist-static/`)
 - [ ] R4.1 Landing improved for the desktop app
@@ -66,6 +67,8 @@ Legend: `[x]` done and tested · `[ ]` not started · `[~]` in progress · `[!]`
 
 ## Human and hardware queue
 
+- Voice cloning model download and inference (R7.9): needs the user's permission to download weights; then listening checks of cloned speech, laughs and sighs (agents can't judge sound).
+
 - Listen to all 41 built-in live presets on headphones and speakers (agents can't judge sound).
 - Live on macOS (14.6+ system audio permission) and Linux (PipeWire/Pulse monitor inputs): only built in CI so far.
 
@@ -81,6 +84,8 @@ None.
 
 ## Decision log
 
+- 2026-11-07: Voice cloning models limited to MIT: Chatterbox Turbo (default; inline sound tags), Chatterbox (23 languages, voice conversion), OpenVoice V2 (lightest). Dia skipped: its README limits it to research and educational use. Weights are never committed and are downloaded only with the user's permission.
+
 - 2026-11-07: Live can't make Flux appear as an output device for other apps: that needs a signed kernel audio driver. Instead Flux captures an output device (loopback) and plays to another. To route a processed mic into call apps the user installs a virtual cable; Flux says so in the app and over MCP.
 - 2026-11-07: Live presets exclude speed, convolver, noise reduction and tape stop (they need a file or move time). "Slowed + reverb" therefore lowers pitch and says so.
 - 2026-11-07: Updater signing key lives outside the repo (`%USERPROFILE%\.flux-signing`); CI reads `TAURI_SIGNING_PRIVATE_KEY`. Builds are not code-signed (queued).
@@ -91,6 +96,8 @@ None.
 - 2026-11-07: User asked for a full rebuild as a native desktop app with MCP and per-push releases. Old code deleted.
 
 ## Session log
+
+- 2026-11-07: R7.8: voice cloning part 1. Model picker tested for 9 hardware cases; on this machine it detects an RTX 3070 Ti Laptop GPU (8 GB) and picks Chatterbox Turbo on CUDA, with Chatterbox for voice conversion. Consent gate refuses missing consent, missing statement recording, unknown owner, too-short and non-audio clips. Script parser: [laugh] (sighs) *giggles* {clear throat} become sounds; hmm and um stay words; unknown [tags] refused. E2E: a voice made through the UI with real file picks, script sounds shown, speak reports why it can't yet. 84 Rust tests and 16 E2E checks green. Two live timing tests now wait for levels instead of a fixed sleep (they failed under full parallel load; same tolerances).
 
 - 2026-11-07: R7.7: tooltips on every control. tests/e2e/test_live.py now 15 checks; all 2784 controls on all 92 screens have a tooltip (failed with 3 bare before the fix). Effect and parameter tips come from the engine; actions, screens and settings from apps/desktop/ui/tips.js.
 
