@@ -3,6 +3,7 @@
 import json
 import math
 import os
+import time
 import wave
 
 import _wav
@@ -21,6 +22,13 @@ def flux_stub_run(req, say):
     speed = float((req.get("params") or {}).get("speed", 1.0))
     text = " ".join(s["value"] for s in req["segments"] if s["type"] == "text")
     _wav.log({"tts": "kokoro", "voice": voice, "speed": speed, "chars": len(text)})
+    # For testing a run that takes a while, and one that fails.
+    say("STATUS", "Loading the model")
+    say("PROGRESS", 0.15)
+    say("STATUS", "Speaking part 1 of 1")
+    time.sleep(float(os.environ.get("FLUX_STUB_TTS_SLEEP", "0")))
+    if "fail-this-run" in text:
+        raise RuntimeError("the stub was told to fail")
     sr = 24000
     n = int(sr * 0.05 * len(text) / speed)
     with wave.open(req["out"], "wb") as w:

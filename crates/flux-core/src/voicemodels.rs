@@ -640,6 +640,11 @@ fn run_logged(
                 if show && !l.starts_with("PROGRESS ") {
                     ctx.log(&l);
                 }
+                if let Some(x) = l.strip_prefix("STATUS ") {
+                    // A step of the work in plain words. Only these reach the page, never the model's own output.
+                    ctx.log(x);
+                    ctx.detail(x);
+                }
                 if let Some(p) = l.strip_prefix("PROGRESS ") {
                     if let Ok(x) = p.trim().parse::<f32>() {
                         ctx.progress(x);

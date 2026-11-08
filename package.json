@@ -10,7 +10,7 @@
     "app:dev": "node scripts/sidecar.mjs && tauri dev --config apps/desktop/src-tauri/tauri.conf.json",
     "app:build": "node scripts/sidecar.mjs && tauri build --config apps/desktop/src-tauri/tauri.conf.json",
     "build:static": "node scripts/build-static.mjs",
-    "test:ui": "python tests/e2e/test_live.py && python tests/e2e/test_clone_models.py && python tests/e2e/test_first_run.py && python tests/e2e/test_smart_tools.py && python tests/e2e/test_flux_devices.py && python tests/e2e/test_editor.py",
+    "test:ui": "python tests/e2e/test_live.py && python tests/e2e/test_clone_models.py && python tests/e2e/test_first_run.py && python tests/e2e/test_smart_tools.py && python tests/e2e/test_flux_devices.py && python tests/e2e/test_editor.py && python tests/e2e/test_jobs.py",
     "test:site": "node --test tests/site/*.test.mjs",
     "check:js": "node scripts/check-js.mjs"
   },

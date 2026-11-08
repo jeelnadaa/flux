@@ -3,6 +3,9 @@
   const { S, M, ic, THEMES, FONTS } = Flux, F = FD, D = FD.D, stage = document.getElementById('stage');
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches || (D.settings && D.settings.reduce_motion);
   let cur = null, lastRev = -1, dragging = false;
+  /* A button whose work takes a moment says so, and a second click on it does nothing until the first has finished. */
+  const busyActs = new Set(), busyShown = new Set(), busyKey = a => a.dataset.act + '|' + [a.dataset.id, a.dataset.clip, a.dataset.k].join();
+  function markBusy() { document.querySelectorAll('#stage [data-act]').forEach(b => { if (busyShown.has(busyKey(b))) b.setAttribute('aria-busy', 'true'); else b.removeAttribute('aria-busy'); }); }
   const P = () => D.project;
 
   /* ---------- engine bridge helpers ---------- */
@@ -35,6 +38,7 @@
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
   const ENTER = {
+    jobs: () => { jobsSig = jobsKey(); },
     magic: () => { if (!D.ui.magic && P() && P().length) call('tool.magic.scan', {}).then(r => { D.ui.magic = r; D.ui.magicOff = []; rr(); }, e => fail(e)); },
     master: () => { if (!D.ui.masterPlan && P() && P().length) planMaster(); },
     'fx-silence': () => { if (!D.ui.silScan && P() && P().length) silScan(); },
@@ -48,7 +52,7 @@
     if (Flux.hideTip) Flux.hideTip();
     root.querySelectorAll('.seg').forEach(s => { const ind = s.querySelector('.ind'); if (ind) ind.style.transition = 'none'; placeInd(s); if (ind) { ind.getBoundingClientRect(); ind.style.transition = ''; } });
     root.querySelectorAll('.in').forEach(el => [...el.children].forEach((c, i) => c.style.setProperty('--n', Math.min(i, 14))));
-    if (root === stage) tlMount();
+    if (root === stage) { tlMount(); markBusy(); }
     Viz.mount(root);
     if (Flux.applyTips) Flux.applyTips(root);
     splitType(root);
@@ -109,7 +113,9 @@
   async function render(id, push) {
     if (!M[id]) id = P() ? 'edit' : 'home';
     const seq = ++navSeq;
-    await F.need(ALWAYS.concat(NEED[id] || []));
+    // Measuring a long project takes a moment, so a click on the way to it shows something straight away.
+    const slow = setTimeout(() => document.documentElement.classList.add('navbusy'), 200);
+    try { await F.need(ALWAYS.concat(NEED[id] || [])); } finally { clearTimeout(slow); document.documentElement.classList.remove('navbusy'); }
     if (seq !== navSeq) return;
     if (id === 'hpcheck' && cur !== 'hrtf' && cur !== 'hpcheck') D.ui.soundFrom = cur && M[cur] && M[cur].group !== 'First run' ? cur : null;
     const go = () => { stage.classList.remove('rr'); stage.innerHTML = M[id].fn(); const prev = cur; cur = id; hydrate(stage); document.title = (P() ? P().name + ' · ' : '') + 'Flux'; const m = stage.querySelector('#m'); if (m && prev !== id) m.scrollTop = 0; };
@@ -145,14 +151,40 @@
   Flux.rr = rr;
 
   /* ---------- jobs ---------- */
-  async function follow(id, screen, done) {
+  /* While a job runs, only the parts of its page marked data-live change, and canvases whose data did. The rest stays put. */
+  function patchLive() {
+    if (!cur || dragging) return;
+    const SEL = '[data-live],canvas[data-v]', t = document.createElement('template'); t.innerHTML = M[cur].fn();
+    const a = [...stage.querySelectorAll(SEL)], b = [...t.content.querySelectorAll(SEL)];
+    if (a.length !== b.length || a.some((o, i) => o.tagName !== b[i].tagName)) return rr();
+    a.forEach((o, i) => {
+      const n = b[i];
+      if (o.tagName === 'CANVAS') { let diff = false; for (const k of Object.keys(n.dataset)) if (o.dataset[k] !== n.dataset[k]) { o.dataset[k] = n.dataset[k]; diff = true; } if (diff) Viz.one(o); return; }
+      for (const at of n.attributes) if (o.getAttribute(at.name) !== at.value) o.setAttribute(at.name, at.value);
+      if (o.innerHTML !== n.innerHTML) o.innerHTML = n.innerHTML;
+    });
+  }
+  async function follow(id, screen, done, onTick) {
     D.ui.job = { id, state: 'running', progress: 0 };
     if (screen) await render(screen);
     for (; ;) {
       let j; try { j = await call('job.get', { id, wait_s: .25 }); } catch (e) { fail(e); return null; }
-      D.ui.job = j; if (cur === screen || cur === 'jobs') { if (cur === 'jobs') F.stale('jobs'), await F.need(['jobs']); rr(); }
-      if (j.state !== 'running') { if (j.state === 'done' && done) await done(j.result, j); return j; }
+      D.ui.job = j; if (onTick) onTick(j);
+      if (cur === screen) { if (j.state === 'running') patchLive(); else rr(); }
+      if (j.state !== 'running') {
+        if (j.state === 'done' && done) await done(j.result, j);
+        else if (j.state === 'failed' && !screen) fail({ message: j.error || 'The job stopped.' }); // with no page of its own, it would fail in silence
+        return j;
+      }
     }
+  }
+  /* The Jobs page keeps itself current, whoever started the job. */
+  let jobsAt = 0, jobsBusy = false, jobsSig = '';
+  const jobsKey = () => (D.jobs || []).map(j => j.id + j.state).join();
+  async function jobsTick() {
+    if (jobsBusy || performance.now() - jobsAt < 400) return; jobsBusy = true; jobsAt = performance.now();
+    try { F.stale('jobs'); await F.need(['jobs']); if (cur === 'jobs') { const k = jobsKey(); if (k !== jobsSig) { jobsSig = k; rr(); } else patchLive(); } } catch (e) { /* try again next time */ }
+    jobsBusy = false;
   }
 
   /* ---------- actions ---------- */
@@ -170,7 +202,7 @@
     }
     if (then) render(then); else if (cur === 'import') { const j = D.ui.job; if (j && j.state === 'done') render(D.settings && D.settings.mode === 'simple' ? 'task' : 'edit'); }
   }
-  async function silScan() { const o = D.ui.sil || { threshold_db: -42, longer_than_s: .6, shorten_to_s: .3, padding_s: .15 }; try { D.ui.silScan = await call('tool.silence.scan', o); D.ui.silKeep = []; rr(); } catch (e) { fail(e); } }
+  async function silScan() { const o = D.ui.sil || { threshold_db: -42, longer_than_s: .6, shorten_to_s: .3, padding_s: .15 }; D.ui.silBusy = true; rr(); try { D.ui.silScan = await call('tool.silence.scan', o); D.ui.silKeep = []; } catch (e) { fail(e); } D.ui.silBusy = false; rr(); }
   const togg = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : arr.concat([v]);
   let taps = [];
   const exportOpts = o => { const x = { bits: o.bits, mono: !!o.mono, dither: o.dither !== 'none', normalize: o.normalize, target: o.target, ceiling: o.ceiling, tags: { title: o.title || undefined, artist: o.artist || undefined } }; if (o.sample_rate) x.sample_rate = o.sample_rate; if (!['wav', 'flac'].includes(o.format)) x.bitrate = o.bitrate; if (o.fade) x.fade_out_s = 2; return x; };
@@ -301,7 +333,15 @@
     'tempo-detect': async () => { F.stale('tempokey'); await F.need(['tempokey'], true); rr(); },
     'master-style': (el, i) => { D.ui.masterStyle = i; D.ui.masterPlan = null; planMaster(); },
     'master-apply': async el => { const r = await act('tool.master.apply', { style: ds(el).style, target: D.ui.masterTarget || (P() && P().target_lufs) || -14, amount: D.ui.masterAmt == null ? .5 : D.ui.masterAmt }); if (r) { D.ui.mastered = true; D.ui.masterPlan = null; await planMaster(); F.stale('loudness'); await F.need(['loudness'], true); rr(); } },
-    'tts-speak': async () => { const text = (D.ui.ttsText || '').trim(); if (!text) return; const vs = (D.voices && D.voices.voices) || []; if (!P()) await act('project.new', { name: 'Speech', template: 'blank' }); const en = Flux.ttsEngine ? Flux.ttsEngine() : { id: 'system' }; const p = en.id === 'system' ? { text, engine: 'system', voice: D.ui.ttsVoice || (vs[0] && vs[0].id), rate: D.ui.ttsRate || 0, at: pos() } : { text, engine: en.id, at: pos() }; const r = await act('tts.speak', p, { refresh: false }); if (r && r.job) await follow(r.job, null, async () => { await refresh(); render('edit'); }); },
+    'tts-speak': async () => { const text = (D.ui.ttsText || '').trim(); if (!text || D.ui.ttsJob) return; D.ui.ttsErr = D.ui.ttsMsg = null; const vs = (D.voices && D.voices.voices) || []; if (!P()) await act('project.new', { name: 'Speech', template: 'blank' }); const en = Flux.ttsEngine ? Flux.ttsEngine() : { id: 'system' }; const p = en.id === 'system' ? { text, engine: 'system', voice: D.ui.ttsVoice || (vs[0] && vs[0].id), rate: D.ui.ttsRate || 0, at: pos() } : { text, engine: en.id, at: pos() }; const r = await act('tts.speak', p, { refresh: false }); if (!r || !r.job) return;
+      D.ui.ttsMsg = D.ui.ttsErr = null; D.ui.ttsJob = { id: r.job, state: 'running', progress: 0 }; rr();
+      let j; for (; ;) { try { j = await call('job.get', { id: r.job, wait_s: .4 }); } catch (e) { D.ui.ttsJob = null; fail(e); return; } if (j.state !== 'running') break; D.ui.ttsJob = j; if (cur === 'tts') Flux.dlPatch('tts', j); }
+      D.ui.ttsJob = null;
+      // Finished while looking at something else: stay there, and say so on the page when they come back.
+      if (j.state === 'done') { await refresh(); if (cur === 'tts') render('edit'); else D.ui.ttsMsg = 'Your speech is on the timeline.'; }
+      else { if (j.state === 'failed') D.ui.ttsErr = j.error || 'The speech engine stopped.'; if (cur === 'tts') rr(); }
+    },
+    'tts-cancel': async () => { const j = D.ui.ttsJob; if (j) await act('job.cancel', { id: j.id }, { refresh: false }); },
     'job-cancel': async el => { const id = ds(el).id || (D.ui.job && D.ui.job.id); if (id) await act('job.cancel', { id }, { refresh: false }); F.stale('jobs'); if (ds(el).then) render(ds(el).then); else { await F.need(['jobs'], true); rr(); } },
     'jobs-clear': async () => { await act('job.clear', {}, { refresh: false }); F.stale('jobs'); await F.need(['jobs'], true); rr(); },
     /* export */
@@ -325,11 +365,11 @@
     'conv-add': async () => { const fs = await F.pickFiles({ multiple: true, kind: 'audio' }); if (fs && fs.length) { const c = D.ui.conv = Object.assign({ files: [], format: 'mp3', bitrate: 245, sample_rate: 0 }, D.ui.conv || {}); c.files = c.files.concat(fs); D.ui.convJob = null; rr(); } },
     'conv-set': el => { D.ui.conv = Object.assign({ files: [], format: 'mp3', bitrate: 245, sample_rate: 0 }, D.ui.conv || {}, { [ds(el).k]: ds(el).v }); rr(); },
     'files-remove': el => { const c = D.ui.conv; if (c) { c.files.splice(+ds(el).i, 1); rr(); } },
-    'conv-start': async () => { const c = D.ui.conv; if (!c || !c.files.length) return; const opts = ['wav', 'flac'].includes(c.format) ? { bits: c.bits || 24 } : { bitrate: c.bitrate === 245 ? 256 : c.bitrate, vbr: c.bitrate === 245 }; let r; try { r = await call('convert.start', Object.assign({ files: c.files, format: c.format, options: opts, dir: exportDir() }, c.sample_rate ? { sample_rate: c.sample_rate } : {})); } catch (e) { fail(e); return; } D.ui.convJob = { state: 'running', progress: 0 }; rr(); await follow(r.job, null, () => { }).then(j => { D.ui.convJob = j; rr(); }); },
+    'conv-start': async () => { const c = D.ui.conv; if (!c || !c.files.length) return; const opts = ['wav', 'flac'].includes(c.format) ? { bits: c.bits || 24 } : { bitrate: c.bitrate === 245 ? 256 : c.bitrate, vbr: c.bitrate === 245 }; let r; try { r = await call('convert.start', Object.assign({ files: c.files, format: c.format, options: opts, dir: exportDir() }, c.sample_rate ? { sample_rate: c.sample_rate } : {})); } catch (e) { fail(e); return; } D.ui.convJob = { state: 'running', progress: 0 }; rr(); await follow(r.job, null, () => { }, j => { D.ui.convJob = j; if (cur === 'convert') patchLive(); }).then(j => { D.ui.convJob = j; rr(); }); },
     'batch-add': async () => { const fs = await F.pickFiles({ multiple: true, kind: 'audio' }); if (fs && fs.length) { const b = D.ui.batch = Object.assign({ files: [], steps: [], format: 'mp3' }, D.ui.batch || {}); b.files = b.files.concat(fs); D.ui.batchJob = null; rr(); } },
     'batch-remove': el => { D.ui.batch.steps.splice(+ds(el).i, 1); rr(); },
     'batch-remove-file': el => { D.ui.batch.files.splice(+ds(el).i, 1); rr(); },
-    'batch-start': async () => { const b = D.ui.batch; if (!b || !b.files.length) return; const st = b.steps.find(s => s.style), pre = b.steps.find(s => s.preset), norm = b.steps.find(s => s.norm != null); const p = { files: b.files, format: b.format, options: norm ? { normalize: 'lufs', target: norm.norm, ceiling: -1 } : {} }; if (st) { p.style = st.style; p.amount = .7; } if (pre) p.preset = pre.preset; if (b.dest === 'export' && exportDir()) p.dir = exportDir(); let r; try { r = await call('batch.start', p); } catch (e) { fail(e); return; } D.ui.batchJob = { state: 'running', progress: 0 }; rr(); await follow(r.job, null).then(j => { D.ui.batchJob = j; rr(); }); },
+    'batch-start': async () => { const b = D.ui.batch; if (!b || !b.files.length) return; const st = b.steps.find(s => s.style), pre = b.steps.find(s => s.preset), norm = b.steps.find(s => s.norm != null); const p = { files: b.files, format: b.format, options: norm ? { normalize: 'lufs', target: norm.norm, ceiling: -1 } : {} }; if (st) { p.style = st.style; p.amount = .7; } if (pre) p.preset = pre.preset; if (b.dest === 'export' && exportDir()) p.dir = exportDir(); let r; try { r = await call(p.style || p.preset ? 'batch.start' : 'convert.start', p); } catch (e) { fail(e); return; } D.ui.batchJob = { state: 'running', progress: 0 }; rr(); await follow(r.job, null, null, j => { D.ui.batchJob = j; if (cur === 'batch') patchLive(); }).then(j => { D.ui.batchJob = j; rr(); }); },
     'ring-phone': (el, i) => { D.ui.ring = Object.assign({ start: 0, len: 30, fi: .3, fo: 1 }, D.ui.ring || {}, { phone: i ? 'android' : 'iphone' }); rr(); },
     'ring-find': async () => { const p = P(); if (!p) return; try { const r = await call('analysis.loudness', {}); const c = r.loudness.curve || []; const len = Math.min((D.ui.ring && D.ui.ring.len) || 30, p.seconds); let best = 0, bv = -1e9; const per = p.seconds / Math.max(1, c.length); const w = Math.max(1, Math.round(len / per)); for (let i = 0; i + w <= c.length; i++) { let s = 0; for (let k = i; k < i + w; k++) s += c[k]; if (s > bv) { bv = s; best = i; } } D.ui.ring = Object.assign({ len: 30, fi: .3, fo: 1, phone: 'iphone' }, D.ui.ring || {}, { start: Math.min(best * per, Math.max(0, p.seconds - len)) }); rr(); } catch (e) { fail(e); } },
     'ring-export': async () => { const r0 = Object.assign({ start: 0, len: 30, fi: .3, fo: 1, phone: 'iphone' }, D.ui.ring || {}), p = P(); const len = Math.min(r0.len, r0.phone === 'iphone' ? 30 : 40, p.seconds); const r = await act('ringtone.make', { start_s: r0.start, len_s: len, fade_in_s: r0.fi, fade_out_s: r0.fo, format: r0.phone === 'iphone' ? 'm4r' : 'mp3', dir: exportDir() }, { refresh: false }); if (!r) return; const done = res => { D.ui.exported = res; D.ui.exportBase = 'ringtone'; render('exported'); }; if (r.job) await follow(r.job, 'exporting', async res => done(res)); else done(r); },
@@ -455,14 +495,22 @@
     const a = e.target.closest('[data-act]');
     if (a && !a.disabled && a.getAttribute('aria-disabled') !== 'true') {
       if (a.tagName === 'A') e.preventDefault();
-      const fn = ACT[a.dataset.act]; const go = a.dataset.go;
-      if (fn) { const r = fn(a); if (go) { if (r && r.then) await r; render(go); } else if (r && r.then) await r; }
+      const fn = ACT[a.dataset.act]; const go = a.dataset.go, key = busyKey(a);
+      if (busyActs.has(key)) return; // still working on the last click
+      if (fn) {
+        const r = fn(a);
+        if (r && r.then) {
+          busyActs.add(key); const t = setTimeout(() => { busyShown.add(key); markBusy(); }, 150);
+          try { await r; } finally { clearTimeout(t); busyActs.delete(key); busyShown.delete(key); markBusy(); }
+        }
+        if (go) render(go);
+      }
       else if (go) render(go);
       return;
     }
     const g = e.target.closest('[data-go]');
     if (g && !g.closest('[data-hold]')) { e.preventDefault(); if (g.dataset.go) render(g.dataset.go); return; }
-    const cl = e.target.closest('[data-clip]');
+    const cl = e.target.closest('.clip[data-clip]');
     if (cl && !clipDrag) { const id = +cl.dataset.clip; selectClip(D.sel.clip === id ? null : id); return; }
     const sv = e.target.closest('.sl[data-bind] .sv, .fader[data-bind]~[data-gtext]');
     if (sv && openTyped(sv.closest('.sl') || sv.parentElement.querySelector('.fader'))) return;
@@ -482,7 +530,7 @@
   let inT = null;
   document.addEventListener('input', e => {
     const el = e.target;
-    if (el.dataset.ui) { D.ui[el.dataset.ui] = num(el, el.value); if (el.dataset.rerender) { clearTimeout(inT); inT = setTimeout(rr, 120); } return; }
+    if (el.dataset.ui) { D.ui[el.dataset.ui] = num(el, el.value); if (el.dataset.rerender) { clearTimeout(inT); inT = setTimeout(rr, 120); } else if (el.dataset.liveInput !== undefined) { clearTimeout(inT); inT = setTimeout(patchLive, 60); } return; }
     if (el.matches('[data-ui="libsearch"]')) return;
   });
   document.addEventListener('change', async e => {
@@ -635,7 +683,7 @@
     }
     const h = e.target.closest('[data-hold]');
     if (h) { h.classList.add('on'); h.style.transform = 'scale(.97)'; h.dataset.txt = h.textContent; h.textContent = 'Original'; call('transport.hold', { on: true }).catch(() => { }); return; }
-    const cl = e.target.closest('[data-clip]');
+    const cl = e.target.closest('.clip[data-clip]');
     if (cl && cur === 'edit') {
       const c = F.clip(+cl.dataset.clip), tl = cl.closest('.tl'), lane = cl.closest('.lane'), box = cl.getBoundingClientRect(), ed = box.width >= 24 && e.target.closest('.edge');
       if (c) { clipDrag = null; clipSt = { el: cl, c, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, tl, sl0: tl.scrollLeft, w: lane.offsetWidth, px: cl.offsetWidth, home: lane, lanes: [...tl.querySelectorAll('.lane')], moved: false, pid: e.pointerId, edge: ed ? ed.dataset.edge : null, ns: c.start, track: c.track }; cl.setPointerCapture(e.pointerId); }
@@ -756,6 +804,7 @@
   let polling = false, nextPoll = 0, lastScope = 0;
   async function poll(now) {
     if (now) nextPoll = 0;
+    if (cur === 'jobs') jobsTick();
     if (polling || performance.now() < nextPoll) return; polling = true;
     try {
       const s = await call('transport.state'); const was = D.st.playing, wasRec = !!D.st.recording; D.st = s;

@@ -278,6 +278,7 @@ def op_tts(req):
             return kokoro.flux_stub_run(req, say)
         from kokoro import KModel, KPipeline
         device = pick_device(torch, req.get("device", "auto"))
+        say("STATUS", "Loading the model")
         ck = req["ckpt_dir"]
         km = KModel(repo_id="hexgrad/Kokoro-82M", config=os.path.join(ck, "config.json"), model=os.path.join(ck, "kokoro-v1_0.pth")).to(device).eval()
         voice = req["voice"]
@@ -293,12 +294,14 @@ def op_tts(req):
                 out.extend([0.0] * int(sr * int(s["value"]) / 1000))
             else:
                 torch.manual_seed(seed + i)
+                say("STATUS", f"Speaking part {i + 1} of {len(segs)}")
                 for r in pipe(s["value"], voice=vp, speed=float(params.get("speed", 1.0))):
                     if r.audio is not None:
                         out.extend(r.audio.detach().cpu().tolist())
             say("PROGRESS", round(0.15 + 0.8 * (i + 1) / len(segs), 3))
     else:
         device = pick_device(torch, req.get("device", "auto"))
+        say("STATUS", "Loading the model")
         model = load(loader, req["ckpt_dir"], device)
         sr = int(getattr(model, "sr", 24000))
         say("PROGRESS", 0.15)
@@ -307,6 +310,7 @@ def op_tts(req):
                 out.extend([0.0] * int(sr * int(s["value"]) / 1000))
             else:
                 torch.manual_seed(seed + i)
+                say("STATUS", f"Speaking part {i + 1} of {len(segs)}")
                 out.extend(samples(call(model.generate, **dict(params, text=s["value"]))))
             say("PROGRESS", round(0.15 + 0.8 * (i + 1) / len(segs), 3))
     write_wav(req["out"], out, sr)
@@ -317,6 +321,7 @@ def run(req_path):
     with open(req_path, encoding="utf-8") as f:
         req = json.load(f)
     op = req.get("op")
+    say("STATUS", "Starting the voice engine")
     if op == "transcribe":
         return op_transcribe(req)
     if op == "stems":
@@ -326,12 +331,14 @@ def run(req_path):
     import torch
     device = pick_device(torch, req.get("device", "auto"))
     say("PROGRESS", 0.02)
+    say("STATUS", "Loading the model")
     model = load(req["loader"], req["ckpt_dir"], device)
     sr = int(getattr(model, "sr", 24000))
     say("PROGRESS", 0.15)
     seed = int(req.get("seed", 0))
     out = []
     if req["op"] == "convert":
+        say("STATUS", "Turning your take into the voice")
         torch.manual_seed(seed)
         wav = call(model.generate, audio=req["input"], target_voice_path=req["reference"])
         out = samples(wav)
@@ -347,6 +354,7 @@ def run(req_path):
                 out.extend([0.0] * int(sr * int(s["value"]) / 1000))
             else:
                 torch.manual_seed(seed + i)
+                say("STATUS", f"Speaking part {i + 1} of {len(segs)}")
                 kw = dict(params, text=s["value"])
                 if not prompted:
                     kw["audio_prompt_path"] = req["reference"]

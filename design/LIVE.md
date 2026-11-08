@@ -133,3 +133,11 @@ a dim 12.5 px line on the arrow keys under them, and a ghost `x` Deselect button
 **Motion.** A redraw of the same screen adds `.rr` to the stage, which stops `.in` entrances and `.prog` growth from
 playing again. They still play when arriving at a screen. Checked at 1440, 820 and 390 px in the Cassette theme
 (`tests/e2e/test_editor.py`, screenshots `target/e2e/editor-timeline-*.png`). Other themes and fonts use the same tokens.
+
+## Work in progress: Text to speech, Jobs, busy states
+
+**Text to speech.** Under the button, the download row from Smart tools (`Flux.dlRow`) with a ghost danger Cancel; the
+button reads Generating… and is disabled. A failure is a `callout bad` in the same place. **Jobs.** A running row adds
+the ghost Show log button before Cancel and the current step in its dim line. **Busy.** A button or chip waiting on its
+work takes `aria-busy` (55% opacity, progress cursor). A page taking over 200 ms to measure shows a 3 px `--sig` shimmer
+across the top of the window. Checked at 1440, 820 and 390 px (`tests/e2e/test_jobs.py`).

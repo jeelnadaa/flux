@@ -66,6 +66,7 @@ AI agents can drive every feature.
   GitHub release in the visitor's browser and offers the right installer for their computer. `npm run build:static`
   writes `dist-static/` for Cloudflare Pages, with a content security policy.
 
+- **You can see work happening.** Pages stay still while a job runs and only the moving parts change. Generating speech shows what the engine is doing, how long it's taken, a log and Cancel. The Jobs page keeps itself current, and a failure is always said out loud.
 - **Smart tools: pick the model.** Stems, transcripts and text to speech each have a built-in or light engine
   and downloadable models, and Flux suggests one for this computer (graphics chip, memory, cores) with the reason.
   Stems: the built-in split (instant, no download), Demucs v4 (balanced), Demucs fine-tuned (best) or Demucs 6 stems

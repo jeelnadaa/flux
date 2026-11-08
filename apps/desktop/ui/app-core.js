@@ -22,7 +22,7 @@ window.Flux = (function () {
   const sec = (t, b) => `<section class="sec"><h4>${t}</h4>${b}</section>`;
   const tile = (i, t, s, go, x = '', a = '') => `<a class="tile ${x}" href="#${go || ''}" ${go ? `data-go="${go}"` : ''}${a ? ' ' + a : ''}>${i ? ic(i) : ''}<b>${t}</b><span>${s}</span></a>`;
   const cal = (i, t, k) => `<div class="callout ${k || ''}">${ic(i)}<div>${t}</div></div>`;
-  const prog = (p, run) => `<div class="prog ${run ? 'run' : ''}" style="--v:${p}%" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100"><i></i></div>`;
+  const prog = (p, run) => `<div class="prog ${run ? 'run' : ''}" data-live style="--v:${p}%" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100"><i></i></div>`;
 
   /* Effect card: a color block from a theme palette, with a word that performs the effect. */
   const LETTERS = { water: 1, stut: 1, stop: 1 };
@@ -60,12 +60,14 @@ window.Flux = (function () {
   function reg(id, group, name, fn) { M[id] = { id, group, name, fn, i: S.length }; S.push(M[id]); }
   const R = id => M[id].fn();
   /* A running download or job. While it runs only these parts change (dlPatch), so the page around it stays still. */
-  const dlText = j => { const pc = Math.round((j.progress || 0) * 100); return `${pc}% · ${j.stage || 'Starting'}${j.detail ? ' · ' + j.detail : ''}`; };
+  /* How long a job has been going, once that's worth saying. A bar can sit still while a model loads; this never does. */
+  const dlAge = j => { const s = j.started ? Math.round(Date.now() / 1000 - j.started) : 0; return s < 3 ? '' : s < 60 ? s + ' s' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const dlText = j => { const pc = Math.round((j.progress || 0) * 100), a = j.state === 'running' ? dlAge(j) : ''; return `${pc}% · ${j.stage || 'Starting'}${j.detail ? ' · ' + j.detail : ''}${a ? ' · ' + a : ''}`; };
   const dlLogs = () => FD.D.ui.dlLog = FD.D.ui.dlLog || {}, dlSaved = () => FD.D.ui.dlLogText = FD.D.ui.dlLogText || {};
   const dlLogHtml = job => { const e = FD.esc; return `<pre class="mono box" role="log" aria-label="Install log" tabindex="0" data-dl-log="${e(job)}" style="white-space:pre-wrap;word-break:break-word;margin:0;max-height:220px;overflow:auto;font-size:12px">${e(dlSaved()[job] || 'Starting…')}</pre><span class="dim" style="font-size:12.5px" data-dl-quiet="${e(job)}"></span>`; };
   const dlRow = (id, j, cancel) => {
     const pc = Math.round((j.progress || 0) * 100), open = dlLogs()[j.id], e = FD.esc;
-    return `<div class="col" style="gap:8px;width:100%" data-dl="${e(id)}"><div class="row" style="gap:10px;align-items:center;width:100%"><div style="flex:1 1 120px;min-width:120px">${prog(pc, true)}</div><span class="mono dim" data-dl-text>${e(dlText(j))}</span>${btn(open ? 'Hide log' : 'Show log', { k: 'g', x: `data-act="dl-log" data-job="${e(j.id)}" aria-expanded="${open ? 'true' : 'false'}" data-tip="See what the installer is doing, line by line."` })}${cancel}</div>${open ? dlLogHtml(j.id) : ''}</div>`;
+    return `<div class="col" style="gap:8px;width:100%" data-dl="${e(id)}"><div class="row" style="gap:10px;align-items:center;width:100%"><div style="flex:1 1 120px;min-width:120px">${prog(pc, true)}</div><span class="mono dim" data-dl-text>${e(dlText(j))}</span>${btn(open ? 'Hide log' : 'Show log', { k: 'g', x: `data-act="dl-log" data-job="${e(j.id)}" aria-expanded="${open ? 'true' : 'false'}" data-tip="See what it's doing, line by line."` })}${cancel}</div>${open ? dlLogHtml(j.id) : ''}</div>`;
   };
   /* Returns false when the row isn't on screen. */
   const dlPatch = (id, j) => {
@@ -101,5 +103,5 @@ window.Flux = (function () {
     el.textContent = o[job] ? 'Hide log' : 'Show log'; el.setAttribute('aria-expanded', o[job] ? 'true' : 'false');
   };
 
-  return { dlRow, dlPatch, dlToggle, THEMES, FONTS, fxc, ic, v, vz, btn, seg, sl, tg, chip, pill, fld, inp, sel, sec, tile, cal, prog, pr, pg, wiz, dlg, fxp, reg, S, M, R, transport, PROJ, HOME, rail, topbar };
+  return { dlRow, dlPatch, dlToggle, dlText, dlLogBlock: job => dlLogs()[job] ? dlLogHtml(job) : '', dlLogOpen: job => !!dlLogs()[job], THEMES, FONTS, fxc, ic, v, vz, btn, seg, sl, tg, chip, pill, fld, inp, sel, sec, tile, cal, prog, pr, pg, wiz, dlg, fxp, reg, S, M, R, transport, PROJ, HOME, rail, topbar };
 })();

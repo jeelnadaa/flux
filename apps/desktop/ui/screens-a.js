@@ -101,8 +101,8 @@
     return dlg('home', 'Adding ' + esc(D.ui.importName || 'audio'), `
     ${vz('wave', m ? { media: m.id, start: 0, end: m.frames, stereo: m.channels > 1 ? 1 : 0, until: done ? 1 : (j.progress || 0), color: '--t1', step: 2 } : { empty: 1, color: '--t1', step: 2 }, 130, 'Waveform being read')}
     ${prog(pc, !done && j.state === 'running')}
-    <div class="g3 mono dim"><span>${m ? esc(m.format.toUpperCase()) + (m.bits ? ' · ' + m.bits + '-bit' : '') : '—'}</span><span>${m ? F.khz(m.source_rate) + ' ' + (m.channels > 1 ? 'stereo' : 'mono') : '—'}</span><span>${m ? F.pos(m.frames, F.sr()) : '—'}</span></div>
-    <div class="lst">${(j.stages || []).map(([n, st]) => `<div><span class="${st === 'done' ? 'ok' : st === 'active' ? 'act' : 'faint'}">${ic(st === 'done' ? 'check' : st === 'active' ? 'exp' : 'dots', 17)}</span><div class="ti"><b>${esc(n)}</b></div><span class="mono dim">${st === 'done' ? 'Done' : st === 'active' ? pc + '%' : 'Waiting'}</span></div>`).join('')}</div>
+    <div class="g3 mono dim" data-live><span>${m ? esc(m.format.toUpperCase()) + (m.bits ? ' · ' + m.bits + '-bit' : '') : '—'}</span><span>${m ? F.khz(m.source_rate) + ' ' + (m.channels > 1 ? 'stereo' : 'mono') : '—'}</span><span>${m ? F.pos(m.frames, F.sr()) : '—'}</span></div>
+    <div class="lst" data-live>${(j.stages || []).map(([n, st]) => `<div><span class="${st === 'done' ? 'ok' : st === 'active' ? 'act' : 'faint'}">${ic(st === 'done' ? 'check' : st === 'active' ? 'exp' : 'dots', 17)}</span><div class="ti"><b>${esc(n)}</b></div><span class="mono dim">${st === 'done' ? 'Done' : st === 'active' ? pc + '%' : 'Waiting'}</span></div>`).join('')}</div>
     ${j.state === 'failed' ? cal('warn', '<b>Flux couldn\'t read this file.</b> ' + esc(j.error || ''), 'bad') : cal('info', 'You can start editing now. Flux keeps preparing the rest in the background.')}`, `${btn('Cancel', { k: 'g', x: 'data-act="job-cancel" data-then="home"' })}${btn('Open now', { k: 'p', go: 'edit' })}`);
   });
 

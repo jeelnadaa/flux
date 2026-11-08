@@ -317,5 +317,5 @@ window.Viz = (function () {
     live.forEach(c => { if (c.isConnected) draw(c, t); }); requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-  return { mount, scrolled, hold: on => { hold = on; }, needsScope: () => [...live].some(c => c.isConnected && /eq|gonio|spectrum|gr|transfer/.test(c.dataset.v)), redraw: root => (root || document).querySelectorAll('canvas[data-v]').forEach(c => draw(c, performance.now() / 1000)) };
+  return { one: c => draw(c, performance.now() / 1000), mount, scrolled, hold: on => { hold = on; }, needsScope: () => [...live].some(c => c.isConnected && /eq|gonio|spectrum|gr|transfer/.test(c.dataset.v)), redraw: root => (root || document).querySelectorAll('canvas[data-v]').forEach(c => draw(c, performance.now() / 1000)) };
 })();
