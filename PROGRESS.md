@@ -112,6 +112,8 @@ None.
 
 ## Session log
 
+- 2026-11-08: device test fix: null_device_plays_and_meters read the position after a fixed 400 ms and got 6720 frames on a busy CI machine. It now waits up to 10 s for the same 9000 frames; fails with the null device broken.
+- 2026-11-08: test_first_run times out on Linux CI at 'starting again goes home' (home never appears after a reload). Not reproduced on Windows (35 reloads, with and without the test's route). The test now prints the page, page errors, unanswered calls and each startup call's time on that timeout, so the next CI run names the cause.
 - 2026-11-08: First-run test fix: test_first_run timed out on Linux CI waiting for Hello. because a machine with no sound output correctly goes to the no-sound page first. The app is right; the test assumed a sound card. The test now sets the engine row itself and checks both paths, including the no-sound page, which had no test before.
 - 2026-11-08: R7.9 test fix: test_clone_models timed out on Linux CI waiting for Cancel because the stub download could finish between two polls of the page. Reproduced on Windows by removing the mirror's delay (same error, same line). The stub install now takes a set time; passes with the delay removed too. Prints the page and engine state if it ever fails.
 - 2026-11-08: R5.3 fix: a 504 downloading NSIS's plugin failed the Windows release. The bundler's tools are now cached between runs and the build retries 3 times. Workflow parsed and checked by script; not run on GitHub (needs a push).

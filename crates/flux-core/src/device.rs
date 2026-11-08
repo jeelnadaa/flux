@@ -1015,7 +1015,13 @@ mod tests {
         );
         e.send(Msg::Play(true));
         std::thread::sleep(Duration::from_millis(400));
-        let m = e.meters(1);
+        // A busy machine can give the audio thread little time, so wait for the position rather than guess how long.
+        let mut m = e.meters(1);
+        let end = Instant::now() + Duration::from_secs(10);
+        while m.pos <= 9000 && Instant::now() < end {
+            std::thread::sleep(Duration::from_millis(20));
+            m = e.meters(1);
+        }
         assert!(m.playing);
         assert!(m.pos > 9000, "pos {}", m.pos);
         assert!(m.peak[0] > 0.3 && m.peak[0] < 0.55, "peak {}", m.peak[0]);

@@ -65,6 +65,18 @@ def main():
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+            # Which engine calls never came back, for the report if the page doesn't arrive.
+            pending = {}
+
+            def call_name(r):
+                try:
+                    return json.loads(r.post_data or "{}").get("method", "?")
+                except ValueError:
+                    return "?"
+
+            page.on("request", lambda r: pending.__setitem__(r, call_name(r)) if r.url.endswith("/api/call") else None)
+            page.on("requestfinished", lambda r: pending.pop(r, None))
+            page.on("requestfailed", lambda r: pending.pop(r, None))
             base = f"http://127.0.0.1:{port}/"
 
             # Build machines have no sound output and desktops do, and first run differs. The test sets which one it is.
@@ -95,7 +107,21 @@ def main():
             page.wait_for_selector('text=Hello.')
             page.goto("about:blank")
             page.goto(base)
-            page.wait_for_selector('text=What are we doing to it?')
+            try:
+                page.wait_for_selector('text=What are we doing to it?')
+            except Exception:
+                print("page:", repr(page.inner_text("body")[:600]))
+                print("page errors:", errors[:5])
+                print("calls with no answer:", sorted(pending.values()))
+                for m in ("settings.get", "app.info", "project.get", "recovery.list", "library.list", "ai.status", "app.capabilities"):
+                    t = time.time()
+                    try:
+                        body = json.dumps({"method": m, "params": {}}).encode()
+                        req = urllib.request.Request(f"{base}api/call", body, {"Content-Type": "application/json"})
+                        print(m, urllib.request.urlopen(req, timeout=8).status, round(time.time() - t, 2), "s")
+                    except Exception as e:
+                        print(m, "failed after", round(time.time() - t, 2), "s:", e)
+                raise
             assert page.locator('text=Checking what this computer can do.').count() == 0
             ok("starting again goes home, not back into first run")
 
