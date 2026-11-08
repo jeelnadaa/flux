@@ -234,17 +234,24 @@ def main():
             assert api(port, "clone.settings.get")["settings"]["seed"] == 7
             ok(f"device, Variety slider ({t:.2f}) and seed saved from the page")
 
-            # 5. Speak onto the project, with progress, labelled synthetic.
+            # 5. Speak, with progress, labelled synthetic: held to be heard first, then added to the project.
             page.click('[data-cact="use"][data-id="robin"]')
             page.fill('[data-cin="script"]', "[hmm] So [laugh] [pause] yes")
             page.click('[data-cact="speak"]')
-            page.wait_for_selector('.callout:has-text("Labelled synthetic")', timeout=30000)
-            msg = page.inner_text('.callout:has-text("Labelled synthetic")')
-            assert "Generated speech" in msg, msg
+            page.wait_for_selector('[data-take-card]', timeout=30000)
+            msg = page.inner_text('[data-take-card]')
+            assert "Synthetic" in msg, msg
             p = api(port, "project.get")
-            assert any(t["name"] == "Generated speech" for t in p["tracks"])
+            assert not any(t["name"] == "Generated speech" for t in p["tracks"]), "it went on the timeline before being heard"
+            page.click('[data-take-card] [data-aact="save"]')
+            page.wait_for_selector('[data-take-card] [data-aact="place"]', timeout=6000)
+            assert len(api(port, "asset.list")["assets"]) >= 1
+            page.click('[data-take-card] [data-aact="place"]')
+            page.wait_for_selector('.callout:has-text("On the timeline")', timeout=6000)
+            p = api(port, "project.get")
+            assert any(t["name"] == "Generated speech" and t["clips"] for t in p["tracks"])
             page.screenshot(path=str(OUT / "clone-spoken-1440.png"))
-            ok(f"spoke onto the project: {msg[:60]}")
+            ok(f"spoke, held to be heard, then saved and placed: {msg[:60]}")
 
             # 6. Every control named and with a tooltip; fits at 1440, 820 and 390 px.
             missing = ev("""(() => {

@@ -181,6 +181,11 @@ pub fn parse_script(s: &str) -> Result<Vec<Part>> {
             "That script is too long. Keep it under 5000 characters per call."
         ));
     }
+    parse_long(s)
+}
+
+/// `parse_script` without its length limit, for text to speech, which has always taken long text.
+fn parse_long(s: &str) -> Result<Vec<Part>> {
     let mut out: Vec<Part> = vec![];
     let mut text = String::new();
     let cs: Vec<char> = s.chars().collect();
@@ -739,8 +744,56 @@ fn drop_sounds(text: &str) -> (String, usize) {
     (t.split_whitespace().collect::<Vec<_>>().join(" "), n)
 }
 
-/// Where a generated file goes: onto the open project, or into the export folder.
+/// A script for an engine that only reads plain words: sounds left out (and counted), pauses as a comma.
+pub fn plain_script(s: &str) -> Result<(String, usize)> {
+    let parts = parse_long(s)?;
+    let (mut out, mut n) = (vec![], 0);
+    for seg in segments(&parts) {
+        if let Segment::Say(t) = seg {
+            let (t, d) = drop_sounds(&t);
+            n += d;
+            if !t.is_empty() {
+                out.push(t);
+            }
+        }
+    }
+    if out.is_empty() {
+        bail!(err("bad_params", "There's nothing to say in that script."));
+    }
+    Ok((out.join(", "), n))
+}
+
+/// A script as pieces a speech model can run. Models that can't perform sounds leave them out (and count them).
+pub fn model_segments(s: &str, sounds: bool, max: Option<usize>) -> Result<(Vec<Value>, usize)> {
+    let parts = parse_long(s)?;
+    let (mut out, mut n) = (vec![], 0);
+    for seg in segments(&parts) {
+        match seg {
+            Segment::Silence(ms) => out.push(json!({"type": "silence", "value": ms})),
+            Segment::Say(t) => {
+                let (t, d) = if sounds { (t, 0) } else { drop_sounds(&t) };
+                n += d;
+                let pieces = match max {
+                    Some(m) => crate::smart::sentences(&t, m),
+                    None => vec![t].into_iter().filter(|x| !x.is_empty()).collect(),
+                };
+                out.extend(
+                    pieces
+                        .into_iter()
+                        .map(|x| json!({"type": "text", "value": x})),
+                );
+            }
+        }
+    }
+    if !out.iter().any(|x| x["type"] == "text") {
+        bail!(err("bad_params", "There's nothing to say in that script."));
+    }
+    Ok((out, n))
+}
+
+/// Where a generated file goes: held to be listened to, onto the open project, or into the export folder.
 struct Dest {
+    take: bool,
     project: Option<(String, u32)>,
     path: PathBuf,
     id: String,
@@ -748,10 +801,21 @@ struct Dest {
 }
 
 fn dest(api: &Api, v: &Value) -> Result<Dest> {
+    if crate::assets::wants_take(v)? {
+        let (id, path) = crate::assets::new_take(api)?;
+        return Ok(Dest {
+            take: true,
+            project: None,
+            path,
+            id,
+            at: None,
+        });
+    }
     let id = format!("m{}", crate::store::new_id());
     if let Some((pid, dir, sr)) = crate::methods::speech_target(api) {
         std::fs::create_dir_all(&dir)?;
         return Ok(Dest {
+            take: false,
             project: Some((pid, sr)),
             path: dir.join(format!("{id}.wav")),
             at: crate::api::opos(v, "at", sr),
@@ -767,6 +831,7 @@ fn dest(api: &Api, v: &Value) -> Result<Dest> {
         .unwrap_or_else(crate::store::default_export_dir);
     std::fs::create_dir_all(&dir)?;
     Ok(Dest {
+        take: false,
         project: None,
         path: dir.join(format!("Synthetic speech {id}.wav")),
         at: None,
@@ -775,7 +840,26 @@ fn dest(api: &Api, v: &Value) -> Result<Dest> {
 }
 
 fn finish(api: &Api, d: &Dest, short: &str, voice: &str, mut res: Value) -> Result<Value> {
-    if let Some((pid, sr)) = &d.project {
+    if d.take {
+        let kind = if short == "converted take" {
+            "converted take"
+        } else {
+            "cloned speech"
+        };
+        let held = crate::assets::finish(
+            api,
+            crate::assets::NewTake {
+                id: &d.id,
+                path: &d.path,
+                short,
+                kind,
+                voice,
+                sounds_left_out: res["sounds_left_out"].as_u64().unwrap_or(0) as usize,
+            },
+        )?;
+        res["take"] = held["take"].clone();
+        res["seconds"] = held["seconds"].clone();
+    } else if let Some((pid, sr)) = &d.project {
         let added = crate::methods::add_generated(
             api,
             crate::methods::Place {
@@ -936,6 +1020,35 @@ mod tests {
             gpu_name: "Test GPU".into(),
             vram_gb: vram,
         }
+    }
+
+    #[test]
+    fn a_script_becomes_pieces_for_any_engine() {
+        let (s, n) = model_segments("Hi [laugh] [pause 2s] bye", false, None).unwrap();
+        assert_eq!(n, 1);
+        assert_eq!(
+            s.iter()
+                .map(|x| x["type"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["text", "silence", "text"]
+        );
+        assert_eq!(s[1]["value"], 2000);
+        assert!(!s[0]["value"].as_str().unwrap().contains('['));
+
+        let (s, n) = model_segments("Hi [laugh] bye", true, Some(280)).unwrap();
+        assert_eq!(n, 0);
+        assert!(s[0]["value"].as_str().unwrap().contains("[laugh]"));
+
+        let (t, n) = plain_script("Hi [sigh] [pause] bye").unwrap();
+        assert_eq!((t.as_str(), n), ("Hi, bye", 1));
+
+        assert!(model_segments("[pause]", false, None).is_err());
+        assert!(plain_script("[laugh]").is_err());
+        assert!(plain_script("Say [xyzzy]").is_err());
+        assert!(
+            plain_script(&"word ".repeat(2000)).is_ok(),
+            "text to speech takes long text"
+        );
     }
 
     #[test]

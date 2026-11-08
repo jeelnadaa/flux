@@ -29,12 +29,12 @@
 
   /* ---------- per-screen data ---------- */
   const NEED = {
-    boot: ['caps'], unsupported: ['caps'], home: ['library'], library: ['library'], 'project-menu': ['library'], record: ['devices'], history: ['history', 'snapshots'],
+    edit: ['assets'], empty: ['assets'], assets: ['assets', 'assetsOther', 'takes', 'library'], boot: ['caps'], unsupported: ['caps'], home: ['library'], library: ['library'], 'project-menu': ['library'], record: ['devices'], history: ['history', 'snapshots'],
     mix: ['loudness', 'problems'], meters: ['loudness', 'problems'], 'fx-eq': ['presets'], 'fx-clean': ['problems'], fxp: ['presets'], rooms: ['styles'], aitools: ['ai'], magic: ['ai'],
-    analysis: ['tempokey'], master: ['loudness'], tts: ['voices', 'aeng'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
+    analysis: ['tempokey'], master: ['loudness'], tts: ['voices', 'aeng', 'ctags', 'takes', 'library'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
     macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai', 'aeng'], 'smart-get': ['aeng'], 'smart-cloud': ['aeng'], 'smart-key': ['aeng'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
     live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'], 'live-cable': ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
-    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai', 'aeng', 'trans', 'tfill', 'project'], fillers: ['ai', 'aeng', 'trans', 'tfill'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags', 'csettings'], 'clone-get': ['cstatus'], 'stems-setup': ['ai', 'aeng'], 'prefs-privacy': [],
+    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai', 'aeng', 'trans', 'tfill', 'project'], fillers: ['ai', 'aeng', 'trans', 'tfill'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags', 'csettings', 'takes', 'library'], 'clone-get': ['cstatus'], 'stems-setup': ['ai', 'aeng'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
   const ENTER = {
@@ -222,7 +222,7 @@
     /* home and library */
     import: async el => { const fs = await F.pickFiles({ multiple: true, kind: 'audio' }); if (fs && fs.length) importFiles(fs, ds(el).then); },
     'import-package': async () => { const fs = await F.pickFiles({ multiple: false, kind: 'flux' }); if (fs && fs[0]) { await act('project.import_package', { path: fs[0] }); F.stale('library'); render('edit'); } },
-    'open-project': async el => { await act('project.open', { id: ds(el).id }); D.sel = { clip: null, track: null, fx: null, target: null }; resetProjectUi(); F.stale('library'); render('edit'); },
+    'open-project': async el => { await act('project.open', { id: ds(el).id }); D.sel = { clip: null, track: null, fx: null, target: null }; resetProjectUi(); D.ui.assetsProject = null; F.stale('library', 'assetsOther'); render('edit'); },
     'project-menu': el => { D.ui.menu = ds(el).id; render('project-menu'); },
     'project-dup': async el => { await act('project.duplicate', { id: ds(el).id }, { refresh: false }); F.stale('library'); render('library'); },
     'project-delete': async el => { await act('project.delete', { id: ds(el).id }, { refresh: false }); F.stale('library'); await refresh(['library']); render('library'); },
@@ -333,12 +333,12 @@
     'tempo-detect': async () => { F.stale('tempokey'); await F.need(['tempokey'], true); rr(); },
     'master-style': (el, i) => { D.ui.masterStyle = i; D.ui.masterPlan = null; planMaster(); },
     'master-apply': async el => { const r = await act('tool.master.apply', { style: ds(el).style, target: D.ui.masterTarget || (P() && P().target_lufs) || -14, amount: D.ui.masterAmt == null ? .5 : D.ui.masterAmt }); if (r) { D.ui.mastered = true; D.ui.masterPlan = null; await planMaster(); F.stale('loudness'); await F.need(['loudness'], true); rr(); } },
-    'tts-speak': async () => { const text = (D.ui.ttsText || '').trim(); if (!text || D.ui.ttsJob) return; D.ui.ttsErr = D.ui.ttsMsg = null; const vs = (D.voices && D.voices.voices) || []; if (!P()) await act('project.new', { name: 'Speech', template: 'blank' }); const en = Flux.ttsEngine ? Flux.ttsEngine() : { id: 'system' }; const p = en.id === 'system' ? { text, engine: 'system', voice: D.ui.ttsVoice || (vs[0] && vs[0].id), rate: D.ui.ttsRate || 0, at: pos() } : { text, engine: en.id, at: pos() }; const r = await act('tts.speak', p, { refresh: false }); if (!r || !r.job) return;
+    'tts-speak': async () => { const text = (D.ui.ttsText || '').trim(); if (!text || D.ui.ttsJob) return; D.ui.ttsErr = D.ui.ttsMsg = null; D.ui.ttsTake = null; const vs = (D.voices && D.voices.voices) || []; const en = Flux.ttsEngine ? Flux.ttsEngine() : { id: 'system' }; const p = en.id === 'system' ? { text, engine: 'system', voice: D.ui.ttsVoice || (vs[0] && vs[0].id), rate: D.ui.ttsRate || 0, to: 'take' } : { text, engine: en.id, to: 'take' }; const r = await act('tts.speak', p, { refresh: false }); if (!r || !r.job) return;
       D.ui.ttsMsg = D.ui.ttsErr = null; D.ui.ttsJob = { id: r.job, state: 'running', progress: 0 }; rr();
       let j; for (; ;) { try { j = await call('job.get', { id: r.job, wait_s: .4 }); } catch (e) { D.ui.ttsJob = null; fail(e); return; } if (j.state !== 'running') break; D.ui.ttsJob = j; if (cur === 'tts') Flux.dlPatch('tts', j); }
       D.ui.ttsJob = null;
-      // Finished while looking at something else: stay there, and say so on the page when they come back.
-      if (j.state === 'done') { await refresh(); if (cur === 'tts') render('edit'); else D.ui.ttsMsg = 'Your speech is on the timeline.'; }
+      // Held for listening, on this page or, if they've gone elsewhere, when they come back and in Assets.
+      if (j.state === 'done') { D.ui.ttsTake = j.result.take.id; F.stale('takes'); await F.need(['takes'], true); if (cur === 'tts') rr(); }
       else { if (j.state === 'failed') D.ui.ttsErr = j.error || 'The speech engine stopped.'; if (cur === 'tts') rr(); }
     },
     'tts-cancel': async () => { const j = D.ui.ttsJob; if (j) await act('job.cancel', { id: j.id }, { refresh: false }); },
@@ -523,7 +523,8 @@
     }
     if (e.target.closest('a[href^="#"]')) e.preventDefault();
   });
-  async function togglePlay() { const pl = D.st.playing; D.st.playing = !pl; document.querySelectorAll('[data-play]').forEach(b => { b.innerHTML = ic(!pl ? 'pause' : 'play'); b.setAttribute('aria-label', !pl ? 'Pause' : 'Play'); }); await act(pl ? 'transport.pause' : 'transport.play', {}, { refresh: false }); poll(true); }
+  Flux.pauseProject = () => { if (D.st.playing) togglePlay(); };
+  async function togglePlay() { const pl = D.st.playing; if (!pl && Flux.stopPreview) Flux.stopPreview(); D.st.playing = !pl; document.querySelectorAll('[data-play]').forEach(b => { b.innerHTML = ic(!pl ? 'pause' : 'play'); b.setAttribute('aria-label', !pl ? 'Pause' : 'Play'); }); await act(pl ? 'transport.pause' : 'transport.play', {}, { refresh: false }); poll(true); }
 
   /* inputs */
   const num = (el, v) => el.dataset.num ? +v : el.dataset.bool ? v === '1' : v;

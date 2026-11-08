@@ -121,7 +121,7 @@
       <div class="row">${btn('Check script', { x: 'data-cact="check"' + tip('Shows the words, hesitations, sounds and pauses in order, as the voice will perform them.') })}
         ${btn('Speak in this voice', { k: 'p', i: 'play', x: `data-cact="speak"${canSpeak && !run ? '' : ' disabled'}` + tip(sp ? `Speaks the script in the selected voice with ${sp.name}, labelled synthetic.` : 'Download a speech model first.') })}
         ${btn('Turn my recording into this voice', { i: 'swap', x: `data-cact="convert"${canConvert && !run ? '' : ' disabled'}` + tip(cv && cv.installed ? 'Record yourself saying it, with your own laughs and pauses, and Flux re-voices it, keeping your timing.' : 'Download the voice converter first.') })}</div>
-      ${u.err ? cal('warn', esc(u.err), 'warn') : ''}${u.msg ? cal('check', esc(u.msg)) : ''}
+      ${u.err ? cal('warn', esc(u.err), 'warn') : ''}${u.msg ? cal('check', esc(u.msg)) : ''}${Flux.takeCardFor(u.take)}
     </div>`;
   }
   reg('clone', 'AI', 'Voice cloning', () => wiz(0, 0, `<h1 class="h1">Clone a voice, with consent.</h1>
@@ -147,7 +147,7 @@
       `${btn('Cancel', { k: 'g', go: 'clone' })}${btn('Download', { k: 'p', i: 'down', x: 'data-cact="dl-go"' + (g.text ? '' : ' disabled') })}`);
   });
 
-  async function reload() { F.stale('cprofiles', 'cstatus', 'csettings'); await F.need(['cprofiles', 'cstatus', 'csettings'], true); Flux.rr(); }
+  async function reload() { F.stale('cprofiles', 'cstatus', 'csettings', 'takes'); await F.need(['cprofiles', 'cstatus', 'csettings', 'takes'], true); Flux.rr(); }
   async function watch(id, key, onDone) {
     const u = U();
     let shown = false;
@@ -196,8 +196,8 @@
     del: async el => { if (!confirm('Delete this voice and its recordings? This can\'t be undone.')) return; try { await call('clone.profile.delete', { id: el.dataset.id }); if (U().voice === el.dataset.id) U().voice = null; } catch (e) { U().err = e.message; } reload(); },
     tag: el => { const ta = document.querySelector('[data-cin="script"]'), t = '[' + el.dataset.t + ']'; const u = U(), at = ta ? ta.selectionStart : u.script.length; u.script = u.script.slice(0, at) + (at && u.script[at - 1] !== ' ' ? ' ' : '') + t + ' ' + u.script.slice(at); u.parts = null; Flux.rr(); },
     check: async () => { const u = U(); u.err = u.msg = null; try { const r = await call('clone.script', { text: u.script }); u.parts = r.parts; u.sum = `${r.sounds} sound${r.sounds === 1 ? '' : 's'} · ${r.hesitations} hesitation${r.hesitations === 1 ? '' : 's'} · ${F.num(r.silence_ms / 1000, 1)} s of pauses · ${r.segments.length} piece${r.segments.length === 1 ? '' : 's'}`; } catch (e) { u.parts = null; u.err = e.message; } Flux.rr(); },
-    speak: async () => { const u = U(); u.err = u.msg = null; try { const r = await call('clone.speak', { voice: u.voice, text: u.script }); watch(r.job, null, res => { u.msg = `Done: ${F.num(res.seconds, 1)} s${res.clip != null ? ' on the Generated speech track' : ', saved to ' + base(res.path)}. Labelled synthetic.${res.sounds_left_out ? ` ${res.sounds_left_out} sound${res.sounds_left_out === 1 ? '' : 's'} left out.` : ''}`; }); } catch (e) { u.err = e.message; } Flux.rr(); },
-    convert: async () => { const u = U(); u.err = u.msg = null; const fs = await F.pickFiles({ multiple: false, kind: 'audio' }); if (!fs || !fs[0]) return; try { const r = await call('clone.convert', { voice: u.voice, path: fs[0] }); watch(r.job, null, res => { u.msg = `Done: ${F.num(res.seconds, 1)} s${res.clip != null ? ' on the Generated speech track' : ', saved to ' + base(res.path)}. Labelled synthetic.`; }); } catch (e) { u.err = e.message; } Flux.rr(); },
+    speak: async () => { const u = U(); u.err = u.msg = null; try { const r = await call('clone.speak', { voice: u.voice, text: u.script, to: 'take' }); u.take = null; watch(r.job, null, res => { u.take = res.take.id; }); } catch (e) { u.err = e.message; } Flux.rr(); },
+    convert: async () => { const u = U(); u.err = u.msg = null; const fs = await F.pickFiles({ multiple: false, kind: 'audio' }); if (!fs || !fs[0]) return; try { const r = await call('clone.convert', { voice: u.voice, path: fs[0], to: 'take' }); u.take = null; watch(r.job, null, res => { u.take = res.take.id; }); } catch (e) { u.err = e.message; } Flux.rr(); },
   };
   document.addEventListener('click', e => {
     if (e.button) return;

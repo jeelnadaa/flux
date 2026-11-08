@@ -183,7 +183,7 @@ fn engine_json(api: &Api, c: &Catalog, root: &Path, m: &ModelSpec, h: &Hardware)
     let st = vm::model_state(root, c, m);
     let (fit, why) = vm::fits(m, h);
     json!({
-        "id": m.id, "kind": "local", "name": m.name, "tier": m.tier, "licence": m.licence, "note": m.note,
+        "id": m.id, "kind": "local", "name": m.name, "tier": m.tier, "licence": m.licence, "note": m.note, "sounds": m.sounds,
         "size": st.bytes_total, "size_text": vm::gb(st.bytes_total), "have": st.bytes_have, "partial": st.partial,
         "installed": st.installed, "packages": st.packages, "fits": fit, "fits_why": why, "runs": "This computer",
         "voices": m.voices, "languages": m.languages, "language_names": m.language_names, "params": m.params,
@@ -471,22 +471,18 @@ pub fn speak(
         _ => m.voices.first().map(|v| v.id.clone()),
     };
     // Chatterbox reads about a sentence or two at a time well; Kokoro splits long text itself.
-    let segs: Vec<Value> = if m.loader == "kokoro" {
-        vec![json!({"type": "text", "value": text})]
-    } else {
-        sentences(text, 280)
-            .into_iter()
-            .map(|s| json!({"type": "text", "value": s}))
-            .collect()
-    };
-    run(
+    let max = (m.loader != "kokoro").then_some(280);
+    let (segs, left_out) = crate::voiceclone::model_segments(text, m.sounds, max)?;
+    let mut res = run(
         api,
         "tts",
         id,
         "tts",
         json!({"out": out, "voice": voice, "segments": segs}),
         ctx,
-    )
+    )?;
+    res["sounds_left_out"] = json!(left_out);
+    Ok(res)
 }
 
 /// Text in pieces of at most about `max` characters, split at sentence ends.

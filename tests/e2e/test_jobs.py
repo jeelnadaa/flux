@@ -96,7 +96,7 @@ def run(port, tmp):
         page.wait_for_selector('[data-dl="tts"] [role="log"]:has-text("Loading the model")', timeout=4000)
         page.screenshot(path=str(OUT / "tts-progress-1440.png"))
         assert page.evaluate("window.__re") == 0, "the page redrew while speech was being made"
-        ok("Add to timeline shows the row straight away, what the engine is doing, and a log, without redrawing")
+        ok("Generate shows the row straight away, what the engine is doing, and a log, without redrawing")
 
         # ---------- the Jobs page is steady and current ----------
         page.click('[data-dl="tts"] [data-act="dl-log"]')

@@ -75,6 +75,8 @@ window.FD = (function () {
     aeng: () => call('ai.engines'), trans: async () => { try { return await call('transcript.get'); } catch (e) { return null; } }, tfill: async () => { try { return await call('transcript.fillers'); } catch (e) { return null; } }, cstatus: () => call('clone.status'), cprofiles: () => call('clone.profiles'), ctags: () => call('clone.tags'), csettings: () => call('clone.settings.get'),
     lkinds: () => call('live.kinds'), lpresets: () => call('live.presets'), lstatus: () => call('live.status'), ldevices: () => call('live.devices'),
     lpreset: () => D.ui.live && D.ui.live.sel ? call('live.preset.get', { id: D.ui.live.sel }) : Promise.resolve(null),
+    takes: () => call('take.list'), assets: () => call('asset.list'),
+    assetsOther: async () => { let id = D.ui.assetsProject; if (!id && !D.project) { const l = D.library || await call('library.list', {}); id = l.projects[0] && l.projects[0].id; } return id ? call('asset.list', { project: id }) : null; },
     mcp: () => call('mcp.info'), recovery: () => call('recovery.list'), diag: () => call('system.diagnostics'),
     loudness: () => call('analysis.loudness'), tempokey: () => call('analysis.tempo_key'), problems: () => call('analysis.problems'),
   };
@@ -84,7 +86,7 @@ window.FD = (function () {
     await Promise.all(todo.map(async k => { try { D[k] = await LOAD[k](); ok[k] = 1; } catch (e) { D[k] = null; D.err = D.err || {}; D.err[k] = e; } }));
   }
   function stale(...keys) { keys.forEach(k => delete ok[k]); }
-  const PROJECT_KEYS = ['project', 'history', 'loudness', 'tempokey', 'problems'];
+  const PROJECT_KEYS = ['project', 'history', 'loudness', 'tempokey', 'problems', 'assets'];
 
   /* ---- cached drawing data ---- */
   const pk = new Map(), sg = new Map();

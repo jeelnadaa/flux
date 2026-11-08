@@ -846,7 +846,7 @@ fn h_library(api: &Api, v: &Value) -> Result<Value> {
     )
 }
 
-fn template(p: &mut Project, t: &str) {
+pub(crate) fn template(p: &mut Project, t: &str) {
     let add = |p: &mut Project, name: &str, color: u8, gain: f32| {
         let id = p.add_track(name);
         let t = p.track_mut(id).unwrap();
@@ -3078,7 +3078,42 @@ fn h_tts_speak(api: &Api, v: &Value) -> Result<Value> {
     if engine != "system" {
         return tts_model(api, v, &engine, text, voice);
     }
+    let (said, left_out) = crate::voiceclone::plain_script(&text)?;
     let rate = v.get("rate").and_then(|x| x.as_i64()).unwrap_or(0) as i32;
+    let out = speech_out(api, v)?;
+    let a = api.clone();
+    let job = api.jobs.spawn(
+        "tts",
+        "Generating speech",
+        &["Synthesizing", out.next()],
+        move |ctx| {
+            ctx.stage("Synthesizing", "active");
+            tools::speak(&said, &voice, rate, &out.path)?;
+            ctx.stage("Synthesizing", "done");
+            ctx.stage(out.next(), "active");
+            let short: String = text.chars().take(40).collect();
+            out.finish(&a, &short, &voice, left_out)
+        },
+    );
+    Ok(json!({"job": job}))
+}
+
+/// Where a text to speech result goes: held to be listened to, or straight onto the open project's timeline.
+struct SpeechOut {
+    place: Option<(String, u32, Option<i64>)>,
+    id: String,
+    path: PathBuf,
+}
+
+fn speech_out(api: &Api, v: &Value) -> Result<SpeechOut> {
+    if crate::assets::wants_take(v)? {
+        let (id, path) = crate::assets::new_take(api)?;
+        return Ok(SpeechOut {
+            place: None,
+            id,
+            path,
+        });
+    }
     let sr = sr(api);
     let at = opos(v, "at", sr);
     let (pid, dir) = {
@@ -3086,34 +3121,53 @@ fn h_tts_speak(api: &Api, v: &Value) -> Result<Value> {
         let p = s.project()?;
         (p.id.clone(), s.store.media_dir(&p.id))
     };
-    let a = api.clone();
-    let job = api.jobs.spawn(
-        "tts",
-        "Generating speech",
-        &["Synthesizing", "Adding to project"],
-        move |ctx| {
-            ctx.stage("Synthesizing", "active");
-            let id = format!("m{}", new_id());
-            let path = dir.join(format!("{id}.wav"));
-            tools::speak(&text, &voice, rate, &path)?;
-            ctx.stage("Synthesizing", "done");
-            ctx.stage("Adding to project", "active");
-            let short: String = text.chars().take(40).collect();
-            add_generated(
-                &a,
-                Place {
-                    project: &pid,
-                    sr,
-                    at,
+    std::fs::create_dir_all(&dir)?;
+    let id = format!("m{}", new_id());
+    let path = dir.join(format!("{id}.wav"));
+    Ok(SpeechOut {
+        place: Some((pid, sr, at)),
+        id,
+        path,
+    })
+}
+
+impl SpeechOut {
+    fn next(&self) -> &'static str {
+        if self.place.is_some() {
+            "Adding to project"
+        } else {
+            "Saving"
+        }
+    }
+    fn finish(&self, a: &Api, short: &str, voice: &str, left_out: usize) -> Result<Value> {
+        let Some((pid, sr, at)) = &self.place else {
+            return crate::assets::finish(
+                a,
+                crate::assets::NewTake {
+                    id: &self.id,
+                    path: &self.path,
+                    short,
+                    kind: "speech",
+                    voice,
+                    sounds_left_out: left_out,
                 },
-                &id,
-                &path,
-                &short,
-                &voice,
-            )
-        },
-    );
-    Ok(json!({"job": job}))
+            );
+        };
+        let mut out = add_generated(
+            a,
+            Place {
+                project: pid,
+                sr: *sr,
+                at: *at,
+            },
+            &self.id,
+            &self.path,
+            short,
+            voice,
+        )?;
+        out["sounds_left_out"] = json!(left_out);
+        Ok(out)
+    }
 }
 
 fn tts_model(api: &Api, v: &Value, engine: &str, text: String, voice: String) -> Result<Value> {
@@ -3123,53 +3177,39 @@ fn tts_model(api: &Api, v: &Value, engine: &str, text: String, voice: String) ->
         Some(e) => e.name.to_string(),
         None => crate::smart::ready(api, "tts", engine)?.model.name.clone(),
     };
+    // An online engine gets plain words; a script it can't read is refused before anything is sent.
+    let plain = crate::voiceclone::plain_script(&text)?;
     let speed = v["speed"].as_f64().unwrap_or(1.0).clamp(0.5, 2.0) as f32;
-    let sr = sr(api);
-    let at = opos(v, "at", sr);
-    let (pid, dir) = {
-        let s = api.lock();
-        let p = s.project()?;
-        (p.id.clone(), s.store.media_dir(&p.id))
-    };
+    let out = speech_out(api, v)?;
     let a = api.clone();
     let engine = engine.to_string();
     let job = api.jobs.spawn(
         "tts",
         "Generating speech",
-        &["Synthesizing", "Adding to project"],
+        &["Synthesizing", out.next()],
         move |ctx| {
             ctx.stage("Synthesizing", "active");
-            std::fs::create_dir_all(&dir)?;
-            let id = format!("m{}", new_id());
-            let path = dir.join(format!("{id}.wav"));
+            let path = &out.path;
             let voice = (!voice.is_empty()).then_some(voice.as_str());
-            let res = if cloud {
-                crate::cloud::speak(&a, &engine, &text, voice, speed, &path, ctx)?
+            let (res, left_out) = if cloud {
+                let r = crate::cloud::speak(&a, &engine, &plain.0, voice, speed, path, ctx)?;
+                (r, plain.1)
             } else {
-                crate::smart::speak(&a, &engine, &text, voice, &path, ctx)?
+                let r = crate::smart::speak(&a, &engine, &text, voice, path, ctx)?;
+                let n = r["sounds_left_out"].as_u64().unwrap_or(0) as usize;
+                (r, n)
             };
             crate::voicemodels::label_wav(
-                &path,
+                path,
                 &format!("Synthetic speech made by Flux with {name}. Not a real person."),
             )?;
             ctx.stage("Synthesizing", "done");
-            ctx.stage("Adding to project", "active");
+            ctx.stage(out.next(), "active");
             let short: String = text.chars().take(40).collect();
-            let mut out = add_generated(
-                &a,
-                Place {
-                    project: &pid,
-                    sr,
-                    at,
-                },
-                &id,
-                &path,
-                &short,
-                &name,
-            )?;
-            out["engine"] = json!(engine);
-            out["seconds"] = res["seconds"].clone();
-            Ok(out)
+            let mut r = out.finish(&a, &short, &name, left_out)?;
+            r["engine"] = json!(engine);
+            r["seconds"] = res["seconds"].clone();
+            Ok(r)
         },
     );
     Ok(json!({"job": job}))
@@ -4008,6 +4048,15 @@ pub static METHODS: &[MethodSpec] = &[
     m!("history.redo", "Redo the last undone change.", "", true, h_redo),
     m!("history.goto", "Undo or redo until the history is at `index`.", "!index:integer:Position from history.list", true, h_history_goto),
     m!("media.import", "Add an audio or video file. Creates a project if none is open. Runs as a job.", "!path:string:File path|track:integer:Track to put it on|at:pos:Timeline position|new_track:boolean:Put it on a new track (default true)|wait:boolean:Wait until it is ready", true, h_media_import),
+    m!("asset.list", "A project's assets: every audio file in it, on the timeline or not, and how many times each is used.", "project:string:Project id (default: the open one)", false, crate::assets::h_asset_list),
+    m!("asset.add", "Add an audio file to a project's assets without touching the timeline. Works on a project that isn't open. Job.", "!path:string:File path|project:string:Project id (default: the open one)|wait:boolean:Wait until it is ready", true, crate::assets::h_asset_add),
+    m!("asset.place", "Put one of the open project's assets on the timeline.", "!media:string:Asset id from asset.list|track:integer:Track to put it on|at:pos:Timeline position (default: the playhead)", true, crate::assets::h_asset_place),
+    m!("asset.remove", "Take an asset out of the open project. Undoable. An asset still on the timeline stays.", "!media:string:Asset id", true, crate::assets::h_asset_remove),
+    m!("take.list", "Generated audio held to be listened to (tts.speak, clone.speak or clone.convert with to: take), newest first, and which projects it's saved in.", "", false, crate::assets::h_take_list),
+    m!("take.save", "Save generated audio into a project's assets, leaving the timeline alone: the open project, another one that stays closed, or a new one.", "!id:string:Take id|project:string:Project id (default: the open one)|new_project:string:Make a new project with this name instead", true, crate::assets::h_take_save),
+    m!("take.delete", "Throw away held generated audio. Copies already saved in projects stay.", "!id:string:Take id", false, crate::assets::h_take_delete),
+    m!("audio.preview", "Prepare a take or an asset for listening. Read the result with audio.preview_read.", "take:string:Take id|media:string:Asset id|project:string:Project of the asset (default: the open one)", false, crate::assets::h_preview),
+    m!("audio.preview_read", "Part of a prepared preview, as base64 WAV bytes, up to 4 MB at a time.", "!token:string:From audio.preview|at:integer:Byte offset", false, crate::assets::h_preview_read),
     m!("media.list", "Media files used by the project.", "", false, h_media_list),
     m!("media.peaks", "Waveform peaks (min/max pairs per channel) for drawing.", "!media:string:Media id|start:integer:First sample|end:integer:Last sample|bins:integer:Number of columns|reverse:boolean:Reversed", false, h_media_peaks),
     m!("media.relink", "Point missing media at a file on disk.", "!id:string:Media id|!path:string:File path", true, h_media_relink),
@@ -4081,7 +4130,7 @@ pub static METHODS: &[MethodSpec] = &[
     m!("tool.match_eq", "Copy the tone of a reference recording with a graphic EQ.", "!path:string:Reference file|track:integer:Apply to this track (default master)", true, h_match_eq),
     m!("tool.reverse_swell", "Add a reverse reverb swell that rises into a clip.", "!clip:integer:Clip id|beats:number:Swell length in beats", true, h_reverse_swell),
     m!("tts.voices", "Speech voices installed on this computer.", "", false, h_tts_voices),
-    m!("tts.speak", "Generate speech onto a new track, labelled synthetic, with the chosen text to speech engine (ai.engines): a system voice, a downloaded model or an online engine. Job.", "!text:string:What to say|voice:string:A system voice id from tts.voices, or a model voice from ai.engines|rate:integer:-10 slow to 10 fast (system voices)|engine:string:Engine id from ai.engines (default: the chosen one)|speed:number:0.5 to 2 (online engines)|at:pos:Timeline position", true, h_tts_speak),
+    m!("tts.speak", "Generate speech onto a new track, labelled synthetic, with the chosen text to speech engine (ai.engines): a system voice, a downloaded model or an online engine. Job.", "!text:string:What to say|voice:string:A system voice id from tts.voices, or a model voice from ai.engines|rate:integer:-10 slow to 10 fast (system voices)|engine:string:Engine id from ai.engines (default: the chosen one)|speed:number:0.5 to 2 (online engines)|at:pos:Timeline position|to:string:take holds the result to be listened to, with no project needed (see take.list); timeline (default) puts it on the open project", true, h_tts_speak),
     m!("transcript.make", "Transcribe the project (or one track) on this computer with the chosen transcript model: words with exact sample positions, saved with the project. Job.", "track:integer:Only this track|engine:string:Model id from ai.engines|language:string:Language code, or auto", true, h_transcript_make),
     m!("transcript.get", "The project's transcript: text, segments and every word with its sample position, the model that made it, and whether the project changed since (stale).", "", false, h_transcript_get),
     m!("transcript.fillers", "Filler words (um, uh, ...) and repeated words in the transcript, with sample positions.", "", false, h_transcript_fillers),
@@ -4097,8 +4146,8 @@ pub static METHODS: &[MethodSpec] = &[
     m!("clone.profiles", "Voice profiles made with consent.", "", false, crate::voiceclone::h_profiles),
     m!("clone.profile.create", "Make a voice profile. Needs the owner's consent: their recording reading the consent statement from clone.status, and a 5 to 60 second clip of the voice. Stays on this computer.", "!name:string:Whose voice|owner:string:me or someone-else|consent:boolean:True only if the voice owner agreed|consent_audio:string:Recording of the owner reading the consent statement|!reference:string:5 to 60 second clip of the voice", false, crate::voiceclone::h_profile_create),
     m!("clone.profile.delete", "Delete a voice profile and its recordings.", "!id:string:Voice id", false, crate::voiceclone::h_profile_delete),
-    m!("clone.speak", "Speak a script in a consented voice with the chosen speech model, onto a Generated speech track when a project is open, otherwise into the export folder. Write sounds as [laugh], (sighs), *chuckles* or {cough}; hesitations as [hmm], [um], [uh] or plain words; pauses as [pause] or [pause 2s]. Models that can't perform sounds leave them out and say how many. Output is labelled synthetic. Job.", "!voice:string:Voice id|!text:string:The script|model:string:Speech model id (default: the chosen one)|at:pos:Timeline position|wait:boolean:Wait for it to finish", false, crate::voiceclone::h_speak),
-    m!("clone.convert", "Turn your own spoken recording into a consented cloned voice, keeping its timing, laughs and hesitations exactly, with the chosen conversion model. Output is labelled synthetic. Job.", "!voice:string:Voice id|!path:string:Your recording|model:string:Conversion model id (default: the chosen one)|at:pos:Timeline position|wait:boolean:Wait for it to finish", false, crate::voiceclone::h_convert),
+    m!("clone.speak", "Speak a script in a consented voice with the chosen speech model, onto a Generated speech track when a project is open, otherwise into the export folder. Write sounds as [laugh], (sighs), *chuckles* or {cough}; hesitations as [hmm], [um], [uh] or plain words; pauses as [pause] or [pause 2s]. Models that can't perform sounds leave them out and say how many. Output is labelled synthetic. Job.", "!voice:string:Voice id|!text:string:The script|model:string:Speech model id (default: the chosen one)|at:pos:Timeline position|wait:boolean:Wait for it to finish|to:string:take holds the result to be listened to, with no project needed (see take.list)", false, crate::voiceclone::h_speak),
+    m!("clone.convert", "Turn your own spoken recording into a consented cloned voice, keeping its timing, laughs and hesitations exactly, with the chosen conversion model. Output is labelled synthetic. Job.", "!voice:string:Voice id|!path:string:Your recording|model:string:Conversion model id (default: the chosen one)|at:pos:Timeline position|wait:boolean:Wait for it to finish|to:string:take holds the result to be listened to, with no project needed (see take.list)", false, crate::voiceclone::h_convert),
     m!("clone.tags", "The placeholders a cloning script can use: sounds the voice performs ([laugh], [sigh], [cough] and more), hesitations it says ([hmm], [um], [uh]) and pauses ([pause], [pause 2s]), with the other ways to write them and an example.", "", false, crate::voiceclone::h_tags),
     m!("clone.script", "Check a cloning script without speaking it: the words, hesitations, sounds and pauses in order, the text the model reads, and the pieces and silences it will be generated as.", "!text:string:The script", false, crate::voiceclone::h_script),
     m!("export.formats", "Export formats and whether each is available on this computer.", "", false, h_export_formats),

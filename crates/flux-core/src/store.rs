@@ -239,6 +239,13 @@ impl Store {
     pub fn media_dir(&self, id: &str) -> PathBuf {
         self.project_dir(id).join("media")
     }
+    /// Generated audio that isn't in a project yet.
+    pub fn takes_dir(&self) -> PathBuf {
+        self.root.join("Generated")
+    }
+    pub fn preview_dir(&self) -> PathBuf {
+        self.root.join("Cache").join("preview")
+    }
 
     pub fn settings(&self) -> Settings {
         std::fs::read(self.root.join("settings.json"))
@@ -310,7 +317,7 @@ impl Store {
         let _ = std::fs::remove_file(self.project_dir(id).join(".lock"));
     }
     /// (locked by a live process, locked by a dead process = crashed)
-    fn lock_state(&self, id: &str) -> (bool, bool) {
+    pub(crate) fn lock_state(&self, id: &str) -> (bool, bool) {
         match std::fs::read_to_string(self.project_dir(id).join(".lock"))
             .ok()
             .and_then(|s| s.trim().parse::<u32>().ok())

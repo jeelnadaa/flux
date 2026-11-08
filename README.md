@@ -66,6 +66,9 @@ AI agents can drive every feature.
   GitHub release in the visitor's browser and offers the right installer for their computer. `npm run build:static`
   writes `dist-static/` for Cloudflare Pages, with a content security policy.
 
+- **Listen first, then keep it.** Generate speech with or without a project open. The result waits for you with a player: add it to the assets of the open project, another project (which stays closed) or a new one, or throw it away. Nothing lands on a timeline until you put it there.
+- **Assets.** Every project keeps its audio, on the timeline or not. Add files, listen, put them on the timeline at the playhead or remove them, from the Assets page or the Edit panel. All of it can be undone.
+- **Tags in any script.** [laugh], [hmm] and [pause 2s] work in Text to speech as well as voice cloning. An engine that can't perform a sound leaves it out and says so; it's never read aloud.
 - **You can see work happening.** Pages stay still while a job runs and only the moving parts change. Generating speech shows what the engine is doing, how long it's taken, a log and Cancel. The Jobs page keeps itself current, and a failure is always said out loud.
 - **Smart tools: pick the model.** Stems, transcripts and text to speech each have a built-in or light engine
   and downloadable models, and Flux suggests one for this computer (graphics chip, memory, cores) with the reason.

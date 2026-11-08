@@ -21,7 +21,7 @@ def flux_stub_run(req, say):
         raise FileNotFoundError(f"missing voice {voice}")
     speed = float((req.get("params") or {}).get("speed", 1.0))
     text = " ".join(s["value"] for s in req["segments"] if s["type"] == "text")
-    _wav.log({"tts": "kokoro", "voice": voice, "speed": speed, "chars": len(text)})
+    _wav.log({"tts": "kokoro", "voice": voice, "speed": speed, "chars": len(text), "segments": req["segments"]})
     # For testing a run that takes a while, and one that fails.
     say("STATUS", "Loading the model")
     say("PROGRESS", 0.15)
@@ -30,7 +30,7 @@ def flux_stub_run(req, say):
     if "fail-this-run" in text:
         raise RuntimeError("the stub was told to fail")
     sr = 24000
-    n = int(sr * 0.05 * len(text) / speed)
+    n = int(sr * 0.05 * len(text) / speed) + sum(int(sr * int(s["value"]) / 1000) for s in req["segments"] if s["type"] == "silence")
     with wave.open(req["out"], "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)

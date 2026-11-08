@@ -141,3 +141,13 @@ button reads Generating… and is disabled. A failure is a `callout bad` in the 
 the ghost Show log button before Cancel and the current step in its dim line. **Busy.** A button or chip waiting on its
 work takes `aria-busy` (55% opacity, progress cursor). A page taking over 200 ms to measure shows a 3 px `--sig` shimmer
 across the top of the window. Checked at 1440, 820 and 390 px (`tests/e2e/test_jobs.py`).
+
+## Work in progress: Assets and listening first
+
+**Assets** (rail item in both rails, between the first two groups; box icon drawn at the rail's 24 px and stroke) copies `pg`/`pr` with
+`pgh`. Section Generated holds **take cards**: a `box col` with a `lst` title row and Synthetic pill, the **player**, then a row of
+`select.inp` (project), primary Add to assets, ghost danger Discard. Section In a project is a project `select`, Add a file, and a `lst box`
+of asset rows: ghost icon Listen, title and dim line, Add to timeline, ghost icon trash. The same rows appear in the Edit panel (six, newest
+first) and the empty project page. **Player**: Listen button, `.plbar` (a `.prog` bar in a 24 px hit area, `role=slider`, arrows move 5 s),
+mono time. The take card follows Text to speech and the clone Script box. Text to speech has the clone page's tag chips, copied.
+Checked at 1440, 820 and 390 px (`tests/e2e/test_assets.py`).
