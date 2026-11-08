@@ -278,6 +278,33 @@ def main():
             page.screenshot(path=str(OUT / "tts-engine-1440.png"))
             ok("stems tiles and the speech engine picker follow the installed engines")
 
+            # A computer with no speech voices: the picker still names the engine, and the page says what's missing.
+            def no_voices(route):
+                m = json.loads(route.request.post_data or "{}").get("method")
+                if m not in ("ai.engines", "tts.voices"):
+                    route.continue_()
+                    return
+                r = route.fetch()
+                d = r.json()
+                if m == "tts.voices":
+                    d["result"]["voices"] = []
+                else:
+                    tts = next(x for x in d["result"]["roles"] if x["role"] == "tts")
+                    tts["engines"] = [dict(e, installed=False) for e in tts["engines"]]
+                route.fulfill(response=r, json=d)
+
+            page.route("**/api/call", no_voices)
+            page.goto("about:blank")
+            page.goto(f"http://127.0.0.1:{port}/#tts")
+            page.wait_for_selector('text=No speech voices were found')
+            none = page.locator('[data-act-change="tts-engine"] option').all_inner_texts()
+            assert none == ["This computer's voices"], none
+            page.unroute("**/api/call", no_voices)
+            page.goto("about:blank")
+            page.goto(f"http://127.0.0.1:{port}/#tts")
+            page.wait_for_selector('[data-act-change="tts-engine"]')
+            ok("with no speech voices, the picker names the engine and the page says what's missing")
+
             # 8. Every width: no sideways scroll; every control has a name and a tooltip.
             for w, h in [(1440, 900), (820, 1100), (390, 844)]:
                 page.set_viewport_size({"width": w, "height": h})

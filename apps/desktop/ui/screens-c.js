@@ -115,7 +115,9 @@
     const en = ttsEngine(), sys = en.id === 'system', vs = sys ? ((D.voices && D.voices.voices) || []) : (en.voices || []).map(v => ({ id: v.id, name: v.name, engine: en.name }));
     const text = D.ui.ttsText == null ? '' : D.ui.ttsText, rate = D.ui.ttsRate || 0;
     const saved = (ttsRole().options || {}).voice, cur = sys ? (D.ui.ttsVoice || (vs[0] && vs[0].id)) : (vs.some(v => v.id === saved) ? saved : vs[0] && vs[0].id);
-    const usable = ttsRole().engines.filter(e => e.kind === 'cloud' ? e.allowed && e.installed : e.installed);
+    const installed = ttsRole().engines.filter(e => e.kind === 'cloud' ? e.allowed && e.installed : e.installed);
+    // The picker always names the engine in use, even on a computer with no voices and nothing else to choose.
+    const usable = installed.some(e => e.id === en.id) ? installed : [en, ...installed];
     const ready = sys ? vs.length : true;
     const where = en.kind === 'cloud' ? cal('globe', `<b>Runs online with ${esc(en.provider_name || en.name)}.</b> ${esc(en.sends || '')}`, 'warn') : '';
     return pr('aitools', `<div class="split"><div class="a"><div class="pg in" style="max-width:none"><h1 class="h1">Write it. Hear it.</h1>
