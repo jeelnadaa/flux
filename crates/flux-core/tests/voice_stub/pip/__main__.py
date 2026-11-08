@@ -14,5 +14,9 @@ for a in sys.argv[1:]:
 if os.environ.get("FLUX_STUB_PIP_FAIL"):
     print("ERROR: No matching distribution found", file=sys.stderr)
     sys.exit(1)
-time.sleep(float(os.environ.get("FLUX_STUB_PIP_SLEEP", "0")))
+pause = float(os.environ.get("FLUX_STUB_PIP_SLEEP", "0"))
+print("Downloading stub_package-1.0-py3-none-any.whl (120.0 MB)", flush=True)
+for part in range(1, 5):
+    print(f"Progress {part * 30_000_000} of 120000000", flush=True)
+    time.sleep(pause / 4)
 print("Successfully installed (stub)")

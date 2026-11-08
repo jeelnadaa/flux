@@ -21,8 +21,7 @@
 
   function busyRow(id) {
     const j = jobOf(id); if (!j) return '';
-    const pc = Math.round((j.progress || 0) * 100);
-    return `<div class="row" style="gap:10px;align-items:center;width:100%"><div style="flex:1;min-width:120px">${prog(pc, true)}</div><span class="mono dim" style="white-space:nowrap">${pc}% · ${esc(j.stage || 'Starting')}</span>${btn('Cancel', { k: 'g', x: `data-cact="dl-cancel" data-id="${esc(id)}"` + tip('Stops the download. Press Download again later and it carries on from here.') })}</div>`;
+    return Flux.dlRow(id, j, btn('Cancel', { k: 'g', x: `data-cact="dl-cancel" data-id="${esc(id)}"` + tip('Stops the download. Press Download again later and it carries on from here.') }));
   }
 
   function computer() {
@@ -118,7 +117,7 @@
       ${chips('Pauses', (tgs.pauses || []).map(t => [t.tag, 'Insert [' + t.tag + '] at the cursor: ' + F.num(t.ms / 1000, 1) + ' s of silence.' + (t.note ? ' ' + t.note : '')]))}
       ${parts ? `<p style="margin:0;line-height:1.9" data-cparts>${parts.map(part).join(' ')}</p><p class="mono" style="margin:0;opacity:.7" data-csum>${u.sum}</p>` : ''}
       ${sp && !sp.sounds ? cal('info', `${esc(sp.name)} doesn't perform sounds, so [laugh] and the like are left out. Hesitations and pauses still work.`) : ''}
-      ${run ? `<div class="row" style="gap:10px;align-items:center"><div style="flex:1">${prog(pc, true)}</div><span class="mono dim">${pc}% · ${esc(run.stage || 'Starting')}</span>${btn('Cancel', { k: 'g', x: 'data-cact="run-cancel"' })}</div>` : ''}
+      ${run ? `<div class="row" style="gap:10px;align-items:center" data-dl="run"><div style="flex:1">${prog(pc, true)}</div><span class="mono dim" data-dl-text>${pc}% · ${esc(run.stage || 'Starting')}</span>${btn('Cancel', { k: 'g', x: 'data-cact="run-cancel"' })}</div>` : ''}
       <div class="row">${btn('Check script', { x: 'data-cact="check"' + tip('Shows the words, hesitations, sounds and pauses in order, as the voice will perform them.') })}
         ${btn('Speak in this voice', { k: 'p', i: 'play', x: `data-cact="speak"${canSpeak && !run ? '' : ' disabled'}` + tip(sp ? `Speaks the script in the selected voice with ${sp.name}, labelled synthetic.` : 'Download a speech model first.') })}
         ${btn('Turn my recording into this voice', { i: 'swap', x: `data-cact="convert"${canConvert && !run ? '' : ' disabled'}` + tip(cv && cv.installed ? 'Record yourself saying it, with your own laughs and pauses, and Flux re-voices it, keeping your timing.' : 'Download the voice converter first.') })}</div>
@@ -151,10 +150,12 @@
   async function reload() { F.stale('cprofiles', 'cstatus', 'csettings'); await F.need(['cprofiles', 'cstatus', 'csettings'], true); Flux.rr(); }
   async function watch(id, key, onDone) {
     const u = U();
+    let shown = false;
     for (; ;) {
       let j; try { j = await call('job.get', { id, wait_s: .5 }); } catch (e) { u.err = e.message; break; }
       if (key) u.jobs[key] = j; else u.run = j;
-      Flux.rr();
+      // Draw the row once; after that only its own parts change, on whatever page is open.
+      if (!shown) { shown = true; Flux.rr(); } else Flux.dlPatch(key || 'run', j);
       if (j.state !== 'running') { if (j.state === 'failed') u.err = j.error; else if (j.state === 'done' && onDone) onDone(j.result); break; }
     }
     if (key) delete u.jobs[key];

@@ -3907,6 +3907,12 @@ fn h_job_get(api: &Api, v: &Value) -> Result<Value> {
         j.ok_or_else(|| err("not_found", "no such job"))?,
     )?)
 }
+fn h_job_log(api: &Api, v: &Value) -> Result<Value> {
+    let id = s_(v, "id")?;
+    api.jobs
+        .log_of(&id)
+        .ok_or_else(|| err("not_found", "no such job"))
+}
 fn h_job_cancel(api: &Api, v: &Value) -> Result<Value> {
     let id = s_(v, "id")?;
     Ok(json!({"cancelled": api.jobs.cancel(&id)}))
@@ -4105,6 +4111,7 @@ pub static METHODS: &[MethodSpec] = &[
     m!("action.delete", "Delete an action.", "!id:string:Action id", false, h_action_delete),
     m!("job.list", "Background jobs and their progress.", "", false, h_job_list),
     m!("job.get", "One job; optionally wait for it to finish.", "!id:string:Job id|wait_s:number:Wait up to this many seconds", false, h_job_get),
+    m!("job.log", "What a model download or install has printed so far (the last 400 lines, kept in memory only), and how long it has been quiet.", "!id:string:Job id", false, h_job_log),
     m!("job.cancel", "Cancel a running job.", "!id:string:Job id", false, h_job_cancel),
     m!("job.clear", "Forget finished jobs.", "", false, h_job_clear),
 ];

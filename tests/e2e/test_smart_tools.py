@@ -118,7 +118,7 @@ def main():
     service = "Flux E2E " + uuid.uuid4().hex[:8]
     env = {k: v for k, v in os.environ.items() if k not in KEY_VARS and not (k.startswith("FLUX_") and k.endswith("_KEY"))}
     env.update(FLUX_DATA_DIR=str(tmp / "data"), FLUX_EXPORT_DIR=str(tmp / "export"), FLUX_NULL_AUDIO="1",
-               FLUX_STUB_LOG=str(tmp / "stub.log"), FLUX_STUB_PIP_SLEEP="0", FLUX_KEYRING_SERVICE=service)
+               FLUX_STUB_LOG=str(tmp / "stub.log"), FLUX_STUB_PIP_SLEEP="3", FLUX_KEYRING_SERVICE=service)
     srv = subprocess.Popen([str(EXE), "serve", "--port", str(port), "--ui", str(ROOT / "apps/desktop/ui"), "--no-token"], env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     passed = []
@@ -176,6 +176,39 @@ def main():
             assert not (tmp / "data" / "Models" / "files").exists(), "nothing downloaded before the yes"
             page.click('[data-sact="dl-ask"][data-id="t-whisper"]')
             page.click('[role="dialog"] [data-sact="dl-go"]:not([disabled])')
+
+            # While it runs the page stays still: only the row's own parts change, and the bytes keep moving.
+            page.wait_for_selector('[data-dl="t-whisper"]')
+            page.wait_for_timeout(300)
+            page.evaluate("""() => {
+                window.__dl = { redraws: 0, row: document.querySelector('[data-dl="t-whisper"]') };
+                new MutationObserver(m => { window.__dl.redraws += m.length; }).observe(document.querySelector('#stage'), { childList: true });
+            }""")
+            page.wait_for_selector('[data-dl-text]:has-text(" of ")', timeout=20000)
+            page.wait_for_timeout(1200)
+            still = page.evaluate("({ n: window.__dl.redraws, same: window.__dl.row === document.querySelector('[data-dl=\"t-whisper\"]') })")
+            assert still == {"n": 0, "same": True}, still
+            ok("a running download changes only its own row, and shows the bytes")
+
+            # The log opens from the row and fills while the install runs.
+            page.click('[data-dl="t-whisper"] [data-act="dl-log"]')
+            page.wait_for_selector('[role="log"][aria-label="Install log"]')
+            page.wait_for_selector('[role=log]:has-text("Downloading stub_package")', timeout=20000)
+            assert page.get_attribute('[data-dl="t-whisper"] [data-act="dl-log"]', "aria-expanded") == "true"
+            assert page.evaluate("window.__dl.redraws") == 0, "opening the log doesn't redraw the page"
+            page.locator('[role="log"]').scroll_into_view_if_needed()
+            page.screenshot(path=str(OUT / "smart-download-log-1440.png"))
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.wait_for_timeout(200)
+            over = page.evaluate("(() => { const m = document.querySelector('#m'); return Math.max(document.documentElement.scrollWidth - innerWidth, m.scrollWidth - m.clientWidth); })()")
+            assert over <= 1, over
+            page.locator('[role="log"]').scroll_into_view_if_needed()
+            page.screenshot(path=str(OUT / "smart-download-log-390.png"))
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.click('[data-dl="t-whisper"] [data-act="dl-log"]')
+            page.wait_for_selector('[role=log]', state="detached")
+            ok("Show log opens the live log at every width; Hide log closes it")
+
             page.wait_for_selector('[data-sact="use"][data-id="t-whisper"]', timeout=60000)
             assert "Downloaded and checked." in page.inner_text("#stage")
             ok("download dialog first; Cancel fetches nothing; download installs the model")

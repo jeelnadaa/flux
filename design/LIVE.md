@@ -110,3 +110,10 @@ what was found, a dim line on what it is, a `lst box` of numbered steps (`act mo
 links as `btn` with `globe`, commands in mono with a ghost Copy), and a dim line on one cable and removal. Foot: ghost Done, primary Check
 again. When nothing is installed, the panel shows `pill warn` "Not installed" and each route card a dim line with a
 ghost How to install. **Checked:** 1440, 820 and 390 px for each OS (`virtual-cable-guide-*.png`).
+
+## Download log (a running download's row)
+
+The row on Smart tools and Voice cloning gains **Show log**, a ghost button before Cancel, built with `Flux.btn`. It
+opens a `pre.mono.box` under the row, like the release notes box in the Update ready dialog. Under it a `.dim` line
+appears after 20 s without output. While a job runs only the row's meter and text change; the page isn't redrawn.
+Code: `dlRow`, `dlPatch` and `dlToggle` in `apps/desktop/ui/app-core.js`.

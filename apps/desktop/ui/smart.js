@@ -18,8 +18,7 @@
 
   function busyRow(id) {
     const j = jobOf(id); if (!j) return '';
-    const pc = Math.round((j.progress || 0) * 100);
-    return `<div class="row" style="gap:10px;align-items:center;width:100%"><div style="flex:1;min-width:120px">${prog(pc, true)}</div><span class="mono dim" style="white-space:nowrap">${pc}% · ${esc(j.stage || 'Starting')}</span>${btn('Cancel', { k: 'g', x: `data-sact="dl-cancel" data-id="${esc(id)}"` + tip('Stops the download. Download again later and it carries on from here.') })}</div>`;
+    return Flux.dlRow(id, j, btn('Cancel', { k: 'g', x: `data-sact="dl-cancel" data-id="${esc(id)}"` + tip('Stops the download. Download again later and it carries on from here.') }));
   }
 
   function row(role, e) {
@@ -120,7 +119,7 @@
   const hasAudio = () => !!(D.project && (D.project.length || (D.project.project && D.project.project.length)));
   function makeBar() {
     const e = trEngine(), u = U(), j = u.tjob && u.tjob.state === 'running' ? u.tjob : null;
-    if (j) { const pc = Math.round((j.progress || 0) * 100); return `<div class="row" style="gap:10px;align-items:center"><div style="flex:1">${prog(pc, true)}</div><span class="mono dim">${pc}% · ${esc(j.stage || 'Starting')}</span>${btn('Cancel', { k: 'g', x: 'data-sact="tr-cancel"' + tip('Stops making the transcript.') })}</div>`; }
+    if (j) { const pc = Math.round((j.progress || 0) * 100); return `<div class="row" style="gap:10px;align-items:center" data-dl="transcript"><div style="flex:1">${prog(pc, true)}</div><span class="mono dim" data-dl-text>${pc}% · ${esc(j.stage || 'Starting')}</span>${btn('Cancel', { k: 'g', x: 'data-sact="tr-cancel"' + tip('Stops making the transcript.') })}</div>`; }
     if (!trReady(e)) return cal('info', 'Choose a transcript engine first: download Whisper, or turn on an online one. <a class="act" href="#prefs-models" data-go="prefs-models">Smart tools</a>');
     return `<div class="row">${btn(T() ? 'Update the transcript' : 'Make a transcript', { k: T() ? '' : 'p', i: 'text', x: 'data-sact="tr-make"' + (hasAudio() ? '' : ' disabled') + tip(`Transcribes the project with ${e.name}${e.kind === 'cloud' ? ', online' : ', on this computer'}.`) })}</div>`;
   }
@@ -167,7 +166,7 @@
       const u = U(); u.terr = u.tmsg = null;
       try {
         const r = await call('transcript.make', {}); u.tjob = { id: r.job, state: 'running', progress: 0 }; Flux.rr();
-        for (; ;) { const j = await call('job.get', { id: r.job, wait_s: .5 }); u.tjob = j; Flux.rr(); if (j.state !== 'running') { if (j.state === 'failed') u.terr = j.error; break; } }
+        for (; ;) { const j = await call('job.get', { id: r.job, wait_s: .5 }); u.tjob = j; Flux.dlPatch('transcript', j); if (j.state !== 'running') { if (j.state === 'failed') u.terr = j.error; break; } }
       } catch (e) { u.terr = e.message; }
       u.tjob = null; u.word = null; retrans();
     },
@@ -186,9 +185,12 @@
   async function reload() { F.stale('aeng', 'ai'); await F.need(['aeng', 'ai'], true); Flux.rr(); }
   async function watch(id, key) {
     const u = U();
+    let shown = false;
     for (; ;) {
       let j; try { j = await call('job.get', { id, wait_s: .5 }); } catch (e) { u.err = e.message; break; }
-      u.jobs[key] = j; Flux.rr();
+      u.jobs[key] = j;
+      // Draw the row once; after that only its own parts change, on whatever page is open.
+      if (!shown) { shown = true; Flux.rr(); } else Flux.dlPatch(key, j);
       if (j.state !== 'running') { if (j.state === 'failed') u.err = j.error; else if (j.state === 'done') u.msg = 'Downloaded and checked.'; break; }
     }
     delete u.jobs[key];

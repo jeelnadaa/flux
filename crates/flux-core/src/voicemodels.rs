@@ -563,7 +563,24 @@ fn file_url(c: &Catalog, m: &ModelSpec, f: &FileSpec) -> Result<String> {
 
 // ---------------------------------------------------------------- the runtime
 
-fn run_logged(mut cmd: Command, ctx: &JobCtx, stage: &str) -> Result<String> {
+/// One of pip's `--progress-bar raw` lines: bytes so far and the file's size.
+fn pip_bytes(l: &str) -> Option<(u64, u64)> {
+    let (a, b) = l.strip_prefix("Progress ")?.split_once(" of ")?;
+    Some((a.trim().parse().ok()?, b.trim().parse().ok()?))
+}
+
+/// A download's size is worth showing on the meter only for a big file: small ones finish in a blink.
+const BIG_FILE: u64 = 50_000_000;
+
+/// Run a program and follow what it prints. `show` puts its output in the job's log (installs only: speech and
+/// transcripts never do). `span` is the part of the job's meter a big download moves through.
+fn run_logged(
+    mut cmd: Command,
+    ctx: &JobCtx,
+    stage: &str,
+    show: bool,
+    span: Option<(f32, f32)>,
+) -> Result<String> {
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -579,8 +596,12 @@ fn run_logged(mut cmd: Command, ctx: &JobCtx, stage: &str) -> Result<String> {
     let errs = child.stderr.take().unwrap();
     let tail = std::sync::Arc::new(Mutex::new(Vec::<String>::new()));
     let t2 = tail.clone();
+    let c2 = ctx.clone();
     let eh = std::thread::spawn(move || {
         for l in BufReader::new(errs).lines().map_while(Result::ok) {
+            if show {
+                c2.log(&l);
+            }
             let mut t = t2.lock().unwrap();
             t.push(l);
             if t.len() > 12 {
@@ -605,6 +626,20 @@ fn run_logged(mut cmd: Command, ctx: &JobCtx, stage: &str) -> Result<String> {
         }
         match rx.recv_timeout(std::time::Duration::from_millis(200)) {
             Ok(l) => {
+                if let Some((got, size)) = pip_bytes(&l) {
+                    ctx.detail(&if size > 0 {
+                        format!("{} of {}", gb(got), gb(size))
+                    } else {
+                        format!("{} so far", gb(got))
+                    });
+                    if let (Some((from, to)), true) = (span, size >= BIG_FILE) {
+                        ctx.progress(from + (to - from) * (got as f32 / size as f32).min(1.0));
+                    }
+                    continue;
+                }
+                if show && !l.starts_with("PROGRESS ") {
+                    ctx.log(&l);
+                }
                 if let Some(p) = l.strip_prefix("PROGRESS ") {
                     if let Ok(x) = p.trim().parse::<f32>() {
                         ctx.progress(x);
@@ -657,6 +692,8 @@ fn python_cmd(root: &Path, c: &Catalog) -> Result<Command> {
     let mut cmd = Command::new(exe);
     cmd.env("PYTHONNOUSERSITE", "1")
         .env("PYTHONIOENCODING", "utf-8")
+        // Line by line, so the log and the meter keep up.
+        .env("PYTHONUNBUFFERED", "1")
         .env("HF_HUB_OFFLINE", "1")
         .env("TRANSFORMERS_OFFLINE", "1")
         .env("HF_HUB_DISABLE_TELEMETRY", "1");
@@ -710,7 +747,14 @@ fn write_runner(dir: &Path) -> Result<PathBuf> {
 }
 
 /// One pip install, shown as a stage of the job.
-fn pip_step(root: &Path, c: &Catalog, kind: &str, ctx: &JobCtx, s: &Step) -> Result<()> {
+fn pip_step(
+    root: &Path,
+    c: &Catalog,
+    kind: &str,
+    ctx: &JobCtx,
+    s: &Step,
+    span: Option<(f32, f32)>,
+) -> Result<()> {
     ctx.stage(&s.name, "active");
     let mut cmd = python_cmd(root, c)?;
     cmd.args([
@@ -721,13 +765,15 @@ fn pip_step(root: &Path, c: &Catalog, kind: &str, ctx: &JobCtx, s: &Step) -> Res
         "--no-input",
         "--no-cache-dir",
         "--no-warn-script-location",
+        "--progress-bar",
+        "raw",
     ]);
     cmd.args(&s.args);
     if let Some(ix) = s.index.get(kind) {
         check_url(ix)?;
         cmd.args(["--index-url", ix]);
     }
-    run_logged(cmd, ctx, &s.name)?;
+    run_logged(cmd, ctx, &s.name, true, span)?;
     ctx.stage(&s.name, "done");
     Ok(())
 }
@@ -789,15 +835,23 @@ fn install_runtime(
     let py_end = meter.from + meter.span;
     let n = c.runtime.steps.len().max(1) as f32;
     for (i, s) in c.runtime.steps.iter().enumerate() {
-        ctx.progress(py_end + (share * 0.95 - py_end) * i as f32 / n);
-        pip_step(root, c, kind, ctx, s)?;
-        ctx.progress(py_end + (share * 0.95 - py_end) * (i + 1) as f32 / n);
+        let at = |k: f32| py_end + (share * 0.95 - py_end) * k / n;
+        ctx.progress(at(i as f32));
+        pip_step(
+            root,
+            c,
+            kind,
+            ctx,
+            s,
+            Some((at(i as f32), at(i as f32 + 1.0))),
+        )?;
+        ctx.progress(at(i as f32 + 1.0));
     }
     ctx.stage("Checking the voice engine", "active");
     let runner = write_runner(&dir)?;
     let mut cmd = python_cmd(root, c)?;
     cmd.arg(&runner).arg("check");
-    let out = run_logged(cmd, ctx, "Checking the voice engine")?;
+    let out = run_logged(cmd, ctx, "Checking the voice engine", true, None)?;
     let mut v: Value = out
         .lines()
         .rev()
@@ -1159,7 +1213,7 @@ pub fn h_download(api: &Api, v: &Value) -> Result<Value> {
                 ctx.progress(rt_share);
             }
             for s in &pkgs {
-                pip_step(&root2, &c2, &kind2, ctx, s)?;
+                pip_step(&root2, &c2, &kind2, ctx, s, None)?;
                 mark_package(&root2, &c2, s)?;
             }
             if !todo.is_empty() {
@@ -1534,7 +1588,7 @@ pub fn run_model(r: &Ready, req: Value, ctx: &JobCtx) -> Result<Value> {
         Some("tts") => "Synthesizing",
         _ => "Speaking",
     };
-    let res = run_logged(cmd, ctx, stage);
+    let res = run_logged(cmd, ctx, stage, false, None);
     std::fs::remove_file(&rq).ok();
     let out = res?;
     out.lines()
@@ -1677,5 +1731,24 @@ mod tests {
         let r = hound::WavReader::open(&p).unwrap();
         assert_eq!(r.len(), 2400);
         std::fs::remove_dir_all(&d).ok();
+    }
+}
+
+#[cfg(test)]
+mod pip_line_tests {
+    use super::pip_bytes;
+
+    #[test]
+    fn only_pip_progress_lines_are_read_as_bytes() {
+        assert_eq!(pip_bytes("Progress 812 of 2400"), Some((812, 2400)));
+        assert_eq!(pip_bytes("Progress 5 of 0"), Some((5, 0)));
+        for other in [
+            "Progress report",
+            "Progress x of y",
+            "Collecting torch==2.6.0",
+            "PROGRESS 0.5",
+        ] {
+            assert_eq!(pip_bytes(other), None, "{other}");
+        }
     }
 }

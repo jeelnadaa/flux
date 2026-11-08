@@ -36,7 +36,7 @@ AI agents can drive every feature.
   asks, then puts the preset back. Built-ins play 3 LU below their input by default. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
-- **Command API.** 179 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Command API.** 180 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 
@@ -88,7 +88,9 @@ AI agents can drive every feature.
   licence and tier, marks the one suggested for this computer, and downloads, uses or removes it. Online engines
   are turned on there, with what is sent and where, and keys are added or forgotten. Split into stems shows the
   installed engines as tiles; Text to speech has an engine menu. The Transcript editor shows every word: click
-  one to hear it or cut it from the audio, and Filler review removes um, uh and stutters in one go.
+  one to hear it or cut it from the audio, and Filler review removes um, uh and stutters in one go. A download
+  shows the bytes as they arrive, and Show log opens what the installer is printing, so a long install can be told
+  from a stuck one.
 
 Not available yet: dubbing (`dub.start` returns `unavailable`). The Smart tools picker in Settings is next.
 

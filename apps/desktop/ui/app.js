@@ -334,6 +334,7 @@
     'action-stop': async () => { const n = prompt('Name this action', 'My action'); await act('action.record', { on: false, name: n || 'My action' }, { refresh: false }); F.stale('actions'); await F.need(['actions'], true); rr(); },
     /* settings */
     'key-edit': el => { D.ui.keyEdit = D.ui.keyEdit === ds(el).v ? null : ds(el).v; rr(); },
+    'dl-log': el => Flux.dlToggle(el),
     'copy-version': () => { const i = D.info || {}; copyText(`Flux ${i.version} ${i.platform} ${i.arch}`); },
     copy: el => { const n = stage.querySelectorAll(ds(el).sel.split(':')[0]); const t = ds(el).sel.includes('last') ? n[n.length - 1] : n[0]; if (t) copyText(t.textContent); },
     'empty-trash': async () => { if (!confirm('Permanently delete everything in the trash? This can\'t be undone.')) return; await act('storage.empty_trash', {}, { refresh: false }); F.stale('usage', 'library'); await F.need(['usage'], true); rr(); },

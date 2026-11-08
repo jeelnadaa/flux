@@ -59,5 +59,47 @@ window.Flux = (function () {
   const S = [], M = {};
   function reg(id, group, name, fn) { M[id] = { id, group, name, fn, i: S.length }; S.push(M[id]); }
   const R = id => M[id].fn();
-  return { THEMES, FONTS, fxc, ic, v, vz, btn, seg, sl, tg, chip, pill, fld, inp, sel, sec, tile, cal, prog, pr, pg, wiz, dlg, fxp, reg, S, M, R, transport, PROJ, HOME, rail, topbar };
+  /* A running download or job. While it runs only these parts change (dlPatch), so the page around it stays still. */
+  const dlText = j => { const pc = Math.round((j.progress || 0) * 100); return `${pc}% · ${j.stage || 'Starting'}${j.detail ? ' · ' + j.detail : ''}`; };
+  const dlLogs = () => FD.D.ui.dlLog = FD.D.ui.dlLog || {}, dlSaved = () => FD.D.ui.dlLogText = FD.D.ui.dlLogText || {};
+  const dlLogHtml = job => { const e = FD.esc; return `<pre class="mono box" role="log" aria-label="Install log" tabindex="0" data-dl-log="${e(job)}" style="white-space:pre-wrap;word-break:break-word;margin:0;max-height:220px;overflow:auto;font-size:12px">${e(dlSaved()[job] || 'Starting…')}</pre><span class="dim" style="font-size:12.5px" data-dl-quiet="${e(job)}"></span>`; };
+  const dlRow = (id, j, cancel) => {
+    const pc = Math.round((j.progress || 0) * 100), open = dlLogs()[j.id], e = FD.esc;
+    return `<div class="col" style="gap:8px;width:100%" data-dl="${e(id)}"><div class="row" style="gap:10px;align-items:center;width:100%"><div style="flex:1 1 120px;min-width:120px">${prog(pc, true)}</div><span class="mono dim" data-dl-text>${e(dlText(j))}</span>${btn(open ? 'Hide log' : 'Show log', { k: 'g', x: `data-act="dl-log" data-job="${e(j.id)}" aria-expanded="${open ? 'true' : 'false'}" data-tip="See what the installer is doing, line by line."` })}${cancel}</div>${open ? dlLogHtml(j.id) : ''}</div>`;
+  };
+  /* Returns false when the row isn't on screen. */
+  const dlPatch = (id, j) => {
+    const r = document.querySelector(`[data-dl="${CSS.escape(id)}"]`); if (!r) return false;
+    const pc = Math.round((j.progress || 0) * 100), b = r.querySelector('.prog'), t = r.querySelector('[data-dl-text]'), s = dlText(j);
+    if (b) { b.style.setProperty('--v', pc + '%'); b.setAttribute('aria-valuenow', pc); }
+    if (t && t.textContent !== s) t.textContent = s;
+    return true;
+  };
+  let dlPumping = false;
+  async function dlPump() {
+    if (dlPumping) return; dlPumping = true;
+    try {
+      while (Object.keys(dlLogs()).length) {
+        for (const job of Object.keys(dlLogs())) {
+          let r; try { r = await FD.call('job.log', { id: job }); } catch (e) { delete dlLogs()[job]; continue; }
+          const text = r.lines.concat(r.detail ? [r.detail] : []).join('\n') || 'Starting…';
+          dlSaved()[job] = text;
+          const el = document.querySelector(`[data-dl-log="${CSS.escape(job)}"]`), q = document.querySelector(`[data-dl-quiet="${CSS.escape(job)}"]`);
+          if (el && el.textContent !== text) { const stick = !el.dataset.seen || el.scrollHeight - el.scrollTop - el.clientHeight < 24; el.dataset.seen = 1; el.textContent = text; if (stick) el.scrollTop = el.scrollHeight; }
+          if (q) q.textContent = r.state === 'running' && r.quiet_s >= 20 ? `Nothing new for ${r.quiet_s} s. Big packages can take a while to unpack.` : '';
+          if (r.state !== 'running') delete dlLogs()[job];
+        }
+        await new Promise(k => setTimeout(k, 800));
+      }
+    } finally { dlPumping = false; }
+  }
+  /* Opens and closes in place: no redraw of the page. */
+  const dlToggle = el => {
+    const job = el.dataset.job, o = dlLogs(), row = el.closest('[data-dl]');
+    if (o[job]) { delete o[job]; row.querySelectorAll('[data-dl-log],[data-dl-quiet]').forEach(n => n.remove()); }
+    else { o[job] = true; row.insertAdjacentHTML('beforeend', dlLogHtml(job)); dlPump(); }
+    el.textContent = o[job] ? 'Hide log' : 'Show log'; el.setAttribute('aria-expanded', o[job] ? 'true' : 'false');
+  };
+
+  return { dlRow, dlPatch, dlToggle, THEMES, FONTS, fxc, ic, v, vz, btn, seg, sl, tg, chip, pill, fld, inp, sel, sec, tile, cal, prog, pr, pg, wiz, dlg, fxp, reg, S, M, R, transport, PROJ, HOME, rail, topbar };
 })();
