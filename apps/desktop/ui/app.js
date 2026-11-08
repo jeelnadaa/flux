@@ -30,7 +30,7 @@
     mix: ['loudness', 'problems'], meters: ['loudness', 'problems'], 'fx-eq': ['presets'], 'fx-clean': ['problems'], fxp: ['presets'], rooms: ['styles'], aitools: ['ai'], magic: ['ai'],
     analysis: ['tempokey'], master: ['loudness'], tts: ['voices', 'aeng'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
     macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai', 'aeng'], 'smart-get': ['aeng'], 'smart-cloud': ['aeng'], 'smart-key': ['aeng'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
-    live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
+    live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'], 'live-cable': ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
     'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai', 'aeng', 'trans', 'tfill', 'project'], fillers: ['ai', 'aeng', 'trans', 'tfill'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags', 'csettings'], 'clone-get': ['cstatus'], 'stems-setup': ['ai', 'aeng'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];

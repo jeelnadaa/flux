@@ -69,6 +69,7 @@ fn cables(outputs: &[Dev], inputs: &[Dev]) -> Vec<Pair> {
             || n.contains("loopback")
             || n.contains("virtual")
             || n.contains("soundflower")
+            || n.contains("cable")
         {
             // Devices that are the same on both sides (BlackHole 2ch, Loopback Audio, ...).
             inputs.iter().find(|i| i.name == o.name)
@@ -340,17 +341,36 @@ fn platform() -> &'static str {
     }
 }
 
-/// What the person sees when there is no Flux speaker or microphone yet.
-fn note(f: &Found, create: bool) -> String {
+/// `ready`, `can_add` (Flux can make them here) or `missing` (something has to be installed first).
+fn state(f: &Found, create: bool) -> &'static str {
+    if f.speaker.is_some() || f.mic.is_some() {
+        "ready"
+    } else if create {
+        "can_add"
+    } else {
+        "missing"
+    }
+}
+
+/// Where to get what's needed on this OS, for the guide and for agents.
+fn install(platform: &str) -> Value {
+    match platform {
+        "windows" => json!({"name": "VB-CABLE", "url": "https://vb-audio.com/Cable/"}),
+        "macos" => {
+            json!({"name": "BlackHole", "url": "https://existential.audio/blackhole/", "command": "brew install blackhole-2ch"})
+        }
+        _ => json!({"name": "pactl", "command": "sudo apt install pulseaudio-utils"}),
+    }
+}
+
+/// What the person sees about the two devices.
+fn note(f: &Found, create: bool, platform: &str) -> String {
     if f.speaker.as_ref().is_some_and(|p| p.kind == "flux") {
         return format!("Pick {SPEAKER} as the output in any app (or as the system output) and {MIC} as the microphone in call apps.");
     }
-    if create {
-        return format!("Flux can add {SPEAKER} and {MIC} to this computer. Apps can then play into Flux, and call apps can use your processed voice.");
-    }
     if let Some(s) = &f.speaker {
         return if f.shared {
-            format!("Using the virtual cable {} as the Flux speaker and microphone, one at a time. Install a second cable to use both together.", s.label)
+            format!("Using the virtual cable {} as the Flux speaker and microphone, one at a time. Add a second cable to use both together.", s.label)
         } else {
             format!(
                 "Using the virtual cable {} as the Flux speaker{}.",
@@ -362,7 +382,13 @@ fn note(f: &Found, create: bool) -> String {
             )
         };
     }
-    "To pick Flux in other apps, install a free virtual audio cable: Flux finds it and uses it as the Flux speaker and microphone. A Flux device of its own needs a signed driver, which isn't available yet.".into()
+    if create {
+        return format!("Flux can add {SPEAKER} and {MIC} to this computer. Apps can then play into Flux, and call apps can use your processed voice.");
+    }
+    if platform == "linux" {
+        return "Flux couldn't reach PipeWire or PulseAudio with the pactl command, so it can't add the Flux speaker and microphone. Install pactl, then check again.".into();
+    }
+    "No virtual audio cable is installed on this computer, so other apps can't pick Flux yet, and the original sound keeps playing alongside the processed sound.".into()
 }
 
 fn pair_json(p: &Option<Pair>) -> Value {
@@ -382,7 +408,9 @@ pub fn summary(f: &Found) -> Value {
         "shared": f.shared,
         "can_create": create,
         "own_driver": false,
-        "note": note(f, create),
+        "status": state(f, create),
+        "install": install(platform()),
+        "note": note(f, create, platform()),
     })
 }
 
@@ -512,8 +540,33 @@ mod tests {
         // Nothing virtual: nothing found, and a real output is never taken for one.
         let f4 = detect(&[d("spk", "Speakers")], &[d("m", "Microphone")]);
         assert_eq!(f4, Found::default());
-        assert!(note(&f4, false).contains("virtual audio cable"));
-        assert!(note(&f4, true).contains("can add"));
+        let none = note(&f4, false, "windows");
+        assert!(
+            none.contains("No virtual audio cable is installed"),
+            "{none}"
+        );
+        assert_eq!(state(&f4, false), "missing");
+        assert!(note(&f4, false, "macos").contains("No virtual audio cable"));
+        assert!(note(&f4, false, "linux").contains("pactl"));
+        assert!(note(&f4, true, "linux").contains("can add"));
+        assert_eq!(state(&f4, true), "can_add");
+
+        // macOS with two loopback devices, or the same maker's cable named alike on both sides.
+        let f5 = detect(
+            &[d("b2", "BlackHole 2ch"), d("b16", "BlackHole 16ch")],
+            &[d("i2", "BlackHole 2ch"), d("i16", "BlackHole 16ch")],
+        );
+        assert_eq!(state(&f5, false), "ready");
+        assert_eq!(
+            (
+                f5.speaker.unwrap().rec.id.as_str(),
+                f5.mic.unwrap().rec.id.as_str(),
+                f5.shared
+            ),
+            ("i2", "i16", false)
+        );
+        let f6 = detect(&[d("v", "VB-Cable")], &[d("vi", "VB-Cable")]);
+        assert_eq!(f6.speaker.unwrap().rec.id, "vi");
     }
 
     #[test]

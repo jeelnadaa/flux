@@ -83,7 +83,9 @@ def main():
             page.goto(s.url())
             page.wait_for_selector(panel)
             text = page.inner_text(panel)
-            assert "virtual audio cable" in text and "Not set up" in text, text
+            assert "No virtual audio cable is installed" in text and "Not installed" in text, text
+            assert "original sound keeps playing" in page.inner_text('[data-lv="missing-output"]')
+            assert "call apps can't use this" in page.inner_text('[data-lv="missing-input"]')
             assert "Flux speaker" not in " ".join(page.locator(f"{src} option").all_inner_texts())
             assert page.locator(f'{panel} [data-lact="vset"]').count() == 0
             page.screenshot(path=str(OUT / "flux-devices-none-1440.png"), full_page=True)
@@ -91,7 +93,46 @@ def main():
             page.wait_for_timeout(300)
             assert page.evaluate("(() => { const m = document.querySelector('#m'); return Math.max(document.documentElement.scrollWidth - innerWidth, m.scrollWidth - m.clientWidth); })()") <= 1
             page.set_viewport_size({"width": 1440, "height": 900})
-            ok("nothing virtual: the panel says to install a cable, and offers no Flux choice")
+            ok("nothing virtual: the panel and both cards say it isn't installed, and offer no Flux choice")
+
+            # The guide: says it isn't installed, gives this computer's steps, opens the maker's page, checks again.
+            page.click(f'{panel} [data-lact="vguide"]')
+            page.wait_for_selector('[data-lv="guide-steps"]')
+            page.wait_for_timeout(1500)
+            dlg = page.inner_text('[role="dialog"]')
+            foot = page.evaluate("(() => { const f = document.querySelector('[role=dialog] .foot').getBoundingClientRect(), d = document.querySelector('[role=dialog] .dlg').getBoundingClientRect(); return f.bottom <= d.bottom + 1 && f.top >= d.top; })()")
+            assert foot, "Check again stays on screen in a tall guide"
+            here = api(s.port, "live.virtual")["platform"]
+            assert "Not installed." in dlg or here == "linux", dlg
+            page.screenshot(path=str(OUT / "virtual-cable-guide-1440.png"))
+            for os_key, want in [("windows", "Run as administrator"), ("macos", "brew install blackhole-2ch"), ("linux", "sudo apt install pulseaudio-utils")]:
+                page.click(f'[data-lact="vos"][data-os="{os_key}"]')
+                page.wait_for_timeout(120)
+                assert want in page.inner_text('[data-lv="guide-steps"]'), os_key
+                assert page.get_attribute(f'[data-lact="vos"][data-os="{os_key}"]', "aria-pressed") == "true"
+                for w, h in [(820, 1100), (390, 844)]:
+                    page.set_viewport_size({"width": w, "height": h})
+                    page.wait_for_timeout(120)
+                    assert page.evaluate("(() => { const d = document.querySelector('[role=dialog] .dlg'); return Math.max(d.scrollWidth - d.clientWidth, document.documentElement.scrollWidth - innerWidth); })()") <= 1, (os_key, w)
+                    if w == 390:
+                        page.screenshot(path=str(OUT / f"virtual-cable-guide-{os_key}-390.png"))
+                page.set_viewport_size({"width": 1440, "height": 900})
+            bare = page.evaluate("[...document.querySelectorAll('[role=dialog] button, [role=dialog] select')].filter(e => !e.closest('[data-tip]')).map(e => e.textContent)")
+            assert not bare, bare
+            page.click(f'[data-lact="vos"][data-os="windows"]')
+            page.wait_for_timeout(120)
+            assert page.get_attribute('[data-act="open-url"]', "data-url") == "https://vb-audio.com/Cable/"
+            page.click('[data-lact="vcheck"]')
+            page.wait_for_selector('text=Still not found')
+            # A cable shows up while the guide is open (after installing): Check again finds it and Live offers it.
+            write(fake, [real, dev("ca", "CABLE Input (VB-Audio Virtual Cable)")], [mic, dev("cb", "CABLE Output (VB-Audio Virtual Cable)")])
+            page.click('[data-lact="vcheck"]')
+            page.wait_for_selector('text=Found it.')
+            page.click('[data-lact="vdone"]')
+            page.wait_for_selector(f'{panel} >> text=Ready')
+            assert page.input_value(src) == "flux|"
+            assert page.locator('[data-lv="missing-output"]').count() == 0
+            ok("guide: says not installed, steps for each OS at every width, opens the maker's page, Check again finds a new cable")
         finally:
             s.p.terminate()
 
@@ -109,6 +150,7 @@ def main():
             assert "CABLE Input (VB-Audio Virtual Cable) as the output" in page.inner_text('[data-lv="pick-output"]')
             assert "CABLE Output (VB-Audio Virtual Cable) as the microphone" in page.inner_text('[data-lv="pick-input"]')
             assert "one at a time" in page.inner_text(panel)
+            assert page.locator(f'{panel} [data-lact="vguide"] >> text=Add a second cable').count() == 1
             page.screenshot(path=str(OUT / "flux-devices-cable-1440.png"), full_page=True)
             # Leaving the Flux speaker picks a real output again; coming back is automatic again.
             page.select_option(src, "system|spk")

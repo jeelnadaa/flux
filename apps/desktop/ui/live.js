@@ -2,7 +2,7 @@
    Not in design/: composed from the kit (pg, box, sec, sl, seg, tg, sel, fxc, meter) and tokens; see design/LIVE.md.
    Every control carries a tooltip (data-tip) from live.kinds, which the engine keeps complete (a test enforces it). */
 (function () {
-  const { reg, pg, btn, seg, sl, tg, pill, fld, inp, sel, sec, cal, fxc, ic, THEMES } = Flux, F = FD, D = FD.D, esc = F.esc;
+  const { reg, pg, btn, seg, sl, tg, pill, fld, inp, sel, sec, cal, fxc, ic, THEMES, dlg } = Flux, F = FD, D = FD.D, esc = F.esc;
   const call = (m, p) => F.call(m, p);
   const U = () => D.ui.live = D.ui.live || { tab: 'output', q: '', route: {}, err: {} };
   const TIP = (g, k) => { const t = D.lkinds && D.lkinds.tips; return (t && t[g] && t[g][k]) || ''; };
@@ -130,14 +130,56 @@
       <div class="col" style="gap:6px">${lvl(route, 'in', 'In')}${lvl(route, 'out', 'Out')}</div>
       <span class="mono dim" style="font-size:12px" data-lvs="${route}">${s ? stats(s) : 'Not running'}</span>
       ${e ? cal('warn', esc(e), 'warn') : ''}
+      ${vd.status === 'missing' ? `<div class="row" style="gap:8px;flex-wrap:wrap" data-lv="missing-${route}"><span class="dim" style="font-size:12.5px;flex:1 1 200px">${route === 'output' ? 'No virtual cable found, so the original sound keeps playing too.' : 'No virtual cable found, so call apps can\'t use this yet.'}</span>${btn('How to install', { k: 'g', x: `data-lact="vguide"${tip('Step-by-step instructions for this computer.')}` })}</div>` : ''}
       ${pick ? `<p class="dim" style="font-size:12.5px;margin:0" data-lv="pick-${route}"${tip(cap.apps_note)}>${pick}</p>` : ''}
     </div>`;
   }
+  /* ---------- installing a virtual cable (kit dlg, list rows and callouts; see design/LIVE.md) ---------- */
+  const VOS = { windows: 'Windows', macos: 'macOS', linux: 'Linux' };
+  const link = (t, url, why) => btn(t, { i: 'globe', x: `data-act="open-url" data-url="${esc(url)}"${tip(why)}` });
+  const cmd = c => `<div class="row" style="gap:8px;flex-wrap:wrap"><code class="mono" style="font-size:12.5px;overflow-wrap:anywhere">${esc(c)}</code>${btn('Copy', { k: 'g', x: `data-lact="vcopy" data-c="${esc(c)}"${tip('Copy this command.')}` })}</div>`;
+  const STEPS = {
+    windows: { what: 'VB-CABLE, a free virtual cable (donations are optional). It has two sides: what plays into CABLE Input comes out of CABLE Output.', steps: [
+      ['Download it', `<div>Get the newest Driver Pack zip from the maker's page.</div><div class="row">${link('Open the download page', 'https://vb-audio.com/Cable/', 'Opens the page of the company that makes VB-CABLE in your browser.')}</div>`],
+      ['Install it', 'Extract all the files from the zip. Right-click the setup program for your computer (x64 on most PCs), choose Run as administrator, then Install Driver.'],
+      ['Restart your computer', 'Windows only finishes adding the device after a restart.'],
+      ['Check here', 'Come back and press Check again. Flux then shows the Flux speaker and microphone.'],
+      ['Send your sound to it', 'In Windows Settings, System, Sound, set Output to CABLE Input, or pick it in one app. Press Start on Computer sound and Flux plays to your real speakers.'],
+      ['For calls', 'In the call app, choose CABLE Output as the microphone.'],
+    ], extra: 'One cable is the Flux speaker or the Flux microphone, one at a time. To run both together, add the maker\'s CABLE A+B pack (a paid donation). To remove it, run the same setup program and choose Remove Driver.' },
+    macos: { what: 'BlackHole, a free virtual audio device for Macs. What plays into it can be recorded from it.', steps: [
+      ['Install it', `<div>Close your audio apps. If you use Homebrew, run this in Terminal:</div>${cmd('brew install blackhole-2ch')}<div>To use the Flux speaker and microphone together, install a second one too:</div>${cmd('brew install blackhole-16ch')}<div class="row">${link('Or get the installer', 'https://existential.audio/blackhole/', 'Opens the page of the company that makes BlackHole in your browser. It asks for an email, and a donation is optional.')}</div>`],
+      ['Restart your Mac', 'Restart when the installer asks you to.'],
+      ['Check here', 'Come back and press Check again. Flux then shows the Flux speaker and microphone.'],
+      ['Send your sound to it', 'In System Settings, Sound, set Output to BlackHole 2ch, or pick it in one app. Press Start on Computer sound and Flux plays to your real speakers. Allow Flux to use the microphone when macOS asks.'],
+      ['For calls', 'In the call app, choose the BlackHole device Flux names as the microphone.'],
+    ], extra: 'To remove it: brew uninstall blackhole-2ch, or the uninstaller on the maker\'s page.' },
+    linux: { what: 'Nothing extra on most systems: Flux adds the Flux speaker and microphone itself, with no administrator password. It only needs the pactl command, which comes with PipeWire or PulseAudio.', steps: [
+      ['Install pactl if it is missing', `<div>Debian or Ubuntu:</div>${cmd('sudo apt install pulseaudio-utils')}<div>Fedora:</div>${cmd('sudo dnf install pulseaudio-utils')}<div>Arch:</div>${cmd('sudo pacman -S libpulse')}`],
+      ['Check here', 'Press Check again, then Add them on the Live page.'],
+      ['Send your sound to it', 'Press Start on Computer sound. Flux makes the Flux speaker the system output until you stop, and plays to your real speakers.'],
+      ['For calls', 'In the call app, choose Flux microphone.'],
+    ], extra: 'Remove on the Live page takes both devices away again.' },
+  };
+  reg('live-cable', 'Tools', 'Virtual cable guide', () => {
+    const v = (D.ldevices || {}).flux || {}, here = v.platform || 'windows', u = U(), os = u.vos || here, g = STEPS[os];
+    const found = v.speaker || v.mic;
+    const st = os !== here ? '' : found ? cal('check', `Found on this computer: <b>${esc((v.speaker || v.mic).label)}</b>. ${esc(v.note || '')}`) : v.status === 'can_add' ? cal('check', 'This computer is ready. Press Add them on the Live page.') : cal('warn', `<b>Not installed.</b> ${esc(v.note || '')}`, 'warn');
+    return dlg('live', 'Install a virtual cable', `
+      <div class="row" role="group" aria-label="Your computer">${Object.keys(VOS).map(k => Flux.chip(VOS[k] + (k === here ? ' (this computer)' : ''), k === os, null, `data-lact="vos" data-os="${k}" aria-pressed="${k === os}"${tip('Show the steps for ' + VOS[k] + '.')}`)).join('')}</div>
+      ${st}${u.vmsg ? cal('info', esc(u.vmsg)) : ''}
+      <p class="dim" style="margin:0">${g.what}</p>
+      <div class="lst box" data-lv="guide-steps">${g.steps.map((s, i) => `<div style="align-items:flex-start"><span class="act mono">${i + 1}</span><div class="ti" style="flex:1;min-width:0"><b>${s[0]}</b><span class="col" style="white-space:normal;gap:8px">${s[1]}</span></div></div>`).join('')}</div>
+      <span class="dim" style="font-size:12.5px">${g.extra}</span>
+      ${os === 'linux' ? '' : cal('lock', '<b>Made by another company.</b> Flux doesn\'t install it for you. Installing adds a sound driver and asks for your administrator password.')}
+      ${sec('Why Flux doesn\'t include its own', '<span class="dim">Windows and macOS only accept new sound devices from a driver that the maker has signed with a paid, verified developer identity. Flux doesn\'t have one yet, so it uses a cable you install. Linux doesn\'t need this.</span>')}`,
+      `${btn('Done', { k: 'g', x: `data-lact="vdone"${tip('Back to Live.')}` })}${btn('Check again', { k: 'p', i: 'check', x: `data-lact="vcheck"${tip('Looks for a virtual cable on this computer again.')}` })}`, { wide: true, cls: 'stickfoot' });
+  });
   function fluxDevices() {
     const v = (D.ldevices || {}).flux; if (!v) return '';
     const own = v.speaker && v.speaker.kind === 'flux', e = U().verr;
     const act = v.can_create ? (own ? btn('Remove', { k: 'g', i: 'trash', x: `data-lact="vset" data-v="remove"${tip('Removes the Flux speaker and microphone from this computer. Apps go back to your own devices.')}` }) : btn('Add them', { k: 'p', i: 'plus', x: `data-lact="vset" data-v="setup"${tip('Adds the Flux speaker and Flux microphone to this computer. No administrator password is needed.')}` })) : '';
-    return `<div class="box col" data-lv="flux-devices"><div class="between" style="flex-wrap:wrap;gap:10px"><div class="col" style="gap:2px;flex:1 1 240px;min-width:0"><b class="h3"${tip('Devices other apps can pick, so their sound goes through Flux and your processed voice reaches call apps.')}>Flux speaker and microphone</b><span class="dim" style="font-size:13px">${esc(v.note || '')}</span></div><div class="row">${v.speaker || v.mic ? pill('Ready', 'ok') : pill('Not set up')}${act}</div></div>${e ? cal('warn', esc(e), 'warn') : ''}</div>`;
+    return `<div class="box col" data-lv="flux-devices"><div class="between" style="flex-wrap:wrap;gap:10px"><div class="col" style="gap:2px;flex:1 1 240px;min-width:0"><b class="h3"${tip('Devices other apps can pick, so their sound goes through Flux and your processed voice reaches call apps.')}>Flux speaker and microphone</b><span class="dim" style="font-size:13px">${esc(v.note || '')}</span></div><div class="row">${v.speaker || v.mic ? pill('Ready', 'ok') : v.status === 'missing' ? pill('Not installed', 'warn') : pill('Not set up')}${act}${v.can_create && v.status !== 'missing' ? '' : btn(v.shared ? 'Add a second cable' : v.speaker ? 'Guide' : 'How to install', { k: v.status === 'missing' ? 'p' : '', x: `data-lact="vguide"${tip('Step-by-step instructions for this computer.')}` })}</div></div>${U().vmsg ? cal('info', esc(U().vmsg)) : ''}${e ? cal('warn', esc(e), 'warn') : ''}</div>`;
   }
   const stats = s => `${F.khz((s.info || {}).sample_rate || 48000)} · ${F.num(s.buffer_ms || 0, 1)} ms buffer · ${s.underruns || 0} dropouts${s.error ? ' · ' + esc(s.error) : ''}`;
 
@@ -292,6 +334,11 @@
         U().edit = null; U().note = null; U().err.ed = null; await reload(e.snap.id); await pollNow();
       } catch (er) { e.confirm = false; err(er); }
     },
+    vguide: () => { U().vos = null; U().vmsg = null; Flux.render('live-cable'); },
+    vdone: () => { U().vmsg = null; Flux.render('live'); },
+    vos: el => { U().vos = el.dataset.os; U().vmsg = null; Flux.rr(); },
+    vcopy: el => { const b = el.querySelector('span'); navigator.clipboard.writeText(el.dataset.c).then(() => { if (b) { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy'; }, 1200); } }, () => { }); },
+    vcheck: async () => { const u = U(); u.vmsg = null; F.stale('ldevices'); try { await F.need(['ldevices'], true); } catch (e) { u.vmsg = e.message; } delete u.route.output; delete u.route.input; const v = (D.ldevices || {}).flux || {}; if (!u.vmsg) u.vmsg = v.speaker || v.mic ? 'Found it. The Flux speaker and microphone are ready on the Live page.' : v.status === 'can_add' ? 'Ready to add. Press Add them on the Live page.' : 'Still not found. If you just installed one, restart your computer first.'; Flux.rr(); },
     vset: async el => { const u = U(), rm = el.dataset.v === 'remove'; u.verr = null; try { await call(rm ? 'live.virtual.remove' : 'live.virtual.setup', {}); } catch (e) { u.verr = e.message; } delete u.route.output; delete u.route.input; F.stale('ldevices'); await F.need(['ldevices'], true); Flux.rr(); },
     start: async el => { const r = el.dataset.route, f = form(r), u = U(); u.err[r] = null; try { await call('live.start', { route: r, preset: f.preset, source: f.source, source_device: f.source_device || undefined, output: f.output === 'auto' ? undefined : f.output }); } catch (e) { u.err[r] = e.message; } await pollNow(); Flux.rr(); },
     stop: async el => { try { await call('live.stop', { route: el.dataset.route }); } catch (e) { err(e, el.dataset.route); } await pollNow(); Flux.rr(); },

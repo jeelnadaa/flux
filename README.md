@@ -81,8 +81,8 @@ AI agents can drive every feature.
 - **Flux speaker and Flux microphone.** Pick the Flux speaker as the output in any app and Live plays it through a
   preset to your headphones, so you hear only the processed sound. Pick the Flux microphone in a call app to send it
   your processed voice. On Linux (PipeWire or PulseAudio) Flux adds both itself, with no administrator password. On
-  Windows and macOS, install a free virtual audio cable and Flux finds it and uses it: a device of Flux's own needs a
-  paid, signed driver (ADR 0007). The Linux path has only been tested against a stand-in so far.
+  Windows and macOS, install a free virtual audio cable and Flux finds it and uses it (Live says when none is installed
+  and has a step-by-step guide): a device of Flux's own needs a paid, signed driver (ADR 0007). The Linux path has only been tested against a stand-in so far.
 
 - **Smart tools in Settings.** One page lists every engine for stems, transcripts and speech with its size,
   licence and tier, marks the one suggested for this computer, and downloads, uses or removes it. Online engines
