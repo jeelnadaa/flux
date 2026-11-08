@@ -143,7 +143,8 @@ def main():
 
         # 2. A virtual cable: it becomes the Flux speaker and microphone; only real outputs are places to listen.
         cab_o, cab_i = dev("ca", "CABLE Input (VB-Audio Virtual Cable)"), dev("cb", "CABLE Output (VB-Audio Virtual Cable)")
-        write(fake, [real, cab_o], [mic, cab_i])
+        # Linux records an output through its monitor, so the fake computer has one; other systems record the output itself.
+        write(fake, [real, cab_o], [mic, cab_i, dev("spk.monitor", "Monitor of Speakers")])
         s = Server(tmp, "cable", {"FLUX_FAKE_DEVICES": str(fake)})
         try:
             page.goto(s.url())
@@ -158,7 +159,8 @@ def main():
             assert page.locator(f'{panel} [data-lact="vguide"] >> text=Add a second cable').count() == 1
             page.screenshot(path=str(OUT / "flux-devices-cable-1440.png"), full_page=True)
             # Leaving the Flux speaker picks a real output again; coming back is automatic again.
-            page.select_option(src, "system|spk")
+            sources = page.eval_on_selector_all(f"{src} option", "o => o.map(x => x.value)")
+            page.select_option(src, next(v for v in sources if v.startswith("system|spk")))
             page.wait_for_timeout(200)
             assert page.input_value(out) not in ("auto", ""), page.input_value(out)
             page.select_option(src, "flux|")

@@ -113,6 +113,7 @@ None.
 
 ## Session log
 
+- 2026-11-08: test_flux_devices picked a source by the Windows id; Linux records an output through its monitor, so the option has another id. The fake computer now has a monitor and the test picks the option offered. v2.0.20 published with update files.
 - 2026-11-08: R7.16: downloads no longer redraw the page (Smart tools, Voice cloning, speech and transcript progress). pip runs with raw progress, so bytes show and the meter moves during a big file. Show log reads job.log (400 lines, memory only). Tested with the stub pip; not run against a real PyTorch install.
 - 2026-11-08: test_flux_devices expected the Windows and macOS wording on Linux, where the panel correctly asks for pactl. It now checks the note the engine gives for this computer.
 - 2026-11-08: test_smart_tools assumed system voices, which a build machine lacks (it correctly reports a model instead). The picker is now compared with what ai.engines reports. v2.0.19 has the update files (latest.json, 11 platform entries).
