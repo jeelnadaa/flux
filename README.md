@@ -32,7 +32,8 @@ AI agents can drive every feature.
   meters and a bypass. 41 built-in live presets (21 for computer sound, 20 for a microphone). The designer builds
   anything from 39 effects in parallel lanes and a post chain, moved by modulators (LFOs, random, step sequencer,
   envelope follower, tempo sync) and macros; export and import `.fluxlive` files. A built-in preset is never
-  changed: the first edit makes your own copy. Every control has a tooltip.
+  changed: the first edit makes your own copy. Editing happens in a dialog: Save keeps the changes; Discard or Esc
+  asks, then puts the preset back. Built-ins play 3 LU below their input by default. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
 - **Command API.** 168 methods in one registry, shared by the UI, the MCP server and the tests.

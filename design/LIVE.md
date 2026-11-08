@@ -15,9 +15,14 @@ and the effect panels (`ctl-grid` of `sl` sliders, `seg`, `tg`, `sel`) for the d
    (`inset 0 0 0 2px var(--tx)`) and a `pill sig` reading "Live".
 3. `sec('Presets')`: `seg` (Computer sound / Microphone / Yours), search `inp`, New and Import buttons, then a `g4`
    of `fxc` cards. Card palette and effect come from the 13 themes by a hash of the preset id.
-4. `sec('Designer')`: title row with actions; then `sec`s for Whole preset (`ctl-grid`), Macros, Lanes,
-   Post chain and Modulators. Modules, modulators and macros are `.box.col` on `--s2` in a `.lvmods` grid
-   (auto-fill, min 320 px). Lanes and the post chain have a 3 px `--tx` rule on the left.
+4. `sec('Designer')`: the chosen preset's name, description, pills and actions (Use it, Edit, Preview file, Copy,
+   Export, Delete). Edit opens the editor, a `dlg wide` over the page (the kit's `.ov` + `.dlg`): name and
+   description, Randomize, then `sec`s for Whole preset (`ctl-grid`), Macros, Lanes, Post chain and Modulators,
+   and a footer kept at the bottom of the dialog (sticky, `--s0`, 1.5 px `--ln2` rule above) with Discard and Save.
+   Modules, modulators and macros are `.box.col` on `--s2` in a `.lvmods` grid (auto-fill, min 320 px). Lanes and
+   the post chain have a 3 px `--tx` rule on the left. Changes play as they are made. Discard, the close button
+   and Escape ask first when anything changed, with a small `dlg` ("Discard changes?": Keep editing, Discard;
+   focus on Discard, Escape keeps editing), then put the preset back as it was when the editor opened.
 5. The step sequencer `.lvsteps` is a row of bars filled from the bottom in `--tx` over `--s4`.
 
 **New CSS** (in `app.css` here and `desktop.css` in the app): `.tipbox`, `.lvmods`, `.lvsteps`. No new tokens.

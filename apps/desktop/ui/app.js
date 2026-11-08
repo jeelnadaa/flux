@@ -133,7 +133,10 @@
       rrPending = false; if (dragging) return;
       const m = stage.querySelector('#m'), st = m ? m.scrollTop : 0, aside = stage.querySelector('aside.b'), ast = aside ? aside.scrollTop : 0;
       const a = document.activeElement, all = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')], fi = all.indexOf(a), caret = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
+      // Dialogs that stay open keep their scroll and don't play their opening animation again.
+      const ovs = new Map([...stage.querySelectorAll('.ov[aria-label]')].map(o => [o.getAttribute('aria-label'), (o.querySelector('.dlg') || {}).scrollTop || 0]));
       stage.innerHTML = M[cur].fn(); hydrate(stage);
+      stage.querySelectorAll('.ov[aria-label]').forEach(o => { const k = o.getAttribute('aria-label'); if (ovs.has(k)) { o.classList.add('still'); const d = o.querySelector('.dlg'); if (d) d.scrollTop = ovs.get(k); } });
       const m2 = stage.querySelector('#m'); if (m2) m2.scrollTop = st; const a2 = stage.querySelector('aside.b'); if (a2) a2.scrollTop = ast;
       if (fi >= 0) { const n = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')][fi]; if (n) { n.focus({ preventScroll: true }); if (caret && 'setSelectionRange' in n) try { n.setSelectionRange(caret[0], caret[1]); } catch (e) { } } }
     });
@@ -547,7 +550,7 @@
       return;
     }
     if (cur === 'palette') { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); D.ui.cqi = Math.max(0, (D.ui.cqi || 0) + (e.key === 'ArrowDown' ? 1 : -1)); rr(); return; } if (e.key === 'Enter') { e.preventDefault(); const it = stage.querySelector('.cmd .it.on'); if (it) it.click(); return; } }
-    if (e.key === 'Escape') { const c = stage.querySelector('.ov .btn.ic[aria-label="Close"]'); if (c) { e.preventDefault(); c.click(); } return; }
+    if (e.key === 'Escape') { const c = [...stage.querySelectorAll('.ov .btn.ic[aria-label="Close"]')].pop(); if (c) { e.preventDefault(); c.click(); } return; }
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     const kn = keyName(e), custom = (D.settings && D.settings.keys) || {};
     const hit = Flux.KEYS.find(k => (custom[k[0]] || k[2]) === kn);

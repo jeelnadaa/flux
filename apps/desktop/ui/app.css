@@ -292,6 +292,8 @@ tr:last-child td{border-bottom:0}
 @keyframes fade{from{opacity:0}}
 .dlg{width:100%;max-width:580px;max-height:100%;overflow:auto;background:var(--s0);border-radius:10px;padding:clamp(16px,3cqw,26px);display:flex;flex-direction:column;gap:15px;box-shadow:0 0 0 1.5px var(--tx),0 24px 70px #0007;animation:pop .6s var(--spring)}
 .dlg.wide{max-width:860px}
+.ov.still,.ov.still>.dlg{animation:none}
+[data-lvedit]>.dlg>.foot{position:sticky;bottom:calc(-1*clamp(16px,3cqw,26px));margin-bottom:calc(-1*clamp(16px,3cqw,26px));padding:12px 0 clamp(16px,3cqw,26px);background:var(--s0);box-shadow:0 -1.5px 0 var(--ln2);z-index:1}
 .dlg .h2{font-size:clamp(26px,3.6cqw,40px)}
 @keyframes pop{from{opacity:0;transform:translateY(16px) scale(.97)}}
 .foot{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}

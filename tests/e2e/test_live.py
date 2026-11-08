@@ -129,6 +129,11 @@ def main():
             wait(page, 600)
             assert ev("FD.D.lpreset.id") == builtin
             assert api(port, "live.status")["routes"]["output"]["info"]["preset"] == builtin
+            assert ev("!document.querySelector('[data-lvedit]') && !document.querySelector('[data-module]')"), "editing controls stay in the editor"
+            page.click('[data-lact="edit"]')
+            page.wait_for_selector('[data-lvedit] [data-module]')
+            wait(page, 700)
+            assert ev("document.activeElement && document.activeElement.dataset.lact") == "edclose", "focus moves into the editor"
             bind = ev("document.querySelector('[data-module] .sl[data-bind^=\"lv:mp\"]').dataset.bind")
             _, _, mid, key = bind.split(":")
             before = ev(f"(() => {{ const p = FD.D.lpreset, m = p.lanes.flatMap(l => l.modules).concat(p.post).find(x => x.id === '{mid}'); return m.params['{key}'] ?? null; }})()")
@@ -174,6 +179,110 @@ def main():
             assert mc["targets"] and mc["targets"][0]["param"] == "mix", mc
             ok(f"built: phaser added, steps modulator ({len(md['steps'])} steps) moves it, macro '{mc['name']}' moves its mix")
 
+            # 5b. Every control in the editor has a name and a tooltip; a tooltip shows on focus. Escape hides it and,
+            # with changes made, asks before discarding; Keep editing goes back.
+            missing = ev("""(() => {
+              const root = document.querySelector('[data-lvedit]');
+              const ctl = [...root.querySelectorAll('button, select, input, [role=slider]')];
+              const name = e => (e.getAttribute('aria-label') || e.getAttribute('aria-labelledby') && document.getElementById(e.getAttribute('aria-labelledby'))?.textContent || e.textContent || (e.labels && e.labels[0] && e.labels[0].textContent) || '').trim();
+              return { n: ctl.length, noName: ctl.filter(e => !name(e)).map(e => e.outerHTML.slice(0, 90)), noTip: ctl.filter(e => !e.closest('[data-tip]')).map(e => e.outerHTML.slice(0, 90)) };
+            })()""")
+            assert not missing["noName"], missing["noName"][:5]
+            assert not missing["noTip"], missing["noTip"][:5]
+            page.focus('[data-lact="lim"]')
+            page.keyboard.press("Shift+Tab")
+            page.keyboard.press("Tab")
+            t = None
+            for _ in range(20):
+                wait(page, 100)
+                t = ev("document.getElementById('tipbox').classList.contains('on') && document.getElementById('tipbox').textContent")
+                if t:
+                    break
+            assert t and len(t) > 10, t
+            page.keyboard.press("Escape")
+            wait(page, 50)
+            assert ev("document.getElementById('tipbox').textContent") != t, "Escape hides the tooltip"
+            page.wait_for_selector('[aria-label="Discard changes?"]')
+            page.click('[aria-label="Discard changes?"] .foot [data-lact="edkeep"]')
+            page.wait_for_selector('[aria-label="Discard changes?"]', state="detached")
+            assert ev("!!document.querySelector('[data-lvedit]')"), "Keep editing returns to the editor"
+            page.set_viewport_size({"width": 1440, "height": 900})
+            wait(page, 700)
+            page.screenshot(path=str(OUT / "live-editor-1440.png"))
+            page.set_viewport_size({"width": 390, "height": 844})
+            wait(page, 500)
+            over = ev("(() => { const d = document.querySelector('[data-lvedit] .dlg'); return d.scrollWidth - d.clientWidth; })()")
+            assert over <= 1, ("editor sideways scroll at 390", over)
+            assert ev("(() => { const f = document.querySelector('[data-lvedit] .dlg > .foot').getBoundingClientRect(), d = document.querySelector('[data-lvedit] .dlg').getBoundingClientRect(); return f.bottom <= d.bottom + 1 && f.top >= d.top; })()"), "Save and Discard stay in view"
+            page.screenshot(path=str(OUT / "live-editor-390.png"))
+            page.set_viewport_size({"width": 1440, "height": 900})
+            wait(page, 300)
+            ok(f"editor: {missing['n']} controls named and tipped; tooltip on focus: \"{t[:40]}...\"")
+
+            # 5c. Save keeps the changes and closes the editor.
+            page.click('[data-lact="edsave"]')
+            page.wait_for_selector('[data-lvedit]', state="detached")
+            saved = api(port, "live.preset.get", {"id": mine})
+            assert saved["post"] == got["post"] and saved["mods"] == got["mods"]
+            ok("Save closes the editor and keeps the preset")
+
+            # 5d. Changes, then Escape: Flux asks first. Escape again keeps editing; Discard puts the preset back.
+            page.click('[data-lact="edit"]')
+            page.wait_for_selector('[data-lvedit] [data-module]')
+            page.select_option('[data-lchange="madd"][data-lane="post"]', "chorus")
+            wait(page, 600)
+            assert len(api(port, "live.preset.get", {"id": mine})["post"]) == len(saved["post"]) + 1, "edits play while editing"
+            page.keyboard.press("Escape")
+            page.wait_for_selector('[aria-label="Discard changes?"]')
+            wait(page, 300)
+            assert ev("document.activeElement && document.activeElement.dataset.lact") == "eddiscard"
+            page.screenshot(path=str(OUT / "live-editor-discard-1440.png"))
+            page.keyboard.press("Escape")
+            page.wait_for_selector('[aria-label="Discard changes?"]', state="detached")
+            assert ev("!!document.querySelector('[data-lvedit]')"), "Escape on the question keeps editing"
+            page.click('[data-lvedit] .foot [data-lact="edclose"]')
+            page.wait_for_selector('[aria-label="Discard changes?"]')
+            page.click('[data-lact="eddiscard"]')
+            page.wait_for_selector('[data-lvedit]', state="detached")
+            wait(page, 400)
+            back = api(port, "live.preset.get", {"id": mine})
+            assert back["post"] == saved["post"] and back["mods"] == saved["mods"] and back["macros"] == saved["macros"], "discard restores"
+            ok("Escape asks before discarding; Escape again keeps editing; Discard restores the saved preset")
+
+            # 5e. No changes: closing doesn't ask.
+            page.click('[data-lact="edit"]')
+            page.wait_for_selector('[data-lvedit]')
+            page.keyboard.press("Escape")
+            page.wait_for_selector('[data-lvedit]', state="detached")
+            ok("closing an unchanged editor doesn't ask")
+
+            # 5f. Discarding edits to a built-in deletes the copy Flux made, and the route goes back to the built-in.
+            other = ev(f"FD.D.lpresets.find(p => p.builtin && p.kind === 'output' && p.id !== '{builtin}' && p.modules >= 1).id")
+            n_user = len([p for p in api(port, "live.presets") if not p["builtin"]])
+            page.click(f'.fxc[data-id="{other}"]')
+            wait(page, 600)
+            page.click('[data-lact="edit"]')
+            page.wait_for_selector('[data-lvedit] [data-module]')
+            b2 = ev("document.querySelector('[data-lvedit] [data-module] .sl[data-bind^=\"lv:mp\"]').dataset.bind")
+            page.focus(f'[data-bind="{b2}"] .track')
+            for _ in range(4):
+                page.keyboard.press("ArrowRight")
+            wait(page, 1500)
+            assert len([p for p in api(port, "live.presets") if not p["builtin"]]) == n_user + 1
+            page.keyboard.press("Escape")
+            page.wait_for_selector('[aria-label="Discard changes?"]')
+            page.click('[data-lact="eddiscard"]')
+            page.wait_for_selector('[data-lvedit]', state="detached")
+            wait(page, 500)
+            assert len([p for p in api(port, "live.presets") if not p["builtin"]]) == n_user, "the copy is deleted"
+            assert api(port, "live.status")["routes"]["output"]["info"]["preset"] == other
+            assert ev("FD.D.ui.live.sel") == other
+            ok(f"discarding edits to built-in {other} deletes the copy; the route plays {other} again")
+
+            # Back to the preset built above for the rest of the test.
+            page.click(f'.fxc[data-id="{mine}"]')
+            wait(page, 600)
+
             # 6. Render a preview file with before and after levels.
             page.click('[data-lact="render"]')
             for _ in range(100):
@@ -204,17 +313,6 @@ def main():
             assert not missing["noName"], missing["noName"][:5]
             assert not missing["noTip"], missing["noTip"][:5]
             ok(f"{missing['n']} controls: all named, all with tooltips")
-
-            # 9. A tooltip shows on keyboard focus and hides on Escape.
-            page.focus('[data-lact="lim"]')
-            page.keyboard.press("Shift+Tab")
-            page.keyboard.press("Tab")
-            wait(page, 200)
-            t = ev("document.getElementById('tipbox').classList.contains('on') && document.getElementById('tipbox').textContent")
-            assert t and len(t) > 10, t
-            page.keyboard.press("Escape")
-            assert not ev("document.getElementById('tipbox').classList.contains('on')")
-            ok(f"tooltip on focus: \"{t[:50]}...\"")
 
             # 10. Fits at desktop, tablet and phone widths.
             for w, h in [(1440, 900), (820, 1180), (390, 844)]:

@@ -43,7 +43,7 @@
   function own() {
     const p = P(); if (!p) return Promise.reject(new Error('No preset'));
     if (!p.builtin) return Promise.resolve(p.id);
-    if (!owning) owning = call('live.preset.create', { from: p.id }).then(np => { U().note = `“${p.name}” is built in, so Flux made your own copy to change: “${np.name}”.`; U().sel = np.id; D.lpreset = np; useFor(np); F.stale('lpresets'); F.need(['lpresets']).then(Flux.rr); owning = null; return np.id; }, e => { owning = null; throw e; });
+    if (!owning) owning = call('live.preset.create', { from: p.id }).then(np => { if (U().edit && !U().edit.copy) U().edit.copy = np.id; U().note = `“${p.name}” is built in, so Flux made your own copy to change: “${np.name}”.`; U().sel = np.id; D.lpreset = np; useFor(np); F.stale('lpresets'); F.need(['lpresets']).then(Flux.rr); owning = null; return np.id; }, e => { owning = null; throw e; });
     return owning;
   }
   function err(e, where) { U().err[where || 'ed'] = (e && e.message) || String(e); Flux.rr(); }
@@ -62,6 +62,11 @@
       lastSend = performance.now(); const batch = [...pend.values()]; pend.clear();
       chain = chain.then(async () => { const id = await own(); let r = null; for (const [mm, pp] of batch) r = await call(mm, Object.assign({ preset: id }, pp)); if (end && r && r.preset) { D.lpreset = r.preset; Flux.rr(); } }).catch(e => err(e));
     }
+  }
+  /* Send anything still waiting, and wait for every edit to land. */
+  async function flush() {
+    if (pend.size) { const b = [...pend.values()]; pend.clear(); chain = chain.then(async () => { const id = await own(); for (const [mm, pp] of b) await call(mm, Object.assign({ preset: id }, pp)); }); }
+    await chain.catch(() => { }); if (owning) await owning.catch(() => { });
   }
   Flux.liveBind = (parts, pct, end) => {
     const p = P(); if (!p) return '';
@@ -114,7 +119,7 @@
       ${tipd(fld('Play to', sel(outs, f.output, `data-lchange="route" data-route="${route}" data-k="output" aria-label="${ROUTE[route]}: play to"`)), 'Where the processed sound plays. Pick a different output from the one you capture, or it would feed back.')}
       <div class="row">${s ? btn('Stop', { i: 'stop', x: `data-lact="stop" data-route="${route}"${tip('Stop this route. The sound plays as normal again.')}` }) : btn('Start', { k: 'p', i: 'play', x: `data-lact="start" data-route="${route}"${tip('Start listening and processing live.')}` })}
       ${tg('Bypass', s && s.bypass, '', `data-lact="bypass" data-route="${route}"${s ? '' : ' disabled'}${tip('Hear the sound without the preset, to compare. Crossfades, so there are no clicks.')}`)}
-      ${btn('Edit preset', { k: 'g', i: 'pen', x: `data-lact="pick" data-id="${esc(f.preset || '')}"${tip('Open this preset in the designer below.')}` })}</div>
+      ${btn('Edit preset', { k: 'g', i: 'pen', x: `data-lact="editp" data-id="${esc(f.preset || '')}"${tip('Open this preset in the editor.')}` })}</div>
       <div class="col" style="gap:6px">${lvl(route, 'in', 'In')}${lvl(route, 'out', 'Out')}</div>
       <span class="mono dim" style="font-size:12px" data-lvs="${route}">${s ? stats(s) : 'Not running'}</span>
       ${e ? cal('warn', esc(e), 'warn') : ''}
@@ -194,22 +199,43 @@
         <div style="flex:1">${tipd(sl('Curve', pctOf(t.curve, RG.curve), RG.curve.f(t.curve), { bind: `lv:mc:${mc.id}:${k}` }), TIP('macro', 'curve'))}</div></div></div>`; }).join('')}
       ${tipd(sel(targetOpts(p), '', `data-lchange="matadd" data-ma="${mc.id}" aria-label="Connect ${esc(mc.name)} to a parameter"`), 'Add a parameter for this macro to move, from one value to another.')}</div>`;
   }
+  const strip = p => JSON.stringify(Object.assign({}, p, { builtin: false }));
+  const dirty = () => { const e = U().edit; return !!e && (!!e.copy || strip(P()) !== e.snapS); };
+  /* On the page: what the preset is and what you can do with it. Changing it happens in the editor. */
   function designer() {
-    const p = P(), u = U(), L = (D.lkinds && D.lkinds.limits) || {};
-    if (!p) return cal('info', 'Pick a preset above to see how it\'s built and change anything in it.');
-    const T = k => TIP('preset', k);
+    const p = P(), u = U();
+    if (!p) return cal('info', 'Pick a preset above to see how it\'s built, then edit it.');
     return `<div class="col" style="gap:18px" data-designer>
       <div class="between" style="align-items:flex-start;flex-wrap:wrap"><div class="col" style="gap:4px;flex:1;min-width:260px">
-        ${p.builtin ? `<h2 class="h2">${esc(p.name)}</h2><p class="dim" style="margin:0">${esc(p.description)}</p>` : `${inp(p.name, 'Preset name', 'data-lchange="pname" aria-label="Preset name"' + tip('Name your preset.'))}${inp(p.description, 'What it does', 'data-lchange="pdesc" aria-label="Description"' + tip('A line that says what it does. Agents read this too.'))}`}
+        <h2 class="h2">${esc(p.name)}</h2><p class="dim" style="margin:0">${esc(p.description)}</p>
         <div class="row" style="gap:6px">${pill(KIND[p.kind])}${p.builtin ? pill('Built in') : pill('Yours', 'sig')}${(p.tags || []).map(t => pill(esc(t))).join('')}</div></div>
         <div class="row">${btn('Use it', { k: 'p', i: 'play', x: `data-lact="use"${tip('Use this preset for its route. If the route is live, you hear it straight away.')}` })}
+          ${btn('Edit', { i: 'pen', x: `data-lact="edit"${tip(p.builtin ? 'Change anything in it. Built-ins stay as they are: your changes go into your own copy.' : 'Change anything in it. Save keeps the changes; Discard puts it back.')}` })}
           ${btn('Preview file', { i: 'wave', x: `data-lact="render"${tip('Render 8 seconds of test sound through this preset to a WAV, with before and after levels.')}` })}
           ${btn(p.builtin ? 'Make a copy' : 'Duplicate', { i: 'copy', x: `data-lact="dup"${tip('Make your own copy to change.')}` })}
-          ${p.builtin ? '' : btn('Randomize', { i: 'dice', x: `data-lact="rand"${tip('Nudge every parameter at random, around where it is. Do it again for something new.')}` })}
           ${btn('Export', { i: 'exp', x: `data-lact="export"${tip('Save this preset as a .fluxlive file to share or keep.')}` })}
           ${p.builtin ? '' : btn('', { k: 'g', i: 'trash', a: 'Delete preset', x: `data-lact="del"${tip('Delete this preset. It can\'t be undone.')}` })}</div></div>
-      ${u.note ? cal('info', esc(u.note)) : ''}${u.err.ed ? cal('warn', esc(u.err.ed), 'warn') : ''}
+      ${u.note && !u.edit ? cal('info', esc(u.note)) : ''}${u.err.ed && !u.edit ? cal('warn', esc(u.err.ed), 'warn') : ''}
       ${u.render ? cal('wave', `Preview saved: ${F.num(u.render.seconds, 1)} s of ${u.render.source === 'demo-voice' ? 'test voice' : 'test music'}. In ${F.num(u.render.in_rms_db, 1)} dB RMS, out ${F.num(u.render.out_rms_db, 1)} dB RMS, peak ${F.num(u.render.out_peak_db, 1)} dB. ${btn('Show file', { k: 'g', x: `data-lact="reveal" data-path="${esc(u.render.path)}"${tip('Show the preview WAV in its folder.')}` })}`) : ''}
+    </div>`;
+  }
+  /* The editor: every part of the preset, in a dialog. Changes play as you make them; Save keeps them, Discard or
+     Esc asks first and then puts the preset back as it was when the editor opened. */
+  function editor() {
+    const p = P(), u = U(), L = (D.lkinds && D.lkinds.limits) || {};
+    if (!p || !u.edit) return '';
+    const T = k => TIP('preset', k);
+    const x = `<button class="btn g ic" type="button" aria-label="Close" data-lact="edclose"${tip('Close the editor. If you changed anything, Flux asks whether to discard it.')}>${ic('x')}</button>`;
+    const conf = u.edit.confirm ? `<div class="ov" role="alertdialog" aria-modal="true" aria-label="Discard changes?"><div class="dlg"><div class="between"><h2 class="h2">Discard changes?</h2><button class="btn g ic" type="button" aria-label="Close" data-lact="edkeep">${ic('x')}</button></div>
+      <p class="lede" style="margin:0">${u.edit.copy ? 'The copy Flux made for your changes is deleted, and the built-in preset is used again.' : 'Everything you changed since you opened the editor goes back to how it was.'}</p>
+      <div class="foot">${btn('Keep editing', { k: 'g', x: 'data-lact="edkeep"' })}${btn('Discard', { k: 'p', x: 'data-lact="eddiscard" data-edfocus' })}</div></div></div>` : '';
+    return `<div class="ov" role="dialog" aria-modal="true" aria-label="Edit preset" data-lvedit><div class="dlg wide">
+      <div class="between"><h2 class="h2">Edit preset</h2>${x}</div>
+      <div class="col" style="gap:18px">
+      <div class="between" style="align-items:flex-start;flex-wrap:wrap"><div class="col" style="gap:4px;flex:1;min-width:260px">
+        ${p.builtin ? `<b class="h3">${esc(p.name)}</b><p class="dim" style="margin:0">${esc(p.description)}</p>` : `${inp(p.name, 'Preset name', 'data-lchange="pname" aria-label="Preset name"' + tip('Name your preset.'))}${inp(p.description, 'What it does', 'data-lchange="pdesc" aria-label="Description"' + tip('A line that says what it does. Agents read this too.'))}`}</div>
+        <div class="row">${btn('Randomize', { i: 'dice', x: `data-lact="rand"${tip('Nudge every parameter at random, around where it is. Do it again for something new.')}` })}</div></div>
+      ${u.note ? cal('info', esc(u.note)) : ''}${u.err.ed ? cal('warn', esc(u.err.ed), 'warn') : ''}
       ${sec('Whole preset', `<div class="ctl-grid">${rsl('Input gain', 'input_gain_db', p.input_gain_db, 'p:input_gain_db', T('input_gain_db'))}${rsl('Output gain', 'output_gain_db', p.output_gain_db, 'p:output_gain_db', T('output_gain_db'))}${rsl('Width', 'width', p.width, 'p:width', T('width'))}${rsl('Balance', 'balance', p.balance, 'p:balance', T('balance'))}${rsl('Tempo', 'tempo', p.tempo, 'p:tempo', T('tempo'))}
         ${tipd(tg('Safety limiter', p.safety_limiter, '', 'data-lact="lim"'), T('safety_limiter'))}${tipd(fld('For', sel([['output', 'Computer sound'], ['input', 'Microphone'], ['any', 'Either']], p.kind, 'data-lchange="pkind" aria-label="Preset is for"')), T('kind'))}
         ${tipd(fld('Tags', inp((p.tags || []).join(', '), 'Tags', 'data-lchange="ptags" aria-label="Tags, separated by commas"')), 'Words to find it by, separated by commas.')}</div>`)}
@@ -217,7 +243,9 @@
       ${sec(`Lanes · ${p.lanes.length} of ${L.lanes || 8}`, `<p class="dim" style="margin:0;font-size:13px">${esc(TIP('lane', 'lanes'))}</p>${p.lanes.map(l => chainBlock(p, '', l.id, l.modules, l)).join('')}<div>${btn('Add lane', { i: 'plus', x: `data-lact="ladd"${p.lanes.length >= (L.lanes || 8) ? ' disabled' : ''}${tip('Add a parallel lane on the same incoming sound.')}` })}</div>`)}
       ${sec('Post chain', `<p class="dim" style="margin:0;font-size:13px">${esc(TIP('lane', 'post'))}</p>${chainBlock(p, '', 'post', p.post, null)}`)}
       ${sec(`Modulators · ${p.mods.length} of ${L.mods || 16}`, `<p class="dim" style="margin:0;font-size:13px">LFOs, random, step sequencers and envelope followers. Each can move up to ${L.targets || 8} parameters.</p>${p.mods.length ? `<div class="lvmods">${p.mods.map(o => modCard(p, o)).join('')}</div>` : ''}<div>${btn('Add modulator', { i: 'plus', x: `data-lact="moadd"${p.mods.length >= (L.mods || 16) ? ' disabled' : ''}${tip('Add something that moves parameters by itself over time.')}` })}</div>`)}
-    </div>`;
+      </div>
+      <div class="foot">${btn('Discard', { k: 'g', x: `data-lact="edclose"${tip('Throw away the changes made in this editor. Flux asks first.')}` })}${btn('Save', { k: 'p', i: 'check', x: `data-lact="edsave"${tip('Keep the changes and close the editor.')}` })}</div>
+    </div></div>${conf}`;
   }
 
   reg('live', 'Tools', 'Live', () => {
@@ -228,7 +256,7 @@
       <div class="g2">${routeCard('output')}${routeCard('input')}</div>
       ${cap.note ? `<p class="dim" style="margin:0;font-size:13px">${esc(cap.note)}</p>` : ''}
       ${sec('Presets', gallery())}
-      ${sec('Designer', designer())}</div>`, tipd(btn('Agents can build these', { k: 'g', i: 'user', go: 'prefs-agents' }), 'Every control here is also an MCP tool (live.*), so an agent can design, audition and run presets for you.'));
+      ${sec('Designer', designer())}</div>${editor()}`, tipd(btn('Agents can build these', { k: 'g', i: 'user', go: 'prefs-agents' }), 'Every control here is also an MCP tool (live.*), so an agent can design, audition and run presets for you.'));
   });
 
   /* ---------- interaction ---------- */
@@ -236,6 +264,21 @@
   async function pick(id) { const u = U(); if (!id) return; u.sel = id; u.note = null; u.render = null; u.err.ed = null; F.stale('lpreset'); await F.need(['lpreset'], true); if (D.lpreset) useFor(D.lpreset); Flux.rr(); }
   const A = {
     pick: el => pick(el.dataset.id),
+    editp: async el => { if (el.dataset.id && (U().sel !== el.dataset.id || !P())) await pick(el.dataset.id); openEdit(); },
+    edit: () => openEdit(),
+    edsave: async () => { await flush(); U().edit = null; U().note = null; await reload(); },
+    edclose: async () => { await flush(); if (!U().edit) return; if (!dirty()) { U().edit = null; U().note = null; Flux.rr(); return; } U().edit.confirm = true; Flux.rr(); focusSoon('[data-edfocus]'); },
+    edkeep: () => { if (U().edit) U().edit.confirm = false; Flux.rr(); focusSoon('[data-lvedit] [data-lact="edclose"]'); },
+    eddiscard: async () => {
+      await flush(); const e = U().edit; if (!e) return;
+      try {
+        if (e.copy) {
+          for (const r of ['output', 'input']) { if (form(r).preset === e.copy) form(r).preset = e.snap.id; const rs = running(r); if (rs && (rs.info || {}).preset === e.copy) await call('live.set', { route: r, preset: e.snap.id }); }
+          await call('live.preset.delete', { id: e.copy });
+        } else await call('live.preset.save', { preset: e.snap });
+        U().edit = null; U().note = null; U().err.ed = null; await reload(e.snap.id); await pollNow();
+      } catch (er) { e.confirm = false; err(er); }
+    },
     start: async el => { const r = el.dataset.route, f = form(r), u = U(); u.err[r] = null; try { await call('live.start', { route: r, preset: f.preset, source: f.source, source_device: f.source_device || undefined, output: f.output }); } catch (e) { u.err[r] = e.message; } await pollNow(); Flux.rr(); },
     stop: async el => { try { await call('live.stop', { route: el.dataset.route }); } catch (e) { err(e, el.dataset.route); } await pollNow(); Flux.rr(); },
     bypass: async el => { const r = el.dataset.route, s = running(r); if (!s) return; try { await call('live.set', { route: r, bypass: !s.bypass }); } catch (e) { err(e, r); } await pollNow(); Flux.rr(); },
@@ -264,6 +307,12 @@
     marm: el => ed('live.macro.remove', { macro: el.dataset.ma }),
     matrm: el => { const mc = P().macros.find(x => x.id === el.dataset.ma); if (mc) ed('live.macro.set', { macro: mc.id, targets: mc.targets.filter((_, k) => k !== +el.dataset.i) }); },
   };
+  function openEdit() {
+    const p = P(); if (!p) return; const u = U();
+    u.edit = { snap: JSON.parse(JSON.stringify(p)), snapS: strip(p), copy: null, confirm: false }; u.note = null; u.err.ed = null;
+    Flux.rr(); focusSoon('[data-lvedit] [data-lact="edclose"]');
+  }
+  const focusSoon = sel => requestAnimationFrame(() => requestAnimationFrame(() => { const n = document.querySelector(sel); if (n) n.focus(); }));
   function moveBy(id, d) {
     const p = P(); const where = p.post.some(m => m.id === id) ? 'post' : (p.lanes.find(l => l.modules.some(m => m.id === id)) || {}).id, list = where === 'post' ? p.post : p.lanes.find(l => l.id === where).modules, i = list.findIndex(m => m.id === id);
     return ed('live.module.move', { module: id, lane: where, index: Math.max(0, Math.min(list.length - 1, i + d)) }, { list: false });
