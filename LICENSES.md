@@ -57,6 +57,7 @@ scanner covers the full tree.
 | `tauri` 2, `tauri-build` 2 | Desktop shell: native window and webview | MIT OR Apache-2.0 | Allowed |
 | `tauri-plugin-dialog`, `-opener`, `-updater`, `-process` 2 | File dialogs, reveal and links, signed auto-update, restart | MIT OR Apache-2.0 | Allowed |
 | `reqwest` 0.13 (rustls, no default features) | Voice model downloads over HTTPS, with resume | MIT OR Apache-2.0 | Allowed |
+| `pulseaudio` 0.3 (Linux, through cpal's PulseAudio host) | Lists and opens every sink and monitor for Live | MIT | Allowed |
 | `keyring` 4.2 (with its Windows, Apple and zbus Secret Service stores) | Keeps online-service keys in the system keychain | MIT OR Apache-2.0 | Allowed |
 | `rustls` 0.23 (`ring` provider) | TLS for model downloads | Apache-2.0 OR ISC OR MIT (`ring`: Apache-2.0 AND ISC) | Allowed |
 | `sha2` 0.10 | Checking every downloaded file's SHA-256 | MIT OR Apache-2.0 | Allowed |

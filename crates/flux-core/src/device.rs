@@ -290,7 +290,8 @@ impl Cb {
     }
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, serde::Deserialize, Clone, Debug, Default)]
+#[serde(default)]
 pub struct DeviceInfo {
     pub id: String,
     pub name: String,
@@ -299,7 +300,8 @@ pub struct DeviceInfo {
     pub sample_rate: u32,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, serde::Deserialize, Clone, Debug, Default)]
+#[serde(default)]
 pub struct DeviceList {
     pub host: String,
     pub hosts: Vec<String>,
@@ -684,8 +686,17 @@ fn open_output(prefs: &DevicePrefs, want_sr: u32) -> Result<Opened, String> {
 pub fn list_devices() -> DeviceList {
     #[cfg(feature = "device")]
     {
+        list_devices_on(&cpal::default_host())
+    }
+    #[cfg(not(feature = "device"))]
+    DeviceList::default()
+}
+
+/// The devices of one audio host (Live uses PulseAudio on Linux, where every sink and monitor is listed).
+#[cfg(feature = "device")]
+pub fn list_devices_on(host: &cpal::Host) -> DeviceList {
+    {
         use cpal::traits::{DeviceTrait, HostTrait};
-        let host = cpal::default_host();
         let did = host
             .default_output_device()
             .and_then(|d| d.id().ok())
@@ -733,8 +744,6 @@ pub fn list_devices() -> DeviceList {
                 .unwrap_or_default(),
         }
     }
-    #[cfg(not(feature = "device"))]
-    DeviceList::default()
 }
 
 #[derive(Serialize, Clone, Debug, Default)]

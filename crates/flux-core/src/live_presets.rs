@@ -1191,12 +1191,14 @@ fn source_of(v: &Value) -> Result<Source> {
     let dev = os(v, "source_device");
     Ok(match os(v, "source").as_deref().unwrap_or("system") {
         "system" => Source::System(dev),
+        // the Flux speaker; h_start turns it into the device to record
+        "flux" => Source::System(None),
         "input" | "mic" => Source::Input(dev),
         "demo-music" => Source::DemoMusic,
         "demo-voice" => Source::DemoVoice,
         o => bail!(err(
             "bad_params",
-            format!("unknown source `{o}`. Use system, input, demo-music or demo-voice.")
+            format!("unknown source `{o}`. Use flux, system, input, demo-music or demo-voice.")
         )),
     })
 }
@@ -1259,14 +1261,28 @@ pub fn h_start(api: &Api, v: &Value) -> Result<Value> {
     if let Some(r) = old {
         r.stop();
     }
+    if route == "output" {
+        crate::vdev::restore(api);
+    }
+    let (source, output, take) = virtual_devices(api, &route, v, source)?;
     let r = live::start(
         StartOpts {
             route: route.clone(),
             source,
-            output: os(v, "output"),
+            output,
         },
         &p,
     )?;
+    if take {
+        // Apps that follow the system output now play into the Flux speaker; the old output comes back on stop.
+        match crate::vdev::take_default() {
+            Ok(old) => api.lock().live.restore_sink = old,
+            Err(e) => {
+                r.stop();
+                return Err(e);
+            }
+        }
+    }
     let st = r.status();
     api.lock().live.routes.insert(route.clone(), r);
     remember(
@@ -1277,8 +1293,107 @@ pub fn h_start(api: &Api, v: &Value) -> Result<Value> {
     Ok(st)
 }
 
+/// Turn the Flux speaker (`source: flux`) and the Flux microphone (`output: flux`) into real devices: what to
+/// record, where to play, and whether to make the Flux speaker the system output while the route runs (Linux).
+pub fn virtual_devices(
+    api: &Api,
+    route: &str,
+    v: &Value,
+    source: Source,
+) -> Result<(Source, Option<String>, bool)> {
+    use crate::vdev;
+    let output = os(v, "output");
+    let speaker = route == "output" && os(v, "source").as_deref() == Some("flux");
+    let mic = route == "input" && output.as_deref() == Some("flux");
+    if !speaker && !mic {
+        return Ok((source, output, false));
+    }
+    let (mut f, mut d) = vdev::found();
+    let missing = if speaker {
+        f.speaker.is_none()
+    } else {
+        f.mic.is_none()
+    };
+    if missing && vdev::can_create() {
+        vdev::create()?;
+        (f, d) = vdev::found();
+    }
+    let what = if speaker { vdev::SPEAKER } else { vdev::MIC };
+    let pair = if speaker {
+        f.speaker.clone()
+    } else {
+        f.mic.clone()
+    };
+    let pair = pair.ok_or_else(|| {
+        err(
+            "no_virtual_device",
+            format!("There is no {what} on this computer yet. Install a virtual audio cable and Flux uses it (live.virtual says more)."),
+        )
+    })?;
+    if f.shared {
+        let other = if speaker { "input" } else { "output" };
+        if api.lock().live.routes.contains_key(other) {
+            bail!(err(
+                "busy",
+                format!("{} is both the Flux speaker and the Flux microphone, so only one can run at a time. Stop the other route, or install a second virtual cable.", pair.label),
+            ));
+        }
+    }
+    if mic {
+        return Ok((source, Some(pair.play.id), false));
+    }
+    // The Flux speaker: record its other side, and play somewhere real.
+    let real = |id: &str| !vdev::is_virtual(&f, id);
+    if let Some(o) = output.as_deref().filter(|o| *o != "flux") {
+        if o != "none" && !real(o) {
+            bail!(err(
+                "feedback",
+                "That output is a Flux device, so Flux would hear itself. Pick your headphones or speakers.",
+            ));
+        }
+        return Ok((Source::Input(Some(pair.rec.id)), output, false));
+    }
+    let own = pair.kind == "flux" && vdev::can_create();
+    // Linux: the output the system uses now; elsewhere the default output, unless it is the cable itself.
+    let now = if own {
+        vdev::default_sink()
+            .filter(|s| s != "flux_speaker")
+            .and_then(|s| {
+                d.outputs
+                    .iter()
+                    .find(|o| vdev::sink_of(&o.id) == s)
+                    .map(|o| o.id.clone())
+            })
+    } else {
+        None
+    };
+    let out = now
+        .or_else(|| {
+            d.outputs
+                .iter()
+                .find(|o| o.default && real(&o.id))
+                .map(|o| o.id.clone())
+        })
+        .or_else(|| {
+            d.outputs
+                .iter()
+                .find(|o| real(&o.id) && !o.name.to_lowercase().contains("flux"))
+                .map(|o| o.id.clone())
+        })
+        .ok_or_else(|| {
+            err(
+                "no_device",
+                "Flux needs headphones or speakers to play the processed sound on, and found none besides the Flux devices.",
+            )
+        })?;
+    Ok((Source::Input(Some(pair.rec.id)), Some(out), own))
+}
+
 pub fn h_stop(api: &Api, v: &Value) -> Result<Value> {
     let route = route_of(v)?;
+    if route == "output" {
+        crate::vdev::restore(api);
+    }
     let r = api.lock().live.routes.remove(&route);
     match r {
         Some(r) => {
@@ -1338,12 +1453,22 @@ pub fn h_status(api: &Api, _: &Value) -> Result<Value> {
 }
 
 pub fn h_devices(_: &Api, _: &Value) -> Result<Value> {
-    let d = crate::device::list_devices();
+    // the same audio host Live records and plays with (PulseAudio on Linux)
+    let d = crate::vdev::devices();
+    let dv = |x: &Vec<crate::device::DeviceInfo>| {
+        x.iter()
+            .map(|i| crate::vdev::Dev {
+                id: i.id.clone(),
+                name: i.name.clone(),
+            })
+            .collect::<Vec<_>>()
+    };
+    let f = crate::vdev::detect(&dv(&d.outputs), &dv(&d.inputs));
     let loopback = !cfg!(target_os = "linux");
-    let outputs: Vec<Value> = d.outputs.iter().map(|o| json!({"id": o.id, "name": o.name, "default": o.default, "channels": o.channels, "sample_rate": o.sample_rate, "capture": loopback})).collect();
-    let inputs: Vec<Value> = d.inputs.iter().map(|i| json!({"id": i.id, "name": i.name, "default": i.default, "channels": i.channels, "sample_rate": i.sample_rate, "monitor": i.name.to_lowercase().contains("monitor")})).collect();
+    let outputs: Vec<Value> = d.outputs.iter().map(|o| json!({"id": o.id, "name": o.name, "default": o.default, "channels": o.channels, "sample_rate": o.sample_rate, "capture": loopback, "virtual": crate::vdev::is_virtual(&f, &o.id)})).collect();
+    let inputs: Vec<Value> = d.inputs.iter().map(|i| json!({"id": i.id, "name": i.name, "default": i.default, "channels": i.channels, "sample_rate": i.sample_rate, "monitor": i.name.to_lowercase().contains("monitor"), "virtual": crate::vdev::is_virtual(&f, &i.id)})).collect();
     Ok(
-        json!({"host": d.host, "outputs": outputs, "inputs": inputs, "capture": live::capture_support()}),
+        json!({"host": d.host, "outputs": outputs, "inputs": inputs, "capture": live::capture_support(), "flux": crate::vdev::summary(&f)}),
     )
 }
 

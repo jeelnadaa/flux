@@ -93,3 +93,13 @@ transcripts show a `callout warn` and disable Delete and Remove until updated.
 **Checked:** 1440, 820 and 390 px with no sideways scrolling, and at 390 px in all 13 themes and 6 fonts; every
 control named and inside a `data-tip` (`tests/e2e/test_smart_tools.py`, screenshots `target/e2e/smart-*.png`,
 `transcript-*.png`, `fillers-*.png`, `stems-setup-1440.png`, `tts-engine-1440.png`).
+
+## Live: Flux speaker and microphone
+
+Sits under the two route cards, a `box col` shaped like them: a `h3` title and a dim 13 px note on the left, and on
+the right a `pill ok` "Ready" or a `pill` "Not set up", then Add them (`btn p`) or Remove (ghost, trash) where Flux
+makes the devices itself. In the route cards, Sound from gains "Flux speaker: apps you send to it" first, Play to
+gains "Your usual output" (computer sound) and "Flux microphone: for call apps" (microphone). A dim 12.5 px line at
+the bottom of the card says which device to pick in other apps. Virtual devices are never offered as a place to
+listen. No new CSS. **Checked:** 1440, 820 and 390 px with no sideways scrolling (`tests/e2e/test_flux_devices.py`,
+screenshots `target/e2e/flux-devices-*.png`).

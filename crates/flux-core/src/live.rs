@@ -1685,7 +1685,7 @@ pub struct StartOpts {
 #[cfg(feature = "device")]
 fn find_device(id: &Option<String>, output: bool) -> Result<cpal::Device> {
     use cpal::traits::{DeviceTrait, HostTrait};
-    let host = cpal::default_host();
+    let host = crate::vdev::host();
     if let Some(want) = id {
         let list = if output {
             host.output_devices()
@@ -2094,20 +2094,31 @@ pub fn start(o: StartOpts, p: &LivePreset) -> Result<Runner> {
 /// How this computer can capture its own sound.
 pub fn capture_support() -> serde_json::Value {
     let (how, note) = if cfg!(target_os = "windows") {
-        ("loopback", "Pick any output as the source. Flux hears what plays there. Listen on a different output, like headphones, so it doesn't feed back.")
+        ("loopback", "Pick any output as the source. Flux hears what plays there. Listen on a different output, like headphones, so it doesn't feed back. The original still plays where it was; to hear only the processed sound, use the Flux speaker.")
     } else if cfg!(target_os = "macos") {
         ("loopback", "Needs macOS 14.6 or later. macOS asks for permission to record system audio the first time.")
     } else {
         ("monitor", "Pick a \"Monitor of ...\" input as the source (PipeWire and PulseAudio list one for each output).")
     };
-    serde_json::json!({ "system": how, "note": note, "virtual_device": false,
-        "apps_note": "Flux doesn't install a virtual audio device. To send your processed microphone into a call app, route Flux's output to a virtual cable you install, and pick that cable as the call app's microphone." })
+    serde_json::json!({ "system": how, "note": note, "virtual_device": crate::vdev::can_create(),
+        "apps_note": "Play to the Flux microphone, then pick Flux microphone as the microphone in the call app. On Windows and macOS this uses a virtual audio cable you install." })
 }
 
 /// Live state held by the session.
 #[derive(Default)]
 pub struct Live {
     pub routes: BTreeMap<String, Runner>,
+    /// Linux: the system output to put back when the computer-sound route stops (Flux made the Flux speaker the
+    /// system output while it ran).
+    pub restore_sink: Option<String>,
+}
+
+impl Drop for Live {
+    fn drop(&mut self) {
+        if let Some(o) = self.restore_sink.take() {
+            let _ = crate::vdev::set_default_sink(&o);
+        }
+    }
 }
 
 #[cfg(test)]

@@ -19,5 +19,6 @@ pub mod server;
 pub mod smart;
 pub mod store;
 pub mod tools;
+pub mod vdev;
 pub mod voiceclone;
 pub mod voicemodels;

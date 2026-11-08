@@ -36,7 +36,7 @@ AI agents can drive every feature.
   asks, then puts the preset back. Built-ins play 3 LU below their input by default. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
-- **Command API.** 176 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Command API.** 179 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 
@@ -77,6 +77,12 @@ AI agents can drive every feature.
   Replicate. Flux never suggests them; choosing one asks first and says what is sent where. Keys come from an
   environment variable (`OPENAI_API_KEY` and the like) or the system keychain, and are never shown, logged or saved
   in Flux's files. The OpenAI engines also work with any OpenAI-compatible server. See ADR 0006.
+
+- **Flux speaker and Flux microphone.** Pick the Flux speaker as the output in any app and Live plays it through a
+  preset to your headphones, so you hear only the processed sound. Pick the Flux microphone in a call app to send it
+  your processed voice. On Linux (PipeWire or PulseAudio) Flux adds both itself, with no administrator password. On
+  Windows and macOS, install a free virtual audio cable and Flux finds it and uses it: a device of Flux's own needs a
+  paid, signed driver (ADR 0007). The Linux path has only been tested against a stand-in so far.
 
 - **Smart tools in Settings.** One page lists every engine for stems, transcripts and speech with its size,
   licence and tier, marks the one suggested for this computer, and downloads, uses or removes it. Online engines

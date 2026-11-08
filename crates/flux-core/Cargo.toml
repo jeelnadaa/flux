@@ -23,7 +23,7 @@ rtrb = "0.3"
 tiny_http = "0.12"
 dirs = "6"
 zip = { version = "9", default-features = false, features = ["deflate"] }
-cpal = { version = "0.18", optional = true }
+cpal = { version = "0.18", optional = true, features = ["pulseaudio"] }
 # Model downloads (voice cloning): HTTPS with the same TLS stack the app's updater uses, checksums, free space,
 # and unpacking the portable Python archive.
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider", "system-proxy", "json", "multipart"] }

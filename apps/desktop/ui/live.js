@@ -88,11 +88,15 @@
     const u = U(), st = D.lstatus || {}, last = (st.last || {})[route] || {}, dv = D.ldevices || { outputs: [], inputs: [] };
     const defOut = (dv.outputs.find(o => o.default) || dv.outputs[0] || {}).id, defIn = (dv.inputs.find(o => o.default) || dv.inputs[0] || {}).id;
     const mon = st.capture && st.capture.system === 'monitor';
-    const def = route === 'output'
+    const vd = dv.flux || {}, flux = route === 'output' ? !!(vd.speaker || vd.can_create) : !!(vd.mic || vd.can_create);
+    const def = route === 'output' && flux ? { source: 'flux', source_device: undefined, output: 'auto', preset: (presetsFor('output')[0] || {}).id }
+      : route === 'input' && flux ? { source: 'input', source_device: defIn, output: 'flux', preset: (presetsFor('input')[0] || {}).id }
+      : route === 'output'
       ? { source: 'system', source_device: mon ? (dv.inputs.find(i => i.monitor) || {}).id : defOut, output: (dv.outputs.find(o => o.id !== defOut) || {}).id || 'none', preset: (presetsFor('output')[0] || {}).id }
       : { source: 'input', source_device: defIn, output: defOut || 'none', preset: (presetsFor('input')[0] || {}).id };
     const f = u.route[route] = Object.assign(def, last, u.route[route] || {});
-    if (/^demo/.test(f.source)) f.source_device = undefined;
+    if (/^demo|^flux/.test(f.source)) f.source_device = undefined;
+    if (route === 'output' && f.source === 'flux' && !f.output) f.output = 'auto';
     return f;
   }
   const running = route => { const s = ((D.lstatus || {}).routes || {})[route]; return s && s.running ? s : null; };
@@ -103,13 +107,16 @@
   function sourceOpts(route) {
     const dv = D.ldevices || { outputs: [], inputs: [] }, mon = ((D.lstatus || {}).capture || {}).system === 'monitor';
     if (route === 'input') return dv.inputs.filter(i => !i.monitor).map(i => ['input|' + i.id, esc(i.name) + (i.default ? ' (default)' : '')]).concat([['demo-voice|', 'Test voice (built in)']]);
+    const vd = dv.flux || {}, fx = vd.speaker || vd.can_create ? [['flux|', 'Flux speaker' + (vd.speaker && vd.speaker.kind === 'cable' ? ' (' + esc(vd.speaker.label) + ')' : '') + ': apps you send to it']] : [];
     const sys = mon ? dv.inputs.filter(i => i.monitor).map(i => ['system|' + i.id, esc(i.name)]) : dv.outputs.map(o => ['system|' + o.id, 'What plays on ' + esc(o.name) + (o.default ? ' (default)' : '')]);
-    return sys.concat([['demo-music|', 'Test music (built in)']]);
+    return fx.concat(sys, [['demo-music|', 'Test music (built in)']]);
   }
   const lvl = (route, io, label) => `<div class="row" style="gap:8px;flex-wrap:nowrap"><span class="lab" style="width:28px">${label}</span><div class="meter" style="flex:1;width:auto" role="img" aria-label="${ROUTE[route]} level ${label === 'In' ? 'coming in' : 'going out'}"><div class="m"><i data-lvm="${route}:${io}"></i></div></div><span class="mono dim" style="width:64px;text-align:right" data-lvd="${route}:${io}">−∞</span></div>`;
   function routeCard(route) {
     const f = form(route), s = running(route), dv = D.ldevices || { outputs: [] }, cap = (D.lstatus || {}).capture || {}, e = U().err[route];
-    const outs = dv.outputs.map(o => [o.id, esc(o.name) + (o.default ? ' (default)' : '')]).concat([['none', 'Nowhere (meters only)']]);
+    const vd = dv.flux || {}, real = dv.outputs.filter(o => !o.virtual).map(o => [o.id, esc(o.name) + (o.default ? ' (default)' : '')]);
+    const outs = (route === 'output' && f.source === 'flux' ? [['auto', 'Your usual output']] : route === 'input' && (vd.mic || vd.can_create) ? [['flux', 'Flux microphone' + (vd.mic && vd.mic.kind === 'cable' ? ' (' + esc(vd.mic.label) + ')' : '') + ': for call apps']] : []).concat(real, [['none', 'Nowhere (meters only)']]);
+    const pick = route === 'output' ? f.source === 'flux' && vd.speaker && `In your music app or the system sound settings, choose ${esc(vd.speaker.kind === 'cable' ? vd.speaker.play.name : vd.speaker.label)} as the output. You hear only the processed sound.` : f.output === 'flux' && vd.mic && `In your call app, choose ${esc(vd.mic.kind === 'cable' ? vd.mic.rec.name : vd.mic.label)} as the microphone.`;
     const ps = presetsFor(route).map(p => [p.id, esc(p.name) + (p.builtin ? '' : ' · yours')]);
     const t = TIP('route', route);
     return `<div class="box col" data-route="${route}"${s ? ' style="box-shadow:inset 0 0 0 2px var(--tx)"' : ''}>
@@ -123,8 +130,14 @@
       <div class="col" style="gap:6px">${lvl(route, 'in', 'In')}${lvl(route, 'out', 'Out')}</div>
       <span class="mono dim" style="font-size:12px" data-lvs="${route}">${s ? stats(s) : 'Not running'}</span>
       ${e ? cal('warn', esc(e), 'warn') : ''}
-      ${route === 'input' ? `<p class="dim" style="font-size:12.5px;margin:0"${tip(cap.apps_note)}>To use this in a call app, play to a virtual cable and pick the cable as the app's microphone.</p>` : ''}
+      ${pick ? `<p class="dim" style="font-size:12.5px;margin:0" data-lv="pick-${route}"${tip(cap.apps_note)}>${pick}</p>` : ''}
     </div>`;
+  }
+  function fluxDevices() {
+    const v = (D.ldevices || {}).flux; if (!v) return '';
+    const own = v.speaker && v.speaker.kind === 'flux', e = U().verr;
+    const act = v.can_create ? (own ? btn('Remove', { k: 'g', i: 'trash', x: `data-lact="vset" data-v="remove"${tip('Removes the Flux speaker and microphone from this computer. Apps go back to your own devices.')}` }) : btn('Add them', { k: 'p', i: 'plus', x: `data-lact="vset" data-v="setup"${tip('Adds the Flux speaker and Flux microphone to this computer. No administrator password is needed.')}` })) : '';
+    return `<div class="box col" data-lv="flux-devices"><div class="between" style="flex-wrap:wrap;gap:10px"><div class="col" style="gap:2px;flex:1 1 240px;min-width:0"><b class="h3"${tip('Devices other apps can pick, so their sound goes through Flux and your processed voice reaches call apps.')}>Flux speaker and microphone</b><span class="dim" style="font-size:13px">${esc(v.note || '')}</span></div><div class="row">${v.speaker || v.mic ? pill('Ready', 'ok') : pill('Not set up')}${act}</div></div>${e ? cal('warn', esc(e), 'warn') : ''}</div>`;
   }
   const stats = s => `${F.khz((s.info || {}).sample_rate || 48000)} · ${F.num(s.buffer_ms || 0, 1)} ms buffer · ${s.underruns || 0} dropouts${s.error ? ' · ' + esc(s.error) : ''}`;
 
@@ -253,7 +266,7 @@
     /* Open on the preset that is playing, or the one used last. */
     if (!u.sel && !u.picked) { u.picked = 1; const r = (D.lstatus || {}).routes || {}, id = (r.output && r.output.info.preset) || (r.input && r.input.info.preset) || form('output').preset; if (id) { u.sel = id; F.stale('lpreset'); F.need(['lpreset'], true).then(Flux.rr); } }
     return pg('live', 'Live', 'Put a preset on everything your computer plays, or on your microphone, as it happens. Then build your own from any effect.', `<div data-livepage class="col" style="gap:22px">
-      <div class="g2">${routeCard('output')}${routeCard('input')}</div>
+      <div class="g2">${routeCard('output')}${routeCard('input')}</div>${fluxDevices()}
       ${cap.note ? `<p class="dim" style="margin:0;font-size:13px">${esc(cap.note)}</p>` : ''}
       ${sec('Presets', gallery())}
       ${sec('Designer', designer())}</div>${editor()}`, tipd(btn('Agents can build these', { k: 'g', i: 'user', go: 'prefs-agents' }), 'Every control here is also an MCP tool (live.*), so an agent can design, audition and run presets for you.'));
@@ -279,7 +292,8 @@
         U().edit = null; U().note = null; U().err.ed = null; await reload(e.snap.id); await pollNow();
       } catch (er) { e.confirm = false; err(er); }
     },
-    start: async el => { const r = el.dataset.route, f = form(r), u = U(); u.err[r] = null; try { await call('live.start', { route: r, preset: f.preset, source: f.source, source_device: f.source_device || undefined, output: f.output }); } catch (e) { u.err[r] = e.message; } await pollNow(); Flux.rr(); },
+    vset: async el => { const u = U(), rm = el.dataset.v === 'remove'; u.verr = null; try { await call(rm ? 'live.virtual.remove' : 'live.virtual.setup', {}); } catch (e) { u.verr = e.message; } delete u.route.output; delete u.route.input; F.stale('ldevices'); await F.need(['ldevices'], true); Flux.rr(); },
+    start: async el => { const r = el.dataset.route, f = form(r), u = U(); u.err[r] = null; try { await call('live.start', { route: r, preset: f.preset, source: f.source, source_device: f.source_device || undefined, output: f.output === 'auto' ? undefined : f.output }); } catch (e) { u.err[r] = e.message; } await pollNow(); Flux.rr(); },
     stop: async el => { try { await call('live.stop', { route: el.dataset.route }); } catch (e) { err(e, el.dataset.route); } await pollNow(); Flux.rr(); },
     bypass: async el => { const r = el.dataset.route, s = running(r); if (!s) return; try { await call('live.set', { route: r, bypass: !s.bypass }); } catch (e) { err(e, r); } await pollNow(); Flux.rr(); },
     use: () => { const p = P(); if (p) { useFor(p); Flux.rr(); } },
@@ -319,7 +333,7 @@
   }
   const parseVal = (m, k, s) => { const v = parseFloat(String(s).replace(',', '.').replace('−', '-')); return isFinite(v) ? v : null; };
   const C = {
-    route: el => { const r = el.dataset.route, f = form(r), k = el.dataset.k; if (k === 'src') { const [s, d] = el.value.split('|'); f.source = s; f.source_device = d || undefined; } else f[k] = el.value; if (running(r) && k === 'preset') { call('live.set', { route: r, preset: el.value }).then(pollNow, e => err(e, r)); U().sel = el.value; F.stale('lpreset'); F.need(['lpreset'], true).then(Flux.rr); } else if (running(r)) { U().err[r] = 'Stop and start again to use the new device.'; Flux.rr(); } },
+    route: el => { const r = el.dataset.route, f = form(r), k = el.dataset.k; if (k === 'src') { const [s, d] = el.value.split('|'); f.source = s; f.source_device = d || undefined; if (r === 'output') { const dv = D.ldevices || { outputs: [] }, out = dv.outputs.find(o => !o.virtual && o.id !== d); if (s === 'flux') f.output = 'auto'; else if (f.output === 'auto') f.output = (out || {}).id || 'none'; Flux.rr(); } } else f[k] = el.value; if (running(r) && k === 'preset') { call('live.set', { route: r, preset: el.value }).then(pollNow, e => err(e, r)); U().sel = el.value; F.stale('lpreset'); F.need(['lpreset'], true).then(Flux.rr); } else if (running(r)) { U().err[r] = 'Stop and start again to use the new device.'; Flux.rr(); } },
     q: el => { U().q = el.value; Flux.rr(); },
     pname: el => el.value.trim() && ed('live.preset.update', { name: el.value.trim() }),
     pdesc: el => ed('live.preset.update', { description: el.value }),
