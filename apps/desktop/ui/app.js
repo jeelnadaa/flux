@@ -132,13 +132,13 @@
     requestAnimationFrame(() => {
       rrPending = false; if (dragging) return;
       const m = stage.querySelector('#m'), st = m ? m.scrollTop : 0, aside = stage.querySelector('aside.b'), ast = aside ? aside.scrollTop : 0;
-      const a = document.activeElement, all = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')], fi = all.indexOf(a), caret = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
+      const a = document.activeElement, all = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')], fi = all.indexOf(a), caret = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null, hadTip = !!(tipFor && a && tipFor.contains(a));
       // Dialogs that stay open keep their scroll and don't play their opening animation again.
       const ovs = new Map([...stage.querySelectorAll('.ov[aria-label]')].map(o => [o.getAttribute('aria-label'), (o.querySelector('.dlg') || {}).scrollTop || 0]));
       stage.innerHTML = M[cur].fn(); hydrate(stage);
       stage.querySelectorAll('.ov[aria-label]').forEach(o => { const k = o.getAttribute('aria-label'); if (ovs.has(k)) { o.classList.add('still'); const d = o.querySelector('.dlg'); if (d) d.scrollTop = ovs.get(k); } });
       const m2 = stage.querySelector('#m'); if (m2) m2.scrollTop = st; const a2 = stage.querySelector('aside.b'); if (a2) a2.scrollTop = ast;
-      if (fi >= 0) { const n = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')][fi]; if (n) { n.focus({ preventScroll: true }); if (caret && 'setSelectionRange' in n) try { n.setSelectionRange(caret[0], caret[1]); } catch (e) { } } }
+      if (fi >= 0) { const n = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')][fi]; if (n) { tipQuiet = !hadTip; n.focus({ preventScroll: true }); tipQuiet = false; if (caret && 'setSelectionRange' in n) try { n.setSelectionRange(caret[0], caret[1]); } catch (e) { } } }
     });
   }
   Flux.rr = rr;
@@ -413,7 +413,7 @@
 
   /* ---------- tooltips: any element with data-tip, on hover (after a short wait) or keyboard focus ---------- */
   const tipEl = document.createElement('div'); tipEl.className = 'tipbox'; tipEl.id = 'tipbox'; tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl);
-  let tipT = 0, tipFor = null, tipDesc = null;
+  let tipT = 0, tipFor = null, tipDesc = null, tipQuiet = false; // tipQuiet: a redraw is putting focus back, which is not the person arriving at a control
   function showTip(el) {
     const t = el.dataset.tip; if (!t || !document.contains(el)) return;
     tipFor = el; tipEl.textContent = t; tipEl.classList.add('on');
@@ -426,7 +426,7 @@
   function hideTip() { clearTimeout(tipT); tipEl.classList.remove('on'); if (tipDesc) { tipDesc.removeAttribute('aria-describedby'); tipDesc = null; } tipFor = null; }
   Flux.hideTip = hideTip;
   document.addEventListener('pointerover', e => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el === tipFor) return; hideTip(); if (el && !drag && e.pointerType !== 'touch') tipT = setTimeout(() => showTip(el), 420); });
-  document.addEventListener('focusin', e => { const el = e.target.closest && e.target.closest('[data-tip]'); hideTip(); if (el) { let fv = true; try { fv = e.target.matches(':focus-visible'); } catch (er) { } if (fv) showTip(el); } });
+  document.addEventListener('focusin', e => { const el = e.target.closest && e.target.closest('[data-tip]'); hideTip(); if (el) { let fv = true; try { fv = e.target.matches(':focus-visible'); } catch (er) { } if (fv && !tipQuiet) showTip(el); } });
   document.addEventListener('focusout', () => hideTip());
   document.addEventListener('pointerdown', () => hideTip(), true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && tipFor) hideTip(); }, true);

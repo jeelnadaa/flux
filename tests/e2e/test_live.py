@@ -201,7 +201,7 @@ def main():
             assert t and len(t) > 10, t
             page.keyboard.press("Escape")
             wait(page, 50)
-            assert ev("document.getElementById('tipbox').textContent") != t, "Escape hides the tooltip"
+            assert not ev("document.getElementById('tipbox').classList.contains('on') && document.getElementById('tipbox').textContent") == t, "Escape hides the tooltip"
             page.wait_for_selector('[aria-label="Discard changes?"]')
             page.click('[aria-label="Discard changes?"] .foot [data-lact="edkeep"]')
             page.wait_for_selector('[aria-label="Discard changes?"]', state="detached")
