@@ -142,7 +142,7 @@ def main():
     tmp = Path(tempfile.mkdtemp(prefix="flux-e2e-clone-"))
     mir = build_catalog(tmp / "data")
     port = free_port()
-    env = dict(os.environ, FLUX_DATA_DIR=str(tmp / "data"), FLUX_EXPORT_DIR=str(tmp / "export"), FLUX_NULL_AUDIO="1", FLUX_STUB_LOG=str(tmp / "stub.log"))
+    env = dict(os.environ, FLUX_DATA_DIR=str(tmp / "data"), FLUX_EXPORT_DIR=str(tmp / "export"), FLUX_NULL_AUDIO="1", FLUX_STUB_LOG=str(tmp / "stub.log"), FLUX_STUB_PIP_SLEEP="1.5")
     srv = subprocess.Popen([str(EXE), "serve", "--port", str(port), "--ui", str(ROOT / "apps/desktop/ui"), "--no-token"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     passed = []
 
@@ -197,7 +197,12 @@ def main():
             page.click('[data-cact="dl-ask"][data-id="t-turbo"]')
             page.wait_for_selector('[role="dialog"] [data-cact="dl-go"]')
             page.click('[role="dialog"] [data-cact="dl-go"]')
-            page.wait_for_selector('[data-cact="dl-cancel"][data-id="t-turbo"]', timeout=10000)
+            try:
+                page.wait_for_selector('[data-cact="dl-cancel"][data-id="t-turbo"]', timeout=10000)
+            except Exception:
+                print(page.inner_text("#stage")[:3000])
+                print(json.dumps(api(port, "clone.models").get("runtime")))
+                raise
             assert page.locator('[role="progressbar"]').count() >= 1
             page.screenshot(path=str(OUT / "clone-downloading-1440.png"))
             page.wait_for_selector('[data-cact="use-model"][data-id="t-turbo"]', timeout=60000)
