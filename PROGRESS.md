@@ -112,6 +112,7 @@ None.
 
 ## Session log
 
+- 2026-11-08: First-run test fix: test_first_run timed out on Linux CI waiting for Hello. because a machine with no sound output correctly goes to the no-sound page first. The app is right; the test assumed a sound card. The test now sets the engine row itself and checks both paths, including the no-sound page, which had no test before.
 - 2026-11-08: R7.9 test fix: test_clone_models timed out on Linux CI waiting for Cancel because the stub download could finish between two polls of the page. Reproduced on Windows by removing the mirror's delay (same error, same line). The stub install now takes a set time; passes with the delay removed too. Prints the page and engine state if it ever fails.
 - 2026-11-08: R5.3 fix: a 504 downloading NSIS's plugin failed the Windows release. The bundler's tools are now cached between runs and the build retries 3 times. Workflow parsed and checked by script; not run on GitHub (needs a push).
 - 2026-11-08: R5.3 fix: a 504 downloading sccache failed every CI and release job, because RUSTC_WRAPPER was set job-wide and the action's post step read stats from the missing tool. sccache is now optional per job. Workflow files parsed and checked by script (3 places); not run on GitHub (needs a push).

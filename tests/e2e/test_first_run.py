@@ -67,6 +67,20 @@ def main():
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
             base = f"http://127.0.0.1:{port}/"
 
+            # Build machines have no sound output and desktops do, and first run differs. The test sets which one it is.
+            sound = {"state": "ok"}
+
+            def caps(route):
+                if '"app.capabilities"' not in (route.request.post_data or ""):
+                    route.continue_()
+                    return
+                r = route.fetch()
+                d = r.json()
+                next(x for x in d["result"] if x["id"] == "engine")["state"] = sound["state"]
+                route.fulfill(response=r, json=d)
+
+            page.route("**/api/call", caps)
+
             page.goto(base)
             page.wait_for_selector('text=Checking what this computer can do.')
             for _ in range(30):
@@ -84,6 +98,22 @@ def main():
             page.wait_for_selector('text=What are we doing to it?')
             assert page.locator('text=Checking what this computer can do.').count() == 0
             ok("starting again goes home, not back into first run")
+
+            # A computer with no sound output is told so, and can carry on.
+            sound["state"] = "warn"
+            page.goto("about:blank")
+            page.goto(base + "#boot")
+            page.wait_for_selector('text=Checking what this computer can do.')
+            page.click('a.btn:has-text("Continue"), button:has-text("Continue")')
+            page.wait_for_selector("text=Flux can't find a sound output.")
+            assert page.locator('text=Hello.').count() == 0
+            page.click('text=Continue without sound')
+            page.wait_for_selector('text=Hello.')
+            sound["state"] = "ok"
+            page.goto("about:blank")
+            page.goto(base)
+            page.wait_for_selector('text=What are we doing to it?')
+            ok("with no sound output, first run says so and carries on without sound")
 
             # First-run sound steps, no project open: the tones play, no error dialog.
             page.goto(base + "#hpcheck")
