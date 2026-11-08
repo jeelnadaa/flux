@@ -112,6 +112,7 @@ None.
 
 ## Session log
 
+- 2026-11-08: R5.3 fix: a 504 downloading NSIS's plugin failed the Windows release. The bundler's tools are now cached between runs and the build retries 3 times. Workflow parsed and checked by script; not run on GitHub (needs a push).
 - 2026-11-08: R5.3 fix: a 504 downloading sccache failed every CI and release job, because RUSTC_WRAPPER was set job-wide and the action's post step read stats from the missing tool. sccache is now optional per job. Workflow files parsed and checked by script (3 places); not run on GitHub (needs a push).
 - 2026-11-08: R7.15 virtual cable guide. Install steps checked against the makers' pages (VB-CABLE, BlackHole). test_flux_devices.py now 5 checks: not installed shown on panel and both cards; guide steps for each OS at 1440, 820 and 390 with no overflow; maker's link; Check again says still not found, then finds a cable added while it is open and Live switches to it. The guide found a missing kit import. Detection now also accepts cables named the same on both sides (VB-Cable on macOS) and two BlackHole sizes. The real install was not run: it adds a driver to this computer and needs a restart.
 

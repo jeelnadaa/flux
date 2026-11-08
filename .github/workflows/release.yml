@@ -146,6 +146,18 @@ jobs:
       - name: Build the MCP server (bundled with the app)
         run: node scripts/sidecar.mjs --target ${{ matrix.target }}
 
+      # The bundler downloads its tools (NSIS, WiX, AppImage) from GitHub on every run, and GitHub answers 504 at
+      # times. Kept between runs, they are only downloaded once.
+      - name: Keep the bundler's tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/AppData/Local/tauri
+            ~/.cache/tauri
+            ~/Library/Caches/tauri
+          key: tauri-tools-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: tauri-tools-${{ runner.os }}-
+
       - name: Build and upload the app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -156,6 +168,8 @@ jobs:
           args: --config apps/desktop/src-tauri/tauri.conf.json --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
           includeUpdaterJson: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
           updaterJsonPreferNsis: true
+          # A download that fails the first time usually works a moment later; compiled code is reused.
+          retryAttempts: 3
 
       - name: Upload the MCP server on its own
         shell: bash
