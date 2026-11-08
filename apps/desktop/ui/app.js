@@ -48,6 +48,7 @@
     if (Flux.hideTip) Flux.hideTip();
     root.querySelectorAll('.seg').forEach(s => { const ind = s.querySelector('.ind'); if (ind) ind.style.transition = 'none'; placeInd(s); if (ind) { ind.getBoundingClientRect(); ind.style.transition = ''; } });
     root.querySelectorAll('.in').forEach(el => [...el.children].forEach((c, i) => c.style.setProperty('--n', Math.min(i, 14))));
+    if (root === stage) tlMount();
     Viz.mount(root);
     if (Flux.applyTips) Flux.applyTips(root);
     splitType(root);
@@ -111,7 +112,7 @@
     await F.need(ALWAYS.concat(NEED[id] || []));
     if (seq !== navSeq) return;
     if (id === 'hpcheck' && cur !== 'hrtf' && cur !== 'hpcheck') D.ui.soundFrom = cur && M[cur] && M[cur].group !== 'First run' ? cur : null;
-    const go = () => { stage.innerHTML = M[id].fn(); const prev = cur; cur = id; hydrate(stage); document.title = (P() ? P().name + ' · ' : '') + 'Flux'; const m = stage.querySelector('#m'); if (m && prev !== id) m.scrollTop = 0; };
+    const go = () => { stage.classList.remove('rr'); stage.innerHTML = M[id].fn(); const prev = cur; cur = id; hydrate(stage); document.title = (P() ? P().name + ' · ' : '') + 'Flux'; const m = stage.querySelector('#m'); if (m && prev !== id) m.scrollTop = 0; };
     if (canVT() && cur && cur !== id) quiet(document.startViewTransition(go)); else go();
     if (push !== false) { try { history.replaceState(null, '', '#' + id); } catch (e) { location.hash = id; } }
     if (ENTER[id]) ENTER[id]();
@@ -132,13 +133,13 @@
     requestAnimationFrame(() => {
       rrPending = false; if (dragging) return;
       const m = stage.querySelector('#m'), st = m ? m.scrollTop : 0, aside = stage.querySelector('aside.b'), ast = aside ? aside.scrollTop : 0;
-      const a = document.activeElement, all = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')], fi = all.indexOf(a), caret = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null, hadTip = !!(tipFor && a && tipFor.contains(a));
+      const a = document.activeElement, fclip = a && a.dataset ? a.dataset.clip : null, all = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')], fi = all.indexOf(a), caret = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null, hadTip = !!(tipFor && a && tipFor.contains(a));
       // Dialogs that stay open keep their scroll and don't play their opening animation again.
       const ovs = new Map([...stage.querySelectorAll('.ov[aria-label]')].map(o => [o.getAttribute('aria-label'), (o.querySelector('.dlg') || {}).scrollTop || 0]));
-      stage.innerHTML = M[cur].fn(); hydrate(stage);
+      stage.classList.add('rr'); stage.innerHTML = M[cur].fn(); hydrate(stage);
       stage.querySelectorAll('.ov[aria-label]').forEach(o => { const k = o.getAttribute('aria-label'); if (ovs.has(k)) { o.classList.add('still'); const d = o.querySelector('.dlg'); if (d) d.scrollTop = ovs.get(k); } });
       const m2 = stage.querySelector('#m'); if (m2) m2.scrollTop = st; const a2 = stage.querySelector('aside.b'); if (a2) a2.scrollTop = ast;
-      if (fi >= 0) { const n = [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')][fi]; if (n) { tipQuiet = !hadTip; n.focus({ preventScroll: true }); tipQuiet = false; if (caret && 'setSelectionRange' in n) try { n.setSelectionRange(caret[0], caret[1]); } catch (e) { } } }
+      if (fi >= 0) { const n = (fclip && stage.querySelector(`[data-clip="${fclip}"]`)) || [...stage.querySelectorAll('a,button,input,select,textarea,[tabindex]')][fi]; if (n) { tipQuiet = !hadTip; n.focus({ preventScroll: true }); tipQuiet = false; if (caret && 'setSelectionRange' in n) try { n.setSelectionRange(caret[0], caret[1]); } catch (e) { } } }
     });
   }
   Flux.rr = rr;
@@ -216,7 +217,11 @@
     'edit-delete': () => D.sel.clip != null && act('clip.delete', { clip: D.sel.clip }).then(() => { D.sel.clip = null; rr(); }),
     'edit-copy': () => D.sel.clip != null && act('edit.copy', { clip: D.sel.clip }, { refresh: false }),
     'edit-cut': () => D.sel.clip != null && act('edit.cut', { clip: D.sel.clip }).then(() => { D.sel.clip = null; rr(); }),
-    zoom: () => { D.ui.zoom = (D.ui.zoom || 1) >= 16 ? 1 : (D.ui.zoom || 1) * 2; rr(); },
+    zoom: () => { const tl = theTl(); if (tl) zoomTo((D.ui.zoom || 1) >= zoomMax(tl) ? 1 : (D.ui.zoom || 1) * 2); },
+    'zoom-in': () => zoomTo((D.ui.zoom || 1) * 1.6),
+    'zoom-out': () => zoomTo((D.ui.zoom || 1) / 1.6),
+    'zoom-fit': () => { zoomTo(1); const tl = theTl(); if (tl) tl.scrollLeft = 0; },
+    'clip-deselect': () => selectClip(null),
     'ui-toggle': el => { const k = ds(el).k, def = ds(el).def === '1'; D.ui[k] = !(D.ui[k] == null ? def : D.ui[k]); rr(); },
     'ui-set': el => { const k = ds(el).k, v = ds(el).v; D.ui[k] = D.ui[k] === v && k === 'guide' ? null : (/^-?\d+(\.\d+)?$/.test(v) && k !== 'action' ? +v : v); rr(); },
     'track-flag': el => { const t = F.track(+ds(el).track); if (t) act('track.set', { track: t.id, [ds(el).k]: !t[ds(el).k] }); },
@@ -357,7 +362,7 @@
   };
   function curLane() { const p = P(); if (!p || !p.tracks.length) return null; const cur0 = D.ui.autoTarget || `${p.tracks[0].id}:volume`, [tid, ...rest] = cur0.split(':'), t = F.track(+tid) || p.tracks[0], target = rest.join(':'); return { t, target, lane: (t.lanes || []).find(l => l.target === target) }; }
   async function specRepair(fill) { const s = D.ui.specSel; if (!s) return; await act('tool.spectral.repair', { start: Math.round(s.t0), end: Math.round(s.t1), low_hz: s.f0, high_hz: s.f1, amount_db: D.ui.repairDb || 30, fill }); D.ui.specSel = null; rr(); }
-  function resetProjectUi() { ['magic', 'masterPlan', 'mastered', 'silScan', 'specSel', 'stemMix', 'cleanReport', 'styleAmt', 'macroMap', 'job', 'zoom'].forEach(k => delete D.ui[k]); lastRev = -1; }
+  function resetProjectUi() { ['magic', 'masterPlan', 'mastered', 'silScan', 'specSel', 'stemMix', 'cleanReport', 'styleAmt', 'macroMap', 'job', 'zoom', 'tlX', 'tlY'].forEach(k => delete D.ui[k]); lastRev = -1; }
   function copyText(t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).catch(() => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); }); }
 
   /* ---------- live parameter edits (EQ drag, stage) ---------- */
@@ -458,7 +463,16 @@
     const g = e.target.closest('[data-go]');
     if (g && !g.closest('[data-hold]')) { e.preventDefault(); if (g.dataset.go) render(g.dataset.go); return; }
     const cl = e.target.closest('[data-clip]');
-    if (cl && !clipDrag) { const id = +cl.dataset.clip; D.sel.clip = id; D.sel.track = (F.clip(id) || {}).track; call('selection.set', { clip: id }).catch(() => { }); rr(); return; }
+    if (cl && !clipDrag) { const id = +cl.dataset.clip; selectClip(D.sel.clip === id ? null : id); return; }
+    const sv = e.target.closest('.sl[data-bind] .sv, .fader[data-bind]~[data-gtext]');
+    if (sv && openTyped(sv.closest('.sl') || sv.parentElement.querySelector('.fader'))) return;
+    const ln = !cl && e.target.closest('.lane');
+    if (ln && P() && !clipDrag) {
+      const r = ln.getBoundingClientRect(), at = Math.max(0, Math.round((e.clientX - r.left) / r.width * phView()));
+      if (cur === 'automation') { addAutoPoint(+ln.dataset.lane, at, 1 - (e.clientY - r.top) / r.height); return; }
+      if (D.sel.clip != null) selectClip(null);
+      call('transport.seek', { pos: at }).then(() => poll(true), er => fail(er)); return;
+    }
     if (e.target.closest('a[href^="#"]')) e.preventDefault();
   });
   async function togglePlay() { const pl = D.st.playing; D.st.playing = !pl; document.querySelectorAll('[data-play]').forEach(b => { b.innerHTML = ic(!pl ? 'pause' : 'play'); b.setAttribute('aria-label', !pl ? 'Pause' : 'Play'); }); await act(pl ? 'transport.pause' : 'transport.play', {}, { refresh: false }); poll(true); }
@@ -473,6 +487,13 @@
   });
   document.addEventListener('change', async e => {
     const el = e.target, d = el.dataset;
+    if (d.actChange === 'clip-start' || d.actChange === 'clip-len') {
+      const c = F.clip(+d.cid), sr = F.sr(), n = parseTime(el.value, sr);
+      if (!c || n == null || (d.actChange === 'clip-len' && n < 1)) { el.setAttribute('aria-invalid', 'true'); return; }
+      el.removeAttribute('aria-invalid');
+      await (d.actChange === 'clip-start' ? act('clip.move', { clip: c.id, start: n }) : act('clip.trim', { clip: c.id, end: c.start + n }));
+      return;
+    }
     if (d.actChange === 'tts-engine') { try { await call('ai.engine.set', { role: 'tts', engine: el.value }); } catch (err) { fail(err); } F.stale('aeng', 'ai'); await F.need(['aeng'], true); rr(); return; }
     if (d.ui === 'libsearch' || el.matches('[data-ui="libsearch"]')) { D.ui.libq = Object.assign(D.ui.libq || {}, { search: el.value || undefined }); F.stale('library'); await F.need(['library']); rr(); return; }
     if (d.ui) { D.ui[d.ui] = num(el, el.value); if (d.rerender) { if (d.ui === 'masterTarget') { D.ui.masterPlan = null; planMaster(); } rr(); } return; }
@@ -488,49 +509,204 @@
   });
   document.addEventListener('toggle', e => { const el = e.target; if (el.dataset && el.dataset.details) D.ui[el.dataset.details] = el.open; }, true);
 
+  /* ---------- the timeline: scrolling, zoom, selection, position ---------- */
+  const SMP_PER_PX = 4, MAX_LANE_PX = 16e6;
+  let tlAuto = -1, tlUser = 0, tlFrame = 0, holdT = 0, selBusy = 0;
+  const theTl = () => stage.querySelector('.tl[data-tl]');
+  const phView = () => { const ph = stage.querySelector('[data-ph]'); return ph ? +ph.dataset.vlen : P().length; };
+  function tlMount() { const tl = theTl(); if (!tl) return; tl.scrollLeft = D.ui.tlX || 0; tl.scrollTop = D.ui.tlY || 0; tlAuto = tl.scrollLeft; }
+  function zoomMax(tl) { const lane = tl.querySelector('.lane'), base = lane.offsetWidth / (D.ui.zoom || 1); return Math.max(1, Math.min(MAX_LANE_PX / base, phView() / (SMP_PER_PX * base))); }
+  /* Changes zoom in place, keeping the moment under `ax` (px from the timeline's left edge) where it is. */
+  function zoomTo(z, ax) {
+    const tl = theTl(); if (!tl) return; const lane = tl.querySelector('.lane'), hw = lane.offsetLeft, vw = tl.clientWidth - hw, oldW = lane.offsetWidth;
+    z = Math.max(1, Math.min(zoomMax(tl), z)); if (z < 1.02) z = 1;
+    if (ax == null) { const ph = (D.st.pos || 0) / phView() * oldW - tl.scrollLeft; ax = hw + (ph >= 0 && ph <= vw ? ph : vw / 2); }
+    ax = Math.max(hw, ax); const u = (tl.scrollLeft + ax - hw) / oldW;
+    D.ui.zoom = z; tl.style.setProperty('--z', z);
+    tl.scrollLeft = u * lane.offsetWidth - (ax - hw); tlAuto = tl.scrollLeft; D.ui.tlX = tl.scrollLeft;
+    const zv = stage.querySelector('[data-zv]'); if (zv) zv.textContent = z.toFixed(1) + '×';
+    Viz.hold(true); Viz.scrolled(tl); clearTimeout(holdT); holdT = setTimeout(() => { Viz.hold(false); Viz.redraw(tl); }, 140);
+  }
+  document.addEventListener('scroll', e => {
+    const tl = e.target; if (!tl.matches || !tl.matches('.tl[data-tl]')) return;
+    D.ui.tlX = tl.scrollLeft; D.ui.tlY = tl.scrollTop; if (tl.scrollLeft !== tlAuto) tlUser = performance.now();
+    if (!tlFrame) tlFrame = requestAnimationFrame(() => { tlFrame = 0; if (tl.isConnected) Viz.scrolled(tl); });
+  }, true);
+  document.addEventListener('wheel', e => {
+    const tl = e.target.closest && e.target.closest('.tl[data-tl]'); if (!tl) return;
+    const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? tl.clientHeight : 1;
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomTo((D.ui.zoom || 1) * Math.exp(-e.deltaY * k * .0025), e.clientX - tl.getBoundingClientRect().left); return; }
+    // With nothing to scroll up or down, a plain mouse wheel moves along the timeline.
+    if (!e.shiftKey && Math.abs(e.deltaY) > Math.abs(e.deltaX) && tl.scrollHeight <= tl.clientHeight && tl.scrollWidth > tl.clientWidth) { e.preventDefault(); tl.scrollLeft += e.deltaY * k; }
+  }, { passive: false });
+  function selectClip(id) {
+    D.sel.clip = id; if (id != null) D.sel.track = (F.clip(id) || {}).track;
+    // The page has already shown this change, so it isn't one the next poll needs to redraw for.
+    selBusy++; call('selection.set', { clip: id }).then(r => { selBusy--; if (r && lastRev === r.rev - 1) lastRev = r.rev; }, () => { selBusy--; });
+    stage.querySelectorAll('.clip').forEach(x => x.classList.toggle('sel', +x.dataset.clip === id));
+    const a = stage.querySelector('aside.b'); if (cur !== 'edit' || !a) return rr();
+    stage.classList.add('rr'); a.innerHTML = Flux.insp(); a.scrollTop = 0; hydrate(a);
+  }
+  function parseTime(text, sr) {
+    const t = String(text).trim().replace(',', '.').toLowerCase(); let m;
+    if ((m = t.match(/^(\d+(?:\.\d*)?)\s*(ms|s|smp|samples)?$/))) return Math.round(+m[1] * ({ ms: sr / 1000, smp: 1, samples: 1 }[m[2]] || sr));
+    if ((m = t.match(/^(?:(\d+):)?(\d+):(\d+(?:\.\d*)?)$/))) return Math.round(((+m[1] || 0) * 3600 + +m[2] * 60 + +m[3]) * sr);
+    return null;
+  }
+  /* Arrow keys: a burst of presses is one move, one undo step. */
+  let nudge = null;
+  function nudgeClip(delta) {
+    const c = F.clip(D.sel.clip); if (!c) return;
+    if (!nudge || nudge.id !== c.id) nudge = { id: c.id, start: c.start };
+    nudge.start = Math.max(0, nudge.start + delta);
+    const n = nudge, el = stage.querySelector(`.clip[data-clip="${c.id}"]`); if (el) el.style.left = n.start / phView() * 100 + '%';
+    const f = stage.querySelector('[data-act-change="clip-start"]'); if (f) f.value = F.pos(n.start, F.sr());
+    clearTimeout(n.t); n.t = setTimeout(() => { if (nudge === n) nudge = null; act('clip.move', { clip: n.id, start: n.start }); }, 220);
+  }
+  function clipKeys(e) {
+    if (!P() || cur !== 'edit') return false;
+    const a = document.activeElement, free = a === document.body || a === stage || (a.closest && a.closest('[data-clip]')); if (!free) return false;
+    const tl = theTl(), sel = D.sel.clip != null ? F.clip(D.sel.clip) : null, sr = F.sr();
+    if (e.key === 'Enter' && a.closest && a.closest('[data-clip]')) { const id = +a.closest('[data-clip]').dataset.clip; selectClip(D.sel.clip === id ? null : id); return true; }
+    if (e.key === 'Home' || e.key === 'End') { call('transport.seek', { pos: e.key === 'Home' ? 0 : P().length }).then(() => poll(true), er => fail(er)); if (tl) { tl.scrollLeft = e.key === 'Home' ? 0 : tl.scrollWidth; } return true; }
+    if (!/^Arrow/.test(e.key)) return false;
+    if (sel) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { nudgeClip((e.key === 'ArrowLeft' ? -1 : 1) * Math.round(sr * (e.ctrlKey || e.metaKey ? 1 : e.shiftKey ? .001 : .01))); return true; }
+      const ts = F.tracks(), i = ts.findIndex(t => t.id === sel.track), to = ts[i + (e.key === 'ArrowUp' ? -1 : 1)]; if (to) act('clip.move', { clip: sel.id, start: sel.start, track: to.id }); return true;
+    }
+    if (tl && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { tl.scrollLeft += (e.key === 'ArrowLeft' ? -1 : 1) * tl.clientWidth * .2; return true; }
+    return false;
+  }
+
+  /* ---------- typing a slider's value ---------- */
+  const parseVal = t => { const m = String(t).replace(/−/g, '-').replace(',', '.').trim().match(/^([-+]?(?:\d+\.?\d*|\.\d+))\s*([a-zµ%×]*)$/i); return m ? { n: +m[1], u: m[2].toLowerCase() } : null; };
+  const linPct = (lo, hi, v) => hi === lo ? 0 : Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+  const timeUnit = (x, base) => (base === 'ms' && (x.u === 's' || x.u === 'sec')) ? x.n * 1000 : (base === 's' && x.u === 'ms') ? x.n / 1000 : x.n;
+  function specPct(p, x) { let v = p.unit === 'Hz' && /^k/.test(x.u) ? x.n * 1000 : timeUnit(x, p.unit); v = Math.max(p.min, Math.min(p.max, v)); return F.pct(p, v); }
+  function linUnit(parts, x) {
+    const lo = +parts[0], hi = +parts[1], u = parts[2]; if (u === 'frac') return null;
+    let v = x.n;
+    if (u === 'smp') v = x.u === 's' ? x.n * F.sr() : x.n / 1000 * F.sr(); else if (u === 'ms') v = x.u === 's' ? x.n : x.n / 1000; else if (u === 's') v = timeUnit(x, 's'); else if (u === 'dBneg') v = Math.abs(x.n);
+    return linPct(lo, hi, v);
+  }
+  /* Turns what was typed into the slider's position, using the same mapping as the slider. Null when it can't be typed. */
+  function bindParse(b) {
+    const parts = b.split(':'), ns = parts[0], use = f => t => { const x = parseVal(t); return x ? f(x) : null; };
+    if (ns === 'lv') { const r = Flux.liveRange(parts.slice(1)); if (!r) return null; return use(x => r.spec ? specPct(r.spec, x) : r.pct(Math.max(r.r.min, Math.min(r.r.max, timeUnit(x, r.base) / r.scale)))); }
+    if (ns === 'cl') { const r = Flux.cloneRange(parts.slice(1)); return r && use(x => linPct(r.min, r.max, x.n)); }
+    if (ns === 'fx' || ns === 'fxk') { const p = Flux.pspec(ns === 'fxk' ? parts[1] : (F.findFx(+parts[1]) || {}).kind, parts[2]); return p && p.unit !== 'enum' && p.unit !== 'bool' ? use(x => specPct(p, x)) : null; }
+    if (ns === 'fxmix' || ns === 'fxkmix' || ns === 'style' || ns === 'macro') return use(x => Math.max(0, Math.min(100, x.n)));
+    if (ns === 'clip') return use(x => linUnit(parts.slice(3), x));
+    if (ns === 'track' && parts.length > 3) return use(x => linUnit(parts.slice(3), x));
+    if (ns === 'track' || ns === 'master') return use(x => Math.max(0, Math.min(100, 70 + x.n * 6)));
+    if (ns === 'set' || ns === 'ui' || OBJ[ns]) return use(x => linUnit(parts.slice(2), x));
+    return null;
+  }
+  let typing = null;
+  function openTyped(host) {
+    if (typing || !host.dataset.bind) return false; const parse = bindParse(host.dataset.bind); if (!parse) return false;
+    const box = host.querySelector('.track,.ftk'), lbl = host.querySelector('.sv') || host.parentElement.querySelector('[data-gtext]'); if (!lbl) return false;
+    const name = (host.querySelector('label') || {}).textContent || box.getAttribute('aria-label') || '', was = lbl.textContent, inp = document.createElement('input');
+    inp.className = 'inp mono svin'; inp.value = was; inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('aria-label', 'Type a value for ' + name); lbl.hidden = true; lbl.after(inp);
+    dragging = true; typing = inp;
+    const close = refocus => { typing = null; dragging = false; inp.remove(); lbl.hidden = false; if (refocus) box.focus({ preventScroll: true }); };
+    const commit = refocus => {
+      if (typing !== inp) return; const t = inp.value;
+      if (t.trim() === was.trim()) return close(refocus);
+      const p = parse(t); if (p == null) { if (refocus) { inp.setAttribute('aria-invalid', 'true'); return; } return close(false); }
+      close(refocus); host.style.setProperty('--v', p + '%'); box.setAttribute('aria-valuenow', Math.round(p));
+      if (!bindG) bindG = newGesture(); label({ el: host, box }, bindApply(host.dataset.bind, p, true));
+    };
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') { e.preventDefault(); close(true); } else inp.removeAttribute('aria-invalid'); });
+    inp.addEventListener('blur', () => commit(false));
+    inp.focus(); inp.select(); return true;
+  }
+
   /* sliders, faders, clip drags, ruler seeks, spectral selection, automation points */
-  let drag = null, clipDrag = null, specDrag = null;
+  let drag = null, clipDrag = null, specDrag = null, clipSt = null, scrub = null;
   document.addEventListener('pointerdown', e => {
     if (e.button) return;
     const t = e.target.closest('.sl .track'), f = e.target.closest('.fader .ftk');
     if (t || f) {
       const el = t ? t.closest('.sl') : f.closest('.fader');
-      drag = { el, box: t || f, kind: t ? 'sl' : 'f', bind: el.dataset.bind }; dragging = !!drag.bind; bindG = newGesture(); el.classList.add('dr'); (t || f).setPointerCapture(e.pointerId); move(e); return;
+      const box = t || f, r = box.getBoundingClientRect(), v0 = parseFloat(el.style.getPropertyValue('--v')) || 0, size = t ? r.width : r.height, base = t ? r.left : -r.bottom, at = t ? e.clientX : -e.clientY, off = at - base - v0 / 100 * size, onHandle = Math.abs(off) <= 14;
+      // Grabbing the handle keeps it under the pointer. Pressing elsewhere on the track jumps there.
+      drag = { el, box, kind: t ? 'sl' : 'f', bind: el.dataset.bind, size, base, off: onHandle ? off : 0, last: at }; dragging = true; bindG = newGesture(); el.classList.add('dr'); box.setPointerCapture(e.pointerId); if (!onHandle) move(e); return;
     }
     const h = e.target.closest('[data-hold]');
     if (h) { h.classList.add('on'); h.style.transform = 'scale(.97)'; h.dataset.txt = h.textContent; h.textContent = 'Original'; call('transport.hold', { on: true }).catch(() => { }); return; }
     const cl = e.target.closest('[data-clip]');
-    if (cl && cur === 'edit') { const lane = cl.closest('.lane'), c = F.clip(+cl.dataset.clip); if (c) { clipDrag = null; const st = { el: cl, c, x0: e.clientX, w: lane.getBoundingClientRect().width, moved: false, pid: e.pointerId }; cl.setPointerCapture(e.pointerId); cl._st = st; } return; }
+    if (cl && cur === 'edit') {
+      const c = F.clip(+cl.dataset.clip), tl = cl.closest('.tl'), lane = cl.closest('.lane'), box = cl.getBoundingClientRect(), ed = box.width >= 24 && e.target.closest('.edge');
+      if (c) { clipDrag = null; clipSt = { el: cl, c, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, tl, sl0: tl.scrollLeft, w: lane.offsetWidth, px: cl.offsetWidth, home: lane, lanes: [...tl.querySelectorAll('.lane')], moved: false, pid: e.pointerId, edge: ed ? ed.dataset.edge : null, ns: c.start, track: c.track }; cl.setPointerCapture(e.pointerId); }
+      return;
+    }
     const sa = e.target.closest('[data-specarea]');
     if (sa && cur === 'spectral') { const r = sa.getBoundingClientRect(); specDrag = { r, x0: e.clientX - r.left, y0: e.clientY - r.top }; sa.setPointerCapture(e.pointerId); return; }
-    const rl = e.target.closest('[data-ruler]') || (e.target.closest('.lane') && !e.target.closest('[data-clip]') ? e.target.closest('.lane') : null);
-    if (rl && P()) {
-      const ph = stage.querySelector('[data-ph]'), r = rl.getBoundingClientRect(), u = (e.clientX - r.left) / r.width, t0 = ph ? +ph.dataset.t0 : 0, vlen = ph ? +ph.dataset.vlen : P().length, at = Math.max(0, Math.round(t0 + u * vlen));
-      if (cur === 'automation' && rl.classList.contains('lane')) { addAutoPoint(+rl.dataset.lane, at, 1 - (e.clientY - r.top) / r.height); return; }
-      call('transport.seek', { pos: at }).then(() => poll(true), er => fail(er));
-    }
+    const rl = e.target.closest('[data-ruler]');
+    if (rl && P()) { scrub = { el: rl, t: 0 }; rl.setPointerCapture(e.pointerId); scrubTo(e.clientX, true); }
   });
   function move(e) {
     if (drag) {
-      const r = drag.box.getBoundingClientRect(); let p;
-      if (drag.kind === 'sl') { p = Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)); drag.box.setAttribute('aria-valuenow', Math.round(p)); }
-      else p = Math.min(100, Math.max(0, (r.bottom - e.clientY) / r.height * 100));
+      const at = drag.kind === 'sl' ? e.clientX : -e.clientY;
+      if (e.shiftKey) drag.off += (at - drag.last) * .9; // Shift: the handle moves a tenth as far, for fine changes
+      drag.last = at;
+      const p = Math.min(100, Math.max(0, (at - drag.base - drag.off) / drag.size * 100));
+      if (drag.kind === 'sl') drag.box.setAttribute('aria-valuenow', Math.round(p));
       drag.el.style.setProperty('--v', p + '%'); drag.p = p;
       if (drag.bind) label(drag, bindApply(drag.bind, p, false)); else if (drag.kind === 'sl') { const lbl = drag.el.querySelector('.sv'); if (lbl && /%/.test(lbl.textContent)) lbl.textContent = Math.round(p) + '%'; }
       return;
     }
-    const cl = e.target.closest && document.querySelector('[data-clip]') ? [...document.querySelectorAll('[data-clip]')].find(x => x._st && x._st.pid === e.pointerId) : null;
-    if (cl) { const st = cl._st, dx = e.clientX - st.x0; if (Math.abs(dx) > 3) { st.moved = true; clipDrag = st; cl.style.transform = `translateX(${dx}px)`; } return; }
+    if (clipSt && clipSt.pid === e.pointerId) { clipSt.x = e.clientX; clipSt.y = e.clientY; clipMotion(clipSt); return; }
+    if (scrub) { scrubTo(e.clientX); return; }
     if (specDrag) { const r = specDrag.r, x = e.clientX - r.left, y = e.clientY - r.top, len = P().length, fy = v => 20 * Math.pow(1000, 1 - Math.max(0, Math.min(1, v / r.height))); const a = Math.max(0, Math.min(r.width, Math.min(specDrag.x0, x))), b = Math.max(0, Math.min(r.width, Math.max(specDrag.x0, x))); D.ui.specSel = { t0: a / r.width * len, t1: b / r.width * len, f0: fy(Math.max(specDrag.y0, y)), f1: fy(Math.min(specDrag.y0, y)) }; specDrag.moved = true; const box = stage.querySelector('[data-specsel]'); if (box) { box.style.left = a / r.width * 100 + '%'; box.style.width = (b - a) / r.width * 100 + '%'; box.style.top = Math.min(specDrag.y0, y) / r.height * 100 + '%'; box.style.height = Math.abs(y - specDrag.y0) / r.height * 100 + '%'; } }
+  }
+  function scrubTo(x, now) {
+    const lane = stage.querySelector('.lane'); if (!lane) return; const r = lane.getBoundingClientRect(), at = Math.max(0, Math.min(phView(), Math.round((x - r.left) / r.width * phView()))), t = performance.now();
+    D.st.pos = at; scrub.at = at; if (now || t - scrub.t > 50) { scrub.t = t; call('transport.seek', { pos: at }).then(() => poll(true), er => fail(er)); }
+  }
+  function clipMotion(st) {
+    if (!st.moved) { if (Math.abs(st.x - st.x0) <= 3 && Math.abs(st.y - st.y0) <= 3) return; st.moved = true; clipDrag = st; dragging = true; st.el.classList.add('dr'); if (st.edge) { st.el.classList.add('trim'); const cv = st.el.querySelector('canvas'); if (cv && !cv._win) { cv.style.width = st.px + 'px'; } } }
+    const vlen = phView(), c = st.c, ds = Math.round((st.x - st.x0 + st.tl.scrollLeft - st.sl0) / st.w * vlen), lbl = st.el.querySelector('.cl');
+    if (st.edge === 'l') {
+      const ns = Math.max(Math.max(0, c.start - c.offset), Math.min(c.start + c.len - 1, c.start + ds)); st.ns = ns;
+      st.el.style.left = ns / vlen * 100 + '%'; st.el.style.width = (c.start + c.len - ns) / vlen * 100 + '%';
+      const cv = st.el.querySelector('canvas'); if (cv && !cv._win) cv.style.left = (c.start - ns) / vlen * st.w + 'px';
+      if (lbl) lbl.textContent = F.pos(ns, F.sr());
+    } else if (st.edge === 'r') {
+      const ne = Math.max(c.start + 1, c.start + c.len + ds); st.ns = ne;
+      st.el.style.width = (ne - c.start) / vlen * 100 + '%'; if (lbl) lbl.textContent = F.pos(ne - c.start, F.sr());
+    } else {
+      st.ns = Math.max(0, c.start + ds); let py = 0;
+      const to = st.lanes.find(l => { const r = l.getBoundingClientRect(); return st.y >= r.top && st.y < r.bottom; });
+      if (to) { st.track = +to.dataset.lane; py = to.getBoundingClientRect().top - st.home.getBoundingClientRect().top; }
+      else if (st.track !== c.track) { const was = st.lanes.find(l => +l.dataset.lane === st.track); if (was) py = was.getBoundingClientRect().top - st.home.getBoundingClientRect().top; }
+      st.el.style.transform = `translate(${(st.ns - c.start) / vlen * st.w}px,${py}px)`;
+      if (lbl) lbl.textContent = c.name + ' · ' + F.pos(st.ns, F.sr());
+      const f = stage.querySelector(`[data-act-change="clip-start"][data-cid="${c.id}"]`); if (f) f.value = F.pos(st.ns, F.sr());
+    }
+  }
+  function clipUp(st, cancel) {
+    clipSt = null; st.el.classList.remove('dr'); dragging = false;
+    if (!st.moved) { clipDrag = null; return; }
+    const c = st.c, same = st.edge === 'r' ? st.ns === c.start + c.len : st.ns === c.start && st.track === c.track;
+    if (cancel || same) { setTimeout(() => { clipDrag = null; rr(); }, 0); return; }
+    if (D.sel.clip !== c.id) selectClip(c.id);
+    (st.edge === 'l' ? act('clip.trim', { clip: c.id, start: st.ns }) : st.edge === 'r' ? act('clip.trim', { clip: c.id, end: st.ns }) : act('clip.move', Object.assign({ clip: c.id, start: st.ns }, st.track !== c.track ? { track: st.track } : {}))).then(() => { clipDrag = null; rr(); });
   }
   function label(d, v) { const lbl = d.el.querySelector('.sv,[data-gtext]') || d.el.parentElement.querySelector('[data-gtext]'); const set = t => { if (t && lbl) lbl.textContent = t; if (t) d.box.setAttribute('aria-valuetext', t); }; if (v && v.then) v.then(set); else set(v); }
   document.addEventListener('pointermove', move);
   addEventListener('pointerup', e => {
     if (drag) { const d = drag; drag = null; d.el.classList.remove('dr'); dragging = false; if (d.bind && d.p != null) bindApply(d.bind, d.p, true); }
-    const cl = [...document.querySelectorAll('[data-clip]')].find(x => x._st && x._st.pid === e.pointerId);
-    if (cl) { const st = cl._st; cl._st = null; if (st.moved) { const ph = stage.querySelector('[data-ph]'), vlen = ph ? +ph.dataset.vlen : P().length, dx = e.clientX - st.x0, ns = Math.max(0, Math.round(st.c.start + dx / st.w * vlen)); act('clip.move', { clip: st.c.id, start: ns }).then(() => { clipDrag = null; }); } else clipDrag = null; }
+    if (clipSt && clipSt.pid === e.pointerId) clipUp(clipSt);
+    if (scrub) { const s = scrub; scrubTo(e.clientX, true); if (s === scrub) scrub = null; }
     if (specDrag) { const m = specDrag.moved; specDrag = null; if (m) rr(); }
     document.querySelectorAll('[data-hold].on').forEach(h => { h.classList.remove('on'); h.style.transform = ''; h.textContent = h.dataset.txt; call('transport.hold', { on: false }).catch(() => { }); });
+  });
+  addEventListener('pointercancel', e => {
+    if (drag) { const d = drag; drag = null; d.el.classList.remove('dr'); dragging = false; if (d.bind && d.p != null) bindApply(d.bind, d.p, true); }
+    if (clipSt && clipSt.pid === e.pointerId) clipUp(clipSt, true);
+    scrub = null;
   });
   async function addAutoPoint(trackId, at, y) {
     const ln = curLane(); if (!ln || ln.t.id !== trackId) { D.ui.autoTarget = `${trackId}:volume`; }
@@ -542,21 +718,25 @@
 
   /* keyboard */
   const keyName = e => [e.ctrlKey || e.metaKey ? 'Ctrl' : '', e.altKey ? 'Alt' : '', e.shiftKey ? 'Shift' : '', e.key === ' ' ? 'Space' : e.key === 'Delete' ? 'Del' : e.key.length === 1 ? e.key.toUpperCase() : e.key].filter(Boolean).join(' ');
-  const KEYACT = { play: () => togglePlay(), split: () => P() && ACT['edit-split'](), delete: () => ACT['edit-delete'](), undo: () => ACT.undo(), redo: () => ACT.redo(), hold: null, palette: () => { D.ui.paletteBase = cur; D.ui.cq = ''; D.ui.cqi = 0; render('palette'); }, zoom: () => ACT.zoom(), marker: () => P() && ACT['marker-add'](), record: () => render('record'), import: () => ACT.import({ dataset: {} }), export: () => P() && render('export'), sheet: () => render('shortcuts') };
+  const KEYACT = { play: () => togglePlay(), split: () => P() && ACT['edit-split'](), delete: () => ACT['edit-delete'](), undo: () => ACT.undo(), redo: () => ACT.redo(), hold: null, palette: () => { D.ui.paletteBase = cur; D.ui.cq = ''; D.ui.cqi = 0; render('palette'); }, zoom: () => ACT.zoom(), zoomin: () => ACT['zoom-in'](), zoomout: () => ACT['zoom-out'](), zoomfit: () => ACT['zoom-fit'](), marker: () => P() && ACT['marker-add'](), record: () => render('record'), import: () => ACT.import({ dataset: {} }), export: () => P() && render('export'), sheet: () => render('shortcuts') };
   document.addEventListener('keydown', e => {
     if (D.ui.keyEdit && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) { e.preventDefault(); const k = D.ui.keyEdit; D.ui.keyEdit = null; if (e.key !== 'Escape') { const keys = Object.assign({}, (D.settings && D.settings.keys) || {}, { [k]: keyName(e) }); act('settings.set', { values: { keys } }, { refresh: false }).then(s => { if (s) D.settings = s; rr(); }); } else rr(); return; }
     const t = e.target.closest && e.target.closest('.sl .track, .fader .ftk');
     if (t && /Arrow|Home|End|Page/.test(e.key)) {
       e.preventDefault(); const s = t.closest('.sl,.fader'), v = parseFloat(s.style.getPropertyValue('--v')) || 0, up = e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'PageUp', st = /Page/.test(e.key) ? 10 : e.shiftKey ? 0.5 : 2;
       const n = e.key === 'Home' ? 0 : e.key === 'End' ? 100 : Math.min(100, Math.max(0, v + (up ? st : -st)));
+      s.classList.add('dr'); clearTimeout(s._dk); s._dk = setTimeout(() => s.classList.remove('dr'), 200);
       s.style.setProperty('--v', n + '%'); t.setAttribute('aria-valuenow', Math.round(n));
       if (s.dataset.bind) { if (!bindG) bindG = newGesture(); const d = { el: s, box: t }; label(d, bindApply(s.dataset.bind, n, false)); clearTimeout(t._kt); t._kt = setTimeout(() => bindApply(s.dataset.bind, n, true), 450); }
       return;
     }
     if (cur === 'palette') { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); D.ui.cqi = Math.max(0, (D.ui.cqi || 0) + (e.key === 'ArrowDown' ? 1 : -1)); rr(); return; } if (e.key === 'Enter') { e.preventDefault(); const it = stage.querySelector('.cmd .it.on'); if (it) it.click(); return; } }
-    if (e.key === 'Escape') { const c = [...stage.querySelectorAll('.ov .btn.ic[aria-label="Close"]')].pop(); if (c) { e.preventDefault(); c.click(); } return; }
+    if (t && e.key === 'Enter' && openTyped(t.closest('.sl,.fader'))) { e.preventDefault(); return; }
+    if (e.key === 'Enter' && e.target.dataset && 'commit' in e.target.dataset) { e.target.blur(); return; }
+    if (e.key === 'Escape') { const c = [...stage.querySelectorAll('.ov .btn.ic[aria-label="Close"]')].pop(); if (c) { e.preventDefault(); c.click(); } else if (cur === 'edit' && D.sel.clip != null && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); selectClip(null); } return; }
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    const kn = keyName(e), custom = (D.settings && D.settings.keys) || {};
+    if (clipKeys(e)) { e.preventDefault(); return; }
+    const kn = keyName(e).replace('Shift +', '='), custom = (D.settings && D.settings.keys) || {};
     const hit = Flux.KEYS.find(k => (custom[k[0]] || k[2]) === kn);
     if (hit && KEYACT[hit[0]]) { if (hit[0] === 'play' && document.activeElement.closest('button,a')) return; e.preventDefault(); KEYACT[hit[0]](); return; }
     if (hit && hit[0] === 'hold' && !e.repeat) { call('transport.hold', { on: true }).catch(() => { }); }
@@ -579,7 +759,7 @@
     if (polling || performance.now() < nextPoll) return; polling = true;
     try {
       const s = await call('transport.state'); const was = D.st.playing, wasRec = !!D.st.recording; D.st = s;
-      if (s.rev !== lastRev && !dragging) { lastRev = s.rev; if (D.project && s.project === D.project.id || s.project) { F.stale(...F.PROJECT_KEYS); await F.need(['project'].concat(NEED[cur] || []).filter(k => F.PROJECT_KEYS.includes(k)), true); rr(); } }
+      if (s.rev !== lastRev && !dragging && !selBusy) { lastRev = s.rev; if (D.project && s.project === D.project.id || s.project) { F.stale(...F.PROJECT_KEYS); await F.need(['project'].concat(NEED[cur] || []).filter(k => F.PROJECT_KEYS.includes(k)), true); rr(); } }
       if (was !== s.playing || wasRec !== !!s.recording) { document.querySelectorAll('[data-play]').forEach(b => { b.innerHTML = ic(s.playing ? 'pause' : 'play'); b.setAttribute('aria-label', s.playing ? 'Pause' : 'Play'); }); if (cur === 'record') rr(); }
       if (s.playing && Viz.needsScope() && performance.now() - lastScope > 45) { lastScope = performance.now(); call('transport.scope', { bins: 64 }).then(r => { D.scope = r; }, () => { }); }
     } catch (e) { /* the engine may be busy; try again */ }
@@ -590,7 +770,15 @@
     const s = D.st, sec = s.playing ? s.seconds : s.seconds;
     stage.querySelectorAll('[data-tc]').forEach(el => el.textContent = F.tc(sec));
     const ph = stage.querySelector('[data-ph]');
-    if (ph) { const lane = stage.querySelector('.lane'); if (lane) { const x = ((s.pos || 0) - (+ph.dataset.t0 || 0)) / (+ph.dataset.vlen || 1); ph.style.transform = `translateX(${Math.max(0, Math.min(1, x)) * lane.offsetWidth}px)`; ph.style.left = lane.offsetLeft + 'px'; } }
+    if (ph) {
+      const lane = stage.querySelector('.lane');
+      if (lane) {
+        const lw = lane.offsetWidth, hw = lane.offsetLeft, px = Math.max(0, Math.min(1, ((s.pos || 0) - (+ph.dataset.t0 || 0)) / (+ph.dataset.vlen || 1))) * lw; ph.style.transform = `translateX(${px}px)`; ph.style.left = hw + 'px';
+        const tl = ph.parentElement;
+        if (s.playing && !scrub && !clipSt && tl.scrollWidth > tl.clientWidth && ms - tlUser > 2500) { const vw = tl.clientWidth - hw; if (px < tl.scrollLeft || px > tl.scrollLeft + vw - 16) { tl.scrollLeft = Math.max(0, px - vw * .08); tlAuto = tl.scrollLeft; } }
+        if (clipSt && clipSt.moved) { const r = tl.getBoundingClientRect(), a = r.left + hw + 32, b = r.right - 32, v = clipSt.x < a ? clipSt.x - a : clipSt.x > b ? clipSt.x - b : 0; if (v) { tl.scrollLeft += v * .35; tlAuto = tl.scrollLeft; clipMotion(clipSt); } }
+      }
+    }
     if (!calm()) kin.forEach(k => { const lv = s.playing ? Math.max(0, (F.lvl() + 40) / 40) : 0, v = Math.min(1, Math.max(0, (.5 + .5 * Math.sin(ms / 640 + k.i * .7) * Math.sin(ms / 1610 + k.i * .29)) * .5 + Math.exp(-Math.pow((k.x - px) / 160, 2)) * .55 + lv * .25)); k.l.style.fontWeight = Math.round(kinLo + v * (kinHi - kinLo)); k.l.style.transform = `scaleY(${(.94 + v * .2).toFixed(3)})`; });
     const pk = s.peak || [0, 0], lvp = x => Math.max(0, Math.min(100, (x > 0 ? 20 * Math.log10(x) + 60 : 0) / 60 * 100));
     stage.querySelectorAll('[data-lv]').forEach((m, i) => m.style.setProperty('--lv', lvp(pk[i % 2] || 0) + '%'));

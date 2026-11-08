@@ -25,6 +25,10 @@ AI agents can drive every feature.
     removal, spectral repair, match EQ, and text to speech with system voices (always labelled synthetic).
   - Projects are saved atomically and journaled, with crash recovery, `.flux` packages, presets, recorded actions,
     batch, convert and ringtone.
+- **Timeline.** Scroll sideways with the track headers and ruler in place, and zoom from the whole project down to
+  4 samples per pixel (Ctrl and wheel, the bar's buttons, or `=`, `-` and `0`). Drag clips between tracks, drag their
+  edges to trim, type a start or length, or nudge with the arrow keys. Click a selected clip, empty space or Esc to
+  deselect. Click any slider's value to type one; hold Shift while dragging for fine control.
 - **First run.** A short setup shows once: mode, headphone check, a head shape for 3D sound, and where exports go.
   Settings > Audio > Sound profile runs the headphone and head-shape steps again.
 - **Live (desktop app, Live page).** Put a preset on everything the computer plays (Windows and macOS capture an

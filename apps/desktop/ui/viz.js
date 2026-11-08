@@ -53,8 +53,9 @@ window.Viz = (function () {
   }
 
   const V = {};
+  const waveN = (W, o) => Math.min(1600, Math.max(30, Math.floor(W / (+o.step || 2.5))));
   V.wave = (x, W, H, o, t, cv) => {
-    const n = Math.min(1600, Math.max(30, Math.floor(W / (+o.step || 2.5)))), real = o.media || o.src, col = o.color ? css(o.on ? o.color + '-on' : o.color) || o.color : css('--tx');
+    const n = waveN(W, o), real = o.media || o.src, col = o.color ? css(o.on ? o.color + '-on' : o.color) || o.color : css('--tx');
     x.clearRect(0, 0, W, H); const stereo = o.stereo === '1', bw = W / n, gain = +o.gain || 1, mid = H / 2;
     let e, e2;
     if (real) { const pk = peaksFor(o, n, cv); if (pk) { e = pk[0]; e2 = pk[1] || pk[0]; } }
@@ -103,13 +104,14 @@ window.Viz = (function () {
     x.imageSmoothingEnabled = true; x.drawImage(c, 0, 0, W, H);
   };
   /* Ruler in real time: data-len is the visible length in seconds. */
-  V.ruler = (x, W, H, o) => {
+  V.ruler = (x, W, H, o, t, cv) => {
     x.clearRect(0, 0, W, H); x.fillStyle = css('--tx3'); x.font = '500 10.5px "Geist Mono",monospace';
-    const total = +o.len || 32, t0 = +o.t0 || 0, steps = [0.1, .25, .5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600], want = total / Math.max(4, Math.floor(W / 56)), st = steps.find(s => s >= want) || 3600;
-    const first = Math.ceil(t0 / (st / 4)) * (st / 4);
-    for (let s = first, i = Math.round(first / (st / 4)); s <= t0 + total + 1e-9; s += st / 4, i++) {
-      const px = (s - t0) / total * W, ma = i % 4 === 0; x.globalAlpha = ma ? .9 : .4; x.fillRect(px, H - (ma ? 10 : 5), 1, ma ? 10 : 5);
-      if (ma && px < W - 30) { const m = Math.floor(s / 60), se = s - m * 60; x.fillText(`${m}:${(st < 1 ? se.toFixed(1) : String(Math.round(se))).padStart(st < 1 ? 4 : 2, '0')}`, px + 4, 14); }
+    // On the timeline the canvas stays in view, and draws whichever stretch of time is scrolled under it.
+    const tl = cv.closest('.tl'), lane = tl && o.full ? tl.querySelector('.lane') : null, lw = lane ? lane.offsetWidth : 0;
+    const total = lw ? W / lw * +o.full : +o.len || 32, t0 = lw ? tl.scrollLeft / lw * +o.full : +o.t0 || 0, steps = [.001, .002, .005, .01, .02, .05, 0.1, .25, .5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600], want = total / Math.max(4, Math.floor(W / 64)), st = steps.find(s => s >= want) || 3600, dec = st >= 1 ? 0 : st === .25 || st < .1 ? (st < .01 ? 3 : 2) : 1;
+    for (let i = Math.ceil(t0 / (st / 4) - 1e-9); i * st / 4 <= t0 + total + 1e-9; i++) {
+      const s = i * st / 4, px = (s - t0) / total * W, ma = i % 4 === 0; x.globalAlpha = ma ? .9 : .4; x.fillRect(px, H - (ma ? 10 : 5), 1, ma ? 10 : 5);
+      if (ma && px < W - 30) { const m = Math.floor(s / 60), se = s - m * 60; x.fillText(`${m}:${(dec ? se.toFixed(dec) : String(Math.round(se))).padStart(dec ? dec + 3 : 2, '0')}`, px + 4, 14); }
     }
     x.globalAlpha = 1;
   };
@@ -276,13 +278,35 @@ window.Viz = (function () {
 
   const live = new Set();
   const LIVE = { eq: 1, gr: 1, gonio: 1, spectrum: 1, stage: 1, elev: 1, room: 1, transfer: 1 };
-  function draw(c, t) {
-    const d = Math.min(devicePixelRatio || 1, 2), r = c.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return;
-    const w = Math.round(r.width * d), h = Math.round(r.height * d); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0);
-    V[c.dataset.v](x, r.width, r.height, c.dataset, t || 0, c);
+  /* A clip zoomed wider than a canvas can be draws only the stretch around the view, and moves it when the view leaves it. */
+  const WCAP = 4096;
+  function retarget(c) {
+    const clip = c.parentElement; if (c.dataset.v !== 'wave' || !clip || !clip.classList.contains('clip')) return false;
+    const cw = clip.offsetWidth; if (cw <= WCAP) { const had = !!c._win; c._win = null; return had; }
+    const tl = c.closest('.tl'), lane = clip.parentElement, at = lane.offsetLeft + clip.offsetLeft, l0 = tl.scrollLeft + lane.offsetLeft - at, r0 = l0 + tl.clientWidth - lane.offsetLeft, was = c._win;
+    if (was && was.cw === cw && (r0 < 0 || l0 > cw || (l0 >= was.l && r0 <= was.l + was.w))) return false;
+    const w = Math.min(WCAP, Math.max(2048, tl.clientWidth * 3)), l = Math.max(0, Math.min(cw - w, Math.min(cw, Math.max(0, l0)) - (w - (r0 - l0)) / 2));
+    const s = +c.dataset.start || 0, e = +c.dataset.end || 0, span = e - s, u0 = l / cw, u1 = (l + w) / cw, rev = c.dataset.rev === '1';
+    c._win = { cw, l, w, o: rev ? { start: Math.round(e - span * u1), end: Math.round(e - span * u0) } : { start: Math.round(s + span * u0), end: Math.round(s + span * u1) } };
+    return true;
   }
-  const ro = 'ResizeObserver' in window ? new ResizeObserver(es => es.forEach(e => { if (e.target.dataset.v && document.contains(e.target)) draw(e.target, performance.now() / 1000); })) : null;
+  function draw(c, t) {
+    retarget(c);
+    const d = Math.min(devicePixelRatio || 1, 2), r = c.getBoundingClientRect(), win = c._win, W = win ? win.w : r.width; if (W < 2 || r.height < 2) return;
+    const o = win ? Object.assign({}, c.dataset, win.o) : c.dataset;
+    // A wave that has drawn keeps its picture until the new peaks arrive, so changing zoom or scrolling never blanks it.
+    if (c.dataset.v === 'wave' && (o.media || o.src) && c._pk && !peaksFor(o, waveN(W, o), c)) return;
+    if (c.dataset.v === 'wave' && c.parentElement.classList.contains('clip') && !c.parentElement.classList.contains('trim')) { c.style.left = win ? win.l / win.cw * 100 + '%' : ''; c.style.width = win ? win.w / win.cw * 100 + '%' : ''; }
+    const w = Math.round(W * d), h = Math.round(r.height * d); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0);
+    V[c.dataset.v](x, W, r.height, o, t || 0, c);
+  }
+  let hold = false;
+  const ro = 'ResizeObserver' in window ? new ResizeObserver(es => es.forEach(e => { if (e.target.dataset.v && document.contains(e.target) && !(hold && e.target.dataset.v === 'wave')) draw(e.target, performance.now() / 1000); })) : null;
+  function scrolled(tl) {
+    const now = performance.now() / 1000, ru = tl.querySelector('.ruler canvas'); if (ru) draw(ru, now);
+    if (!hold) tl.querySelectorAll('.clip canvas[data-v="wave"]').forEach(c => { if (retarget(c)) draw(c, now); });
+  }
   function mount(root) {
     live.clear(); root.querySelectorAll('canvas[data-v]').forEach(c => { if (!V[c.dataset.v]) return; draw(c, 0); if (ro) ro.observe(c); if (LIVE[c.dataset.v]) live.add(c); });
   }
@@ -293,5 +317,5 @@ window.Viz = (function () {
     live.forEach(c => { if (c.isConnected) draw(c, t); }); requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-  return { mount, needsScope: () => [...live].some(c => c.isConnected && /eq|gonio|spectrum|gr|transfer/.test(c.dataset.v)), redraw: root => (root || document).querySelectorAll('canvas[data-v]').forEach(c => draw(c, performance.now() / 1000)) };
+  return { mount, scrolled, hold: on => { hold = on; }, needsScope: () => [...live].some(c => c.isConnected && /eq|gonio|spectrum|gr|transfer/.test(c.dataset.v)), redraw: root => (root || document).querySelectorAll('canvas[data-v]').forEach(c => draw(c, performance.now() / 1000)) };
 })();

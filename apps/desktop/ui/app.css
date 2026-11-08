@@ -124,6 +124,11 @@ h1,h2,h3,h4,p{margin:0}
 .sl .track:hover .th,.sl.dr .th{transform:scale(1.25)}
 .sl.big .track{height:clamp(44px,5cqw,62px)}.sl.big .rail2{height:100%;border-radius:99px}.sl.big .fill{border-radius:99px;min-width:clamp(44px,5cqw,62px)}.sl.big .th{display:none}
 .sl.big .top label{font-size:clamp(20px,3cqw,40px);font-weight:800;letter-spacing:calc(-.03em + var(--trk))}
+.sl[data-bind] .sv,.fader[data-bind]~[data-gtext]{cursor:text;border-bottom:1px dotted transparent}
+.sl[data-bind] .sv:hover,.fader[data-bind]~[data-gtext]:hover{border-bottom-color:currentColor}
+.svin{height:24px;width:112px;padding:0 6px;text-align:right;font-size:12px;border-radius:4px;flex:none}
+.ch .svin{width:100%;text-align:center}
+.svin[aria-invalid=true],.inp[aria-invalid=true]{outline:2px solid var(--sig)}
 .sl.big .sv{font:800 clamp(20px,3cqw,40px) var(--sans);letter-spacing:calc(-.03em + var(--trk));color:var(--tx)}
 .sl.ac .fill,.sl.ac .th{background:var(--ac-t)}
 .tg{display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;background:none;border:0;padding:6px 0;width:100%;text-align:left;font-weight:700;color:inherit}
@@ -244,11 +249,12 @@ tr:last-child td{border-bottom:0}
 .tlbar .btn{height:34px;padding:0 12px;font-size:12.5px}
 .tlbar .btn.ic{width:34px;padding:0}
 .tlbar .inp{height:34px}
-.tl{position:relative;flex:1;min-height:0;overflow:auto;--hw:176px;scrollbar-width:thin;background:var(--s1)}
-.ruler{position:sticky;top:0;z-index:4;height:28px;margin-left:var(--hw);background:var(--s0);border-bottom:var(--rule);min-width:900px}
-.trk{display:flex;min-width:calc(900px + var(--hw));border-bottom:1px solid var(--ln2);min-height:90px}
+.tl{position:relative;flex:1;min-height:0;overflow:auto;--hw:176px;--lw:calc(max(280px,100cqw - var(--hw))*var(--z,1));container-type:inline-size;scrollbar-width:thin;background:var(--s1)}
+.ruler{position:sticky;top:0;z-index:4;height:28px;margin-left:var(--hw);background:var(--s0);border-bottom:var(--rule);width:var(--lw);touch-action:none;cursor:ew-resize}
+.ruler canvas{position:sticky;left:var(--hw);width:min(100%,100cqw - var(--hw))}
+.trk{display:flex;width:calc(var(--hw) + var(--lw));border-bottom:1px solid var(--ln2);min-height:90px}
 .trk.tall{min-height:132px}
-.thd{position:sticky;left:0;z-index:3;width:var(--hw);flex:none;background:var(--s0);border-right:var(--rule);padding:9px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.thd{position:sticky;left:0;z-index:6;width:var(--hw);flex:none;background:var(--s0);border-right:var(--rule);padding:9px;display:flex;flex-direction:column;gap:7px;min-width:0}
 .thd .nm{display:flex;align-items:center;gap:7px;font-weight:800;min-width:0}
 .thd .nm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800}
 .thd .ms{display:flex;gap:3px}
@@ -258,6 +264,11 @@ tr:last-child td{border-bottom:0}
 .lane{position:relative;flex:1;background:repeating-linear-gradient(90deg,transparent 0 calc(100%/16 - 1px),var(--ln) calc(100%/16 - 1px) calc(100%/16))}
 .clip{position:absolute;top:5px;bottom:5px;border-radius:4px;overflow:hidden;background:var(--c);color:var(--co);cursor:grab;transition:transform .5s var(--spring)}
 .clip:hover{transform:translateY(-2px)}
+.clip.dr{transition:none;z-index:2;cursor:grabbing}
+.clip.dr.trim{overflow:hidden}
+.clip.sel{touch-action:none}
+.clip .edge{position:absolute;top:0;bottom:0;width:8px;z-index:3;cursor:ew-resize}
+.clip .edge.l{left:0}.clip .edge.r{right:0}
 .clip.sel{box-shadow:0 0 0 2.5px var(--s1),0 0 0 5px var(--tx);overflow:visible}
 .clip .cl{position:absolute;left:7px;top:3px;font-size:11.5px;font-weight:800;z-index:2;white-space:nowrap}
 .clip canvas{position:absolute;inset:0;border-radius:4px}
@@ -321,6 +332,7 @@ tr:last-child td{border-bottom:0}
 
 /* entrance: everything is readable from the first frame after a short rise */
 .in>*{animation:rise .65s var(--ez) both;animation-delay:calc(var(--n,0)*26ms)}
+.rr .in>*,.rr .prog i{animation:none}
 @keyframes rise{from{transform:translateY(12px);opacity:0}}
 ::view-transition-old(root){animation:vo .28s var(--ez) both}
 ::view-transition-new(root){animation:vn .5s var(--ez) both}

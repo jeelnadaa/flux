@@ -168,6 +168,7 @@
     if (end) setS({ params: { [mid]: { [key]: +v.toFixed(4) } } });
     return F.num(v, 2);
   };
+  Flux.cloneRange = parts => { const m = byId(parts[0]), p = m && (m.params || []).find(q => q.key === parts[1]); return p ? { min: p.min, max: p.max } : null; };
   Flux.cloneTip = b => { const [, mid, key] = b.split(':'), m = byId(mid), p = m && (m.params || []).find(q => q.key === key); return p ? p.tip : ''; };
 
   const A = {

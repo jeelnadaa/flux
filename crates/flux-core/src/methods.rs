@@ -1664,7 +1664,10 @@ fn h_selection_set(api: &Api, v: &Value) -> Result<Value> {
     }
     let sel = p.selection.clone();
     s.rev += 1;
-    Ok(serde_json::to_value(sel)?)
+    // The revision lets the caller tell its own selection change from someone else's edit.
+    let mut out = serde_json::to_value(sel)?;
+    out["rev"] = json!(s.rev);
+    Ok(out)
 }
 fn h_marker_add(api: &Api, v: &Value) -> Result<Value> {
     let sr = sr(api);

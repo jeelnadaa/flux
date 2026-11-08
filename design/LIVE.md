@@ -117,3 +117,19 @@ The row on Smart tools and Voice cloning gains **Show log**, a ghost button befo
 opens a `pre.mono.box` under the row, like the release notes box in the Update ready dialog. Under it a `.dim` line
 appears after 20 s without output. While a job runs only the row's meter and text change; the page isn't redrawn.
 Code: `dlRow`, `dlPatch` and `dlToggle` in `apps/desktop/ui/app-core.js`.
+
+## Editor: typed values, timeline zoom, clip position
+
+**Typed values.** Clicking a slider's value swaps it for a small `inp mono svin` (24 px high, right-aligned, in the
+same spot). A fader's dB line does the same. Enter applies, Esc cancels, leaving the box applies. A value that can't
+be read gets a 2 px `--sig` outline. A dotted underline on hover marks a value as editable.
+
+**Timeline bar.** The single zoom button becomes ghost minus, a mono readout such as `2.4×`, ghost plus, and ghost
+Fit, at the end of the existing `tlbar`. `--lw` on `.tl` sets the lane width from `--z`.
+
+**Inspector.** With a clip selected, the Start and Len text becomes two `fld`s with mono `inp`s in the same `g2`, with
+a dim 12.5 px line on the arrow keys under them, and a ghost `x` Deselect button beside the track pill.
+
+**Motion.** A redraw of the same screen adds `.rr` to the stage, which stops `.in` entrances and `.prog` growth from
+playing again. They still play when arriving at a screen. Checked at 1440, 820 and 390 px in the Cassette theme
+(`tests/e2e/test_editor.py`, screenshots `target/e2e/editor-timeline-*.png`). Other themes and fonts use the same tokens.

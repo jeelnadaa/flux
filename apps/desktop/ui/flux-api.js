@@ -151,7 +151,7 @@ window.FD = (function () {
     return e ? findFx(e.id) : null;
   }
   function pval(e, key) { if (!e) { return undefined; } if (e.params && key in e.params) return e.params[key]; const s = spec(e.kind); const p = s && s.params.find(q => q.key === key); return p ? p.default : undefined; }
-  function pct(p, v) { if (!p) return 0; if (p.log && p.min > 0) return Math.round(Math.log(v / p.min) / Math.log(p.max / p.min) * 100); return Math.round((v - p.min) / (p.max - p.min) * 100); }
+  function pct(p, v) { if (!p) return 0; if (p.log && p.min > 0) return Math.log(v / p.min) / Math.log(p.max / p.min) * 100; return (v - p.min) / (p.max - p.min) * 100; }
   function unpct(p, x) { x = Math.min(100, Math.max(0, x)) / 100; let v = p.log && p.min > 0 ? p.min * Math.pow(p.max / p.min, x) : p.min + (p.max - p.min) * x; if (p.unit === 'int' || p.unit === 'bool' || p.unit === 'enum') v = Math.round(v); return v; }
   function fmtp(p, v) {
     if (!p) return '';

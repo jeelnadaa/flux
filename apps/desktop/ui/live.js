@@ -68,6 +68,13 @@
     if (pend.size) { const b = [...pend.values()]; pend.clear(); chain = chain.then(async () => { const id = await own(); for (const [mm, pp] of b) await call(mm, Object.assign({ preset: id }, pp)); }); }
     await chain.catch(() => { }); if (owning) await owning.catch(() => { });
   }
+  /* What a slider's typed value means: the range behind it, and whether it reads as a percentage. */
+  Flux.liveRange = parts => {
+    const [t, a, b] = parts;
+    if (t === 'mp') { const mo = modOf(a), q = mo && pspec(mo.kind, b); return q && q.unit !== 'enum' && q.unit !== 'bool' ? { spec: q } : null; }
+    const r = t === 'p' ? RG[a] : t === 'mx' ? RG.mix : t === 'lg' ? RG.gain_db : t === 'lp' ? RG.pan : t === 'mo' ? RG[b] : t === 'mt' ? RG.amount : t === 'mv' ? RG.value : t === 'mc' ? RG.curve : null;
+    return r ? { r, pct: x => pctOf(x, r), scale: r.f === pc || r.f === spc || r.f === bal ? 100 : 1, base: r.f === ms ? 'ms' : '' } : null;
+  };
   Flux.liveBind = (parts, pct, end) => {
     const p = P(); if (!p) return '';
     const [t, a, b, c] = parts;
