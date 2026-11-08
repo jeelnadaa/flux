@@ -274,7 +274,10 @@ def main():
             page.goto(f"http://127.0.0.1:{port}/#tts")
             page.wait_for_selector('[data-act-change="tts-engine"]')
             opts = page.locator('[data-act-change="tts-engine"] option').all_inner_texts()
-            assert any("voices" in o for o in opts), opts
+            # What this computer can use depends on it: a build machine has no system voices, so the engine reports a model.
+            tts = next(x for x in api(port, "ai.engines")["roles"] if x["role"] == "tts")["engines"]
+            want = {e["name"] for e in tts if e["chosen"] or (e["installed"] and (e["kind"] != "cloud" or e["allowed"]))}
+            assert want and sorted(opts) == sorted(want), (opts, want)
             page.screenshot(path=str(OUT / "tts-engine-1440.png"))
             ok("stems tiles and the speech engine picker follow the installed engines")
 
@@ -290,7 +293,7 @@ def main():
                     d["result"]["voices"] = []
                 else:
                     tts = next(x for x in d["result"]["roles"] if x["role"] == "tts")
-                    tts["engines"] = [dict(e, installed=False) for e in tts["engines"]]
+                    tts["engines"] = [dict(e, installed=False, chosen=e["id"] == "system") for e in tts["engines"]]
                 route.fulfill(response=r, json=d)
 
             page.route("**/api/call", no_voices)
