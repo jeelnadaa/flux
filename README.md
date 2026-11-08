@@ -78,6 +78,12 @@ AI agents can drive every feature.
   environment variable (`OPENAI_API_KEY` and the like) or the system keychain, and are never shown, logged or saved
   in Flux's files. The OpenAI engines also work with any OpenAI-compatible server. See ADR 0006.
 
+- **Smart tools in Settings.** One page lists every engine for stems, transcripts and speech with its size,
+  licence and tier, marks the one suggested for this computer, and downloads, uses or removes it. Online engines
+  are turned on there, with what is sent and where, and keys are added or forgotten. Split into stems shows the
+  installed engines as tiles; Text to speech has an engine menu. The Transcript editor shows every word: click
+  one to hear it or cut it from the audio, and Filler review removes um, uh and stutters in one go.
+
 Not available yet: dubbing (`dub.start` returns `unavailable`). The Smart tools picker in Settings is next.
 
 ## Build and test

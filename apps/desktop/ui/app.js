@@ -28,10 +28,10 @@
   const NEED = {
     boot: ['caps'], unsupported: ['caps'], home: ['library'], library: ['library'], 'project-menu': ['library'], record: ['devices'], history: ['history', 'snapshots'],
     mix: ['loudness', 'problems'], meters: ['loudness', 'problems'], 'fx-eq': ['presets'], 'fx-clean': ['problems'], fxp: ['presets'], rooms: ['styles'], aitools: ['ai'], magic: ['ai'],
-    analysis: ['tempokey'], master: ['loudness'], tts: ['voices'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
-    macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
+    analysis: ['tempokey'], master: ['loudness'], tts: ['voices', 'aeng'], jobs: ['jobs'], export: ['formats', 'loudness'], exporting: [], convert: ['formats'], batch: ['styles', 'presets', 'formats'],
+    macros: ['actions'], presets: ['presets'], 'prefs-audio': ['devices'], 'prefs-models': ['ai', 'aeng'], 'smart-get': ['aeng'], 'smart-cloud': ['aeng'], 'smart-key': ['aeng'], 'prefs-storage': ['usage'], 'prefs-agents': ['mcp', 'info'], 'help-agents': ['mcp', 'info'],
     live: ['lkinds', 'lpresets', 'lstatus', 'ldevices', 'lpreset'],
-    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai'], fillers: ['ai'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags', 'csettings'], 'clone-get': ['cstatus'], 'stems-setup': ['ai'], 'prefs-privacy': [],
+    'prefs-about': ['info', 'update'], diag: ['diag'], recovery: ['recovery'], quota: ['usage'], script: ['ai', 'aeng', 'trans', 'tfill', 'project'], fillers: ['ai', 'aeng', 'trans', 'tfill'], dub: ['ai'], dubreview: ['ai'], clone: ['cstatus', 'cprofiles', 'ctags', 'csettings'], 'clone-get': ['cstatus'], 'stems-setup': ['ai', 'aeng'], 'prefs-privacy': [],
   };
   const ALWAYS = ['settings', 'catalog', 'project', 'info'];
   const ENTER = {
@@ -284,8 +284,10 @@
     'magic-mode': (el, i) => { D.ui.magicMode = i; },
     'magic-toggle': el => { D.ui.magicOff = togg(D.ui.magicOff || [], ds(el).v); rr(); },
     'magic-apply': async () => { const m = D.ui.magic; if (!m) return; const ids = m.fixes.map(f => f.id).filter(id => !(D.ui.magicOff || []).includes(id)); const r = await act('tool.magic.apply', { ids }); if (r) { D.ui.magic = null; D.sel.target = 'master'; render('rack'); } },
-    'stem-mode': (el, i) => { if (i === 2) { rr(); return; } D.ui.stemMode = i === 0 ? '2' : '4'; },
-    'stems-start': async () => { const r = await act('tool.stems', { mode: D.ui.stemMode || '4' }, { refresh: false }); if (!r) return; await follow(r.job, 'stems-run', async () => { await refresh(); if (D.ui.stemMute === false) { const orig = F.tracks().find(t => !/^(Vocals|Drums|Bass|Other|Music|Instrumental)\b/.test(t.name) && t.mute); if (orig) await act('track.set', { track: orig.id, mute: false }); } render('stems'); }); },
+    'stem-mode': (el, i) => { if (i === 2) { const six = ((D.aeng && D.aeng.roles || []).find(r => r.role === 'stems') || { engines: [] }).engines.find(e => e.tier === 'extra' && e.installed); if (six) { D.ui.stemMode = '6'; D.ui.stem6 = six.id; } rr(); return; } D.ui.stemMode = i === 0 ? '2' : '4'; rr(); },
+    'tts-mvoice': async el => { try { await call('ai.engine.set', { role: 'tts', voice: el.dataset.v }); } catch (e) { fail(e); } F.stale('aeng'); await F.need(['aeng'], true); rr(); },
+    'stem-tile': el => { D.ui.stemEngine = el.dataset.id; rr(); },
+    'stems-start': async () => { const six = D.ui.stemMode === '6', e = Flux.stemPick ? Flux.stemPick() : null; const r = await act('tool.stems', Object.assign({ mode: six ? '4' : (D.ui.stemMode || '4') }, e ? { engine: e.id } : {}), { refresh: false }); if (!r) return; await follow(r.job, 'stems-run', async () => { await refresh(); if (D.ui.stemMute === false) { const orig = F.tracks().find(t => !/^(Vocals|Drums|Bass|Other|Music|Instrumental)\b/.test(t.name) && t.mute); if (orig) await act('track.set', { track: orig.id, mute: false }); } render('stems'); }); },
     'stem-mix': async (el, i) => { D.ui.stemMix = i; const drop = [null, ['Vocals'], ['Drums', 'Bass', 'Other', 'Music', 'Instrumental'], ['Drums'], ['Bass']][i]; if (!drop) return; for (const t of F.tracks().filter(t => /^(Vocals|Drums|Bass|Other|Music|Instrumental)\b/.test(t.name))) { const m = drop.includes(t.name.split(' ')[0]); if (!!t.mute !== m) await call('track.set', { track: t.id, mute: m }); } await refresh(); },
     'clean-adv': (el, i) => { D.ui.cleanAdv = i; },
     'cleanup-apply': async () => { const p = { strength: (D.ui.cleanStrength == null ? 60 : D.ui.cleanStrength) / 100 }; if (D.sel.target && D.sel.target.startsWith('track:')) p.track = +D.sel.target.split(':')[1]; const r = await act('tool.cleanup', p); if (r) { D.ui.cleanReport = r.report; rr(); } },
@@ -294,7 +296,7 @@
     'tempo-detect': async () => { F.stale('tempokey'); await F.need(['tempokey'], true); rr(); },
     'master-style': (el, i) => { D.ui.masterStyle = i; D.ui.masterPlan = null; planMaster(); },
     'master-apply': async el => { const r = await act('tool.master.apply', { style: ds(el).style, target: D.ui.masterTarget || (P() && P().target_lufs) || -14, amount: D.ui.masterAmt == null ? .5 : D.ui.masterAmt }); if (r) { D.ui.mastered = true; D.ui.masterPlan = null; await planMaster(); F.stale('loudness'); await F.need(['loudness'], true); rr(); } },
-    'tts-speak': async () => { const text = (D.ui.ttsText || '').trim(); if (!text) return; const vs = (D.voices && D.voices.voices) || []; if (!P()) await act('project.new', { name: 'Speech', template: 'blank' }); const r = await act('tts.speak', { text, voice: D.ui.ttsVoice || (vs[0] && vs[0].id), rate: D.ui.ttsRate || 0, at: pos() }, { refresh: false }); if (r && r.job) await follow(r.job, null, async () => { await refresh(); render('edit'); }); },
+    'tts-speak': async () => { const text = (D.ui.ttsText || '').trim(); if (!text) return; const vs = (D.voices && D.voices.voices) || []; if (!P()) await act('project.new', { name: 'Speech', template: 'blank' }); const en = Flux.ttsEngine ? Flux.ttsEngine() : { id: 'system' }; const p = en.id === 'system' ? { text, engine: 'system', voice: D.ui.ttsVoice || (vs[0] && vs[0].id), rate: D.ui.ttsRate || 0, at: pos() } : { text, engine: en.id, at: pos() }; const r = await act('tts.speak', p, { refresh: false }); if (r && r.job) await follow(r.job, null, async () => { await refresh(); render('edit'); }); },
     'job-cancel': async el => { const id = ds(el).id || (D.ui.job && D.ui.job.id); if (id) await act('job.cancel', { id }, { refresh: false }); F.stale('jobs'); if (ds(el).then) render(ds(el).then); else { await F.need(['jobs'], true); rr(); } },
     'jobs-clear': async () => { await act('job.clear', {}, { refresh: false }); F.stale('jobs'); await F.need(['jobs'], true); rr(); },
     /* export */
@@ -470,6 +472,7 @@
   });
   document.addEventListener('change', async e => {
     const el = e.target, d = el.dataset;
+    if (d.actChange === 'tts-engine') { try { await call('ai.engine.set', { role: 'tts', engine: el.value }); } catch (err) { fail(err); } F.stale('aeng', 'ai'); await F.need(['aeng'], true); rr(); return; }
     if (d.ui === 'libsearch' || el.matches('[data-ui="libsearch"]')) { D.ui.libq = Object.assign(D.ui.libq || {}, { search: el.value || undefined }); F.stale('library'); await F.need(['library']); rr(); return; }
     if (d.ui) { D.ui[d.ui] = num(el, el.value); if (d.rerender) { if (d.ui === 'masterTarget') { D.ui.masterPlan = null; planMaster(); } rr(); } return; }
     if (d.exp) { D.ui.exp = Object.assign(Flux.xo(), { [d.exp]: num(el, el.value), dest: 'Custom' }); rr(); return; }

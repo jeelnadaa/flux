@@ -63,3 +63,33 @@ foot with ghost Cancel and primary Download. No new CSS.
 
 **Checked:** 1440, 820 and 390 px with no sideways scrolling; every control named and inside a `data-tip`
 (`tests/e2e/test_clone_models.py`, screenshots `target/e2e/clone-*.png`).
+
+## Smart tools (Settings), Split into stems engines, Text to speech engine menu
+
+**Smart tools** (`prefs-models`, `apps/desktop/ui/smart.js`) is a Settings page built with `Flux.pref` like
+Privacy and Storage. Nearest screens copied: the voice cloning Models list (above) and Settings > Privacy. Top: a
+dim lede with the used size in mono, a `callout chip` naming the graphics chip and memory. Then one `sec` per role
+(Stems, Transcripts, Text to speech): the reason for the suggestion in dim text, then a `lst box` with one kit list
+row per engine (`act` icon: `chip` built in, `disk` model, `globe` online), `ti` with name, licence and size or
+provider and Free / Needs a key, the note, then `pill`s for the tier (Light, Balanced, Best, Specialist, Online),
+`pill ok` "Suggested here", `pill` Free and Text only. On the right: In use (`btn p`, `aria-pressed`), Use,
+Download or Resume (primary when suggested), Turn on (`btn` with `globe`), or a ghost trash `btn`. A `sel` for the
+voice or the language sits under its role. **Online services** is a `lst box` with one row per provider: `lock`
+icon, where the key comes from, and Add key or Forget key. Dialogs (`smart-get`, `smart-cloud`, `smart-key`) are the
+kit `dlg` shaped like the cloning Download dialog: a `lst box` row, then `callout ac` (download) or `callout warn`
+with the globe saying what is sent where, a password `inp` for a key with where to get one in mono, and a foot of
+ghost Cancel and primary action. No new CSS.
+
+**Split into stems** keeps the prototype dialog; the tiles now come from the installed engines (built-in, Balanced,
+Best), and a fourth `seg` option "6 stems" appears when the six-stem model is downloaded. **Text to speech** keeps
+the prototype; the aside gains a `sec('Engine')` with a `sel` and a "Run on" `pill`.
+
+**Transcript editor** and **Filler review** (`script`, `fillers`) are the prototype screens from
+`design/screens-c.js`, wired to real data: words are `.wd` spans (`fl` filler, `low` low confidence, `cur` selected),
+the aside shows the selection with Delete and Listen, Accuracy, and "Transcribed with" plus an On device or Online
+`pill`. When there is no transcript, the page is the kit `pg` with a lede and Make a transcript. Out-of-date
+transcripts show a `callout warn` and disable Delete and Remove until updated.
+
+**Checked:** 1440, 820 and 390 px with no sideways scrolling, and at 390 px in all 13 themes and 6 fonts; every
+control named and inside a `data-tip` (`tests/e2e/test_smart_tools.py`, screenshots `target/e2e/smart-*.png`,
+`transcript-*.png`, `fillers-*.png`, `stems-setup-1440.png`, `tts-engine-1440.png`).

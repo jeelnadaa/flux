@@ -72,7 +72,7 @@ window.FD = (function () {
     library: () => call('library.list', D.ui.libq || {}), jobs: () => call('job.list'), history: () => call('history.list'), snapshots: () => call('snapshot.list'),
     presets: () => call('preset.list', D.ui.presetKind ? { kind: D.ui.presetKind } : {}), actions: () => call('action.list'), styles: () => call('style.list'), catalog: () => call('fx.catalog'),
     devices: () => call('audio.devices'), voices: () => call('tts.voices'), formats: () => call('export.formats'), usage: () => call('storage.usage'), ai: () => call('ai.status'),
-    cstatus: () => call('clone.status'), cprofiles: () => call('clone.profiles'), ctags: () => call('clone.tags'), csettings: () => call('clone.settings.get'),
+    aeng: () => call('ai.engines'), trans: async () => { try { return await call('transcript.get'); } catch (e) { return null; } }, tfill: async () => { try { return await call('transcript.fillers'); } catch (e) { return null; } }, cstatus: () => call('clone.status'), cprofiles: () => call('clone.profiles'), ctags: () => call('clone.tags'), csettings: () => call('clone.settings.get'),
     lkinds: () => call('live.kinds'), lpresets: () => call('live.presets'), lstatus: () => call('live.status'), ldevices: () => call('live.devices'),
     lpreset: () => D.ui.live && D.ui.live.sel ? call('live.preset.get', { id: D.ui.live.sel }) : Promise.resolve(null),
     mcp: () => call('mcp.info'), recovery: () => call('recovery.list'), diag: () => call('system.diagnostics'),
