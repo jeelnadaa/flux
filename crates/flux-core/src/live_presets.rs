@@ -101,7 +101,64 @@ const EIGHT: f32 = 2.0;
 const SWARM: f32 = 3.0;
 
 /// Every built-in live preset. Each one uses the same modules, modulators and macros a user can.
+/// Output level of each built-in preset, measured so each one plays 3 LU quieter than the sound going in (BS.1770,
+/// on the demo music or voice). Without it, presets ranged from 17 LU quieter to 18 LU louder than the input.
+const LEVEL: &[(&str, f32)] = &[
+    ("out-8d-orbit", -4.6),
+    ("out-8d-spiral", -7.2),
+    ("out-8d-swarm", -5.6),
+    ("out-8d-eight", -8.2),
+    ("out-slowed-reverb", 0.4),
+    ("out-nightcore", -3.1),
+    ("out-lofi", -1.6),
+    ("out-vinyl", -2.5),
+    ("out-cassette", -5.8),
+    ("out-concert", -2.7),
+    ("out-next-door", -0.8),
+    ("out-underwater", -6.1),
+    ("out-bass", -7.1),
+    ("out-night", 0.5),
+    ("out-clarity", -0.6),
+    ("out-wide", -3.2),
+    ("out-mono", -2.9),
+    ("out-gate", -1.3),
+    ("out-cathedral", -3.9),
+    ("out-psych", -0.9),
+    ("out-radio", -2.2),
+    ("in-broadcast", -10.2),
+    ("in-clean", -13.1),
+    ("in-deep", -1.8),
+    ("in-chipmunk", 0.9),
+    ("in-helium", -2.2),
+    ("in-robot", 3.2),
+    ("in-choir", 11.0),
+    ("in-hardtune", -0.0),
+    ("in-host", -13.0),
+    ("in-walkie", -10.2),
+    ("in-megaphone", -23.2),
+    ("in-phone", -5.3),
+    ("in-cave", 1.8),
+    ("in-stadium", -9.9),
+    ("in-alien", 6.1),
+    ("in-monster", -3.1),
+    ("in-space", -4.5),
+    ("in-ghost", 13.8),
+    ("in-octaves", -1.4),
+    ("in-warm", -8.9),
+];
+
+/// Every built-in preset, at its matched output level.
 pub fn builtin() -> Vec<LivePreset> {
+    let mut all = presets();
+    for p in &mut all {
+        if let Some((_, db)) = LEVEL.iter().find(|(id, _)| *id == p.id) {
+            p.output_gain_db = *db;
+        }
+    }
+    all
+}
+
+fn presets() -> Vec<LivePreset> {
     vec![
         // ---------------- for sound from the computer
         LivePreset {
@@ -1402,6 +1459,28 @@ mod tests {
                 p.id
             );
         }
+    }
+
+    #[test]
+    fn builtin_presets_play_a_little_quieter_than_the_input() {
+        for p in builtin() {
+            let mut q = p.clone();
+            q.validate().unwrap();
+            let mut d = live::Demo::new(p.kind == "input", 48000.0);
+            let (il, ir, ol, or) = live::render(&q, 48000.0, &mut |l, r| d.fill(l, r), 12.0);
+            let delta = crate::analysis::loudness(&ol, &or, 48000.0).integrated
+                - crate::analysis::loudness(&il, &ir, 48000.0).integrated;
+            assert!(
+                (-4.0..=-2.0).contains(&delta),
+                "{} plays {delta:+.1} LU against its input",
+                p.id
+            );
+        }
+        assert_eq!(
+            LEVEL.len(),
+            presets().len(),
+            "every built-in preset has a measured level"
+        );
     }
 
     #[test]
