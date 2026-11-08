@@ -83,7 +83,10 @@ def main():
             page.goto(s.url())
             page.wait_for_selector(panel)
             text = page.inner_text(panel)
-            assert "No virtual audio cable is installed" in text and "Not installed" in text, text
+            # The wording is this computer's: Linux needs pactl, Windows and macOS need a cable.
+            st = api(s.port, "live.virtual")
+            assert st["note"] in text and "Not installed" in text, text
+            assert st["platform"] == "linux" or st["note"].startswith("No virtual audio cable is installed"), st["note"]
             assert "original sound keeps playing" in page.inner_text('[data-lv="missing-output"]')
             assert "call apps can't use this" in page.inner_text('[data-lv="missing-input"]')
             assert "Flux speaker" not in " ".join(page.locator(f"{src} option").all_inner_texts())

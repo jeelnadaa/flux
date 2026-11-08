@@ -112,6 +112,7 @@ None.
 
 ## Session log
 
+- 2026-11-08: test_flux_devices expected the Windows and macOS wording on Linux, where the panel correctly asks for pactl. It now checks the note the engine gives for this computer.
 - 2026-11-08: test_smart_tools assumed system voices, which a build machine lacks (it correctly reports a model instead). The picker is now compared with what ai.engines reports. v2.0.19 has the update files (latest.json, 11 platform entries).
 - 2026-11-08: R7.5 fix: a silent Live route said it was ready before it was marked running, so live.start could answer running: false (Windows CI). Reproduced here with a pause between the two; order swapped. R7.13 fix: Text to speech showed an empty engine list on a computer with no voices (Linux CI); it now names the engine in use. New test for that state. CI keychain step confirmed working.
 - 2026-11-08: Linux CI: test_smart_tools saves a key in the real system keychain, and a build machine has none running. The UI job now starts gnome-keyring for its step (not run locally: no Linux here). The test prints the page if the key isn't kept. Update files are live from v2.0.18 (latest.json 200, 11 platform entries). test_first_run's home timeout did not recur on run 42479851551; cause still unknown, its report stays.
