@@ -36,7 +36,7 @@ AI agents can drive every feature.
   asks, then puts the preset back. Built-ins play 3 LU below their input by default. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
-- **Command API.** 168 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Command API.** 173 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 
@@ -62,8 +62,17 @@ AI agents can drive every feature.
   GitHub release in the visitor's browser and offers the right installer for their computer. `npm run build:static`
   writes `dist-static/` for Cloudflare Pages, with a content security policy.
 
-Not available without bundled models: transcript editing, filler-word removal and dubbing. These methods return
-`unavailable` instead of fake results.
+- **Smart tools: pick the model.** Stems, transcripts and text to speech each have a built-in or light engine
+  and downloadable models, and Flux suggests one for this computer (graphics chip, memory, cores) with the reason.
+  Stems: the built-in split (instant, no download), Demucs v4 (balanced), Demucs fine-tuned (best) or Demucs 6 stems
+  (adds guitar and piano). Transcripts: Whisper Base, Small or Large v3 Turbo through faster-whisper, with every word
+  at an exact sample position, filler words and repeats found, and a stale flag once the project changes. Text to
+  speech: the system voices, Kokoro (6 voices, speed) or Chatterbox Turbo's own voice; model speech is labelled
+  synthetic in the WAV. All MIT or Apache-2.0; each model installs only the packages it needs, once, and runs on
+  this computer. Choose with `ai.engine.set`; see ADR 0005.
+
+Not available yet: dubbing (`dub.start` returns `unavailable`). Cloud engines and the Smart tools picker in
+Settings are next.
 
 ## Build and test
 

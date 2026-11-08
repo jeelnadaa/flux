@@ -59,12 +59,32 @@ pub struct ModelSpec {
     pub files: Vec<FileSpec>,
     #[serde(default)]
     pub params: Vec<Param>,
+    /// `light`, `balanced` or `best`: how a model compares with the others for its job.
+    #[serde(default)]
+    pub tier: String,
+    #[serde(default)]
+    pub min_ram_gb: f32,
+    /// Ready-made synthetic voices (text to speech models).
+    #[serde(default)]
+    pub voices: Vec<VoiceOpt>,
+    /// Extra packages this model needs in the engine, installed with its first download.
+    #[serde(default)]
+    pub install: Vec<Step>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VoiceOpt {
+    pub id: String,
+    pub name: String,
+    pub language: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FileSpec {
     pub path: String,
     pub size: u64,
     pub sha256: String,
+    /// Where the file is when it isn't in the model's Hugging Face repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Param {
@@ -199,6 +219,8 @@ pub struct State {
     pub files_missing: usize,
     /// A stopped download left part of a file: Download resumes it.
     pub partial: bool,
+    /// The engine has the packages this model needs (always true for models that need none).
+    pub packages: bool,
 }
 
 pub fn model_state(root: &Path, c: &Catalog, m: &ModelSpec) -> State {
@@ -220,8 +242,46 @@ pub fn model_state(root: &Path, c: &Catalog, m: &ModelSpec) -> State {
                 .unwrap_or(0);
         }
     }
-    st.installed = st.files_missing == 0;
+    st.packages = packages_ready(root, c, m);
+    st.installed = st.files_missing == 0 && st.packages;
     st
+}
+
+/// One key per install step, so models that share packages install them once.
+fn step_key(s: &Step) -> String {
+    s.args.join(" ")
+}
+fn packages_file(root: &Path, c: &Catalog) -> PathBuf {
+    runtime_dir(root, c).join("packages.json")
+}
+fn packages_done(root: &Path, c: &Catalog) -> std::collections::BTreeSet<String> {
+    std::fs::read(packages_file(root, c))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+pub fn packages_ready(root: &Path, c: &Catalog, m: &ModelSpec) -> bool {
+    if m.install.is_empty() {
+        return true;
+    }
+    let done = packages_done(root, c);
+    m.install.iter().all(|s| done.contains(&step_key(s)))
+}
+fn packages_todo(root: &Path, c: &Catalog, m: &ModelSpec) -> Vec<Step> {
+    let done = packages_done(root, c);
+    m.install
+        .iter()
+        .filter(|s| !done.contains(&step_key(s)))
+        .cloned()
+        .collect()
+}
+fn mark_package(root: &Path, c: &Catalog, s: &Step) -> Result<()> {
+    let mut done = packages_done(root, c);
+    done.insert(step_key(s));
+    crate::store::atomic_write(
+        &packages_file(root, c),
+        serde_json::to_string_pretty(&done)?.as_bytes(),
+    )
 }
 
 fn runtime_dir(root: &Path, c: &Catalog) -> PathBuf {
@@ -478,6 +538,10 @@ fn model_todo(root: &Path, c: &Catalog, m: &ModelSpec) -> Result<Vec<(PathBuf, F
 }
 
 fn file_url(c: &Catalog, m: &ModelSpec, f: &FileSpec) -> Result<String> {
+    if let Some(u) = &f.url {
+        check_url(u)?;
+        return Ok(u.clone());
+    }
     let r = &c.repos[&m.repo];
     Ok(format!(
         "{}/{}/resolve/{}/{}",
@@ -593,13 +657,70 @@ fn python_cmd(root: &Path, c: &Catalog) -> Result<Command> {
     Ok(cmd)
 }
 
+/// Stand-ins for modules that packages import but Flux never calls (they would bring in LGPL code). The runner puts
+/// them last on its path, so a real package always wins.
+const SHIMS: &[(&str, &str)] = &[
+    ("av.py", include_str!("py_shims/av.py")),
+    ("num2words.py", include_str!("py_shims/num2words.py")),
+    (
+        "espeakng_loader.py",
+        include_str!("py_shims/espeakng_loader.py"),
+    ),
+    (
+        "phonemizer/__init__.py",
+        include_str!("py_shims/phonemizer/__init__.py"),
+    ),
+    (
+        "phonemizer/backend/__init__.py",
+        include_str!("py_shims/phonemizer/backend/__init__.py"),
+    ),
+    (
+        "phonemizer/backend/espeak/__init__.py",
+        include_str!("py_shims/phonemizer/backend/espeak/__init__.py"),
+    ),
+    (
+        "phonemizer/backend/espeak/wrapper.py",
+        include_str!("py_shims/phonemizer/backend/espeak/wrapper.py"),
+    ),
+];
+
 fn write_runner(dir: &Path) -> Result<PathBuf> {
     std::fs::create_dir_all(dir)?;
     let p = dir.join("flux_voice.py");
     if std::fs::read_to_string(&p).ok().as_deref() != Some(RUNNER) {
         std::fs::write(&p, RUNNER)?;
     }
+    for (rel, text) in SHIMS {
+        let f = dir.join("flux_shims").join(rel);
+        if std::fs::read_to_string(&f).ok().as_deref() != Some(*text) {
+            std::fs::create_dir_all(f.parent().unwrap())?;
+            std::fs::write(&f, text)?;
+        }
+    }
     Ok(p)
+}
+
+/// One pip install, shown as a stage of the job.
+fn pip_step(root: &Path, c: &Catalog, kind: &str, ctx: &JobCtx, s: &Step) -> Result<()> {
+    ctx.stage(&s.name, "active");
+    let mut cmd = python_cmd(root, c)?;
+    cmd.args([
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--no-input",
+        "--no-cache-dir",
+        "--no-warn-script-location",
+    ]);
+    cmd.args(&s.args);
+    if let Some(ix) = s.index.get(kind) {
+        check_url(ix)?;
+        cmd.args(["--index-url", ix]);
+    }
+    run_logged(cmd, ctx, &s.name)?;
+    ctx.stage(&s.name, "done");
+    Ok(())
 }
 
 /// Install the runtime: Python, then the pip steps, then check it imports every loader. `share` is the job progress
@@ -631,6 +752,7 @@ fn install_runtime(
                     path: String::new(),
                     size: a.size,
                     sha256: a.sha256.clone(),
+                    url: None,
                 },
             ) {
                 fetch(&a.url, &arc, a.size, &a.sha256, meter)?;
@@ -659,24 +781,7 @@ fn install_runtime(
     let n = c.runtime.steps.len().max(1) as f32;
     for (i, s) in c.runtime.steps.iter().enumerate() {
         ctx.progress(py_end + (share * 0.95 - py_end) * i as f32 / n);
-        ctx.stage(&s.name, "active");
-        let mut cmd = python_cmd(root, c)?;
-        cmd.args([
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--no-input",
-            "--no-cache-dir",
-            "--no-warn-script-location",
-        ]);
-        cmd.args(&s.args);
-        if let Some(ix) = s.index.get(kind) {
-            check_url(ix)?;
-            cmd.args(["--index-url", ix]);
-        }
-        run_logged(cmd, ctx, &s.name)?;
-        ctx.stage(&s.name, "done");
+        pip_step(root, c, kind, ctx, s)?;
         ctx.progress(py_end + (share * 0.95 - py_end) * (i + 1) as f32 / n);
     }
     ctx.stage("Checking the voice engine", "active");
@@ -722,6 +827,13 @@ pub struct Settings {
     pub params: BTreeMap<String, BTreeMap<String, f64>>,
     #[serde(default)]
     pub local: Vec<LocalModel>,
+    /// The engine chosen for each smart tool (`stems`, `transcript`, `tts`): a model id, a built-in engine or a
+    /// cloud service. Missing means the suggestion for this computer.
+    #[serde(default)]
+    pub engines: BTreeMap<String, String>,
+    /// Per job: the chosen voice (text to speech) or language (transcripts).
+    #[serde(default)]
+    pub options: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 impl Default for Settings {
@@ -734,6 +846,8 @@ impl Default for Settings {
             seed: 1,
             params: BTreeMap::new(),
             local: vec![],
+            engines: BTreeMap::new(),
+            options: BTreeMap::new(),
         }
     }
 }
@@ -766,7 +880,7 @@ pub fn settings(api: &Api) -> Settings {
     }
     s
 }
-fn save_settings(api: &Api, s: &Settings) -> Result<()> {
+pub(crate) fn save_settings(api: &Api, s: &Settings) -> Result<()> {
     crate::store::atomic_write(
         &models_root(api).join("settings.json"),
         serde_json::to_string_pretty(s)?.as_bytes(),
@@ -789,7 +903,7 @@ fn resolve(c: &Catalog, s: &Settings, id: &str) -> Option<(ModelSpec, Option<Loc
     Some((m, Some(l.clone())))
 }
 
-fn params_for(s: &Settings, m: &ModelSpec) -> BTreeMap<String, f64> {
+pub(crate) fn params_for(s: &Settings, m: &ModelSpec) -> BTreeMap<String, f64> {
     let mine = s.params.get(&m.id);
     m.params
         .iter()
@@ -805,7 +919,7 @@ fn params_for(s: &Settings, m: &ModelSpec) -> BTreeMap<String, f64> {
 }
 
 /// Does a computer suit a model on its graphics chip? Anything runs on the processor, more slowly.
-fn fits(m: &ModelSpec, h: &crate::voiceclone::Hardware) -> (&'static str, String) {
+pub(crate) fn fits(m: &ModelSpec, h: &crate::voiceclone::Hardware) -> (&'static str, String) {
     if h.os == "macos" && h.arch == "x86_64" {
         return (
             "no",
@@ -843,7 +957,7 @@ fn active() -> &'static Mutex<BTreeMap<String, String>> {
 fn active_key(root: &Path, id: &str) -> String {
     format!("{}|{id}", root.display())
 }
-fn active_job(api: &Api, root: &Path, id: &str) -> Option<Value> {
+pub(crate) fn active_job(api: &Api, root: &Path, id: &str) -> Option<Value> {
     let jid = active()
         .lock()
         .unwrap()
@@ -861,9 +975,11 @@ pub fn h_models(api: &Api, _: &Value) -> Result<Value> {
     let pick = crate::voiceclone::recommend(h);
     let kind = torch_kind(h);
     let rt = runtime_ready(&root, &c);
+    // Stems, transcript and text to speech models are listed by ai.engines.
     let mut list: Vec<Value> = c
         .models
         .iter()
+        .filter(|m| m.role == "speech" || m.role == "convert")
         .map(|m| {
             let st = model_state(&root, &c, m);
             let (fit, why) = fits(m, h);
@@ -929,12 +1045,17 @@ pub fn h_download(api: &Api, v: &Value) -> Result<Value> {
     if h.os == "macos" && h.arch == "x86_64" {
         bail!(err(
             "unavailable",
-            "Voice cloning needs PyTorch 2.6, which isn't made for Intel Macs."
+            "The models need PyTorch 2.6, which isn't made for Intel Macs."
         ));
     }
     let need_rt = runtime_ready(&root, &c).is_none();
     let todo = match &model {
         Some(m) => model_todo(&root, &c, m)?,
+        None => vec![],
+    };
+    let pkgs = match &model {
+        Some(m) if need_rt => m.install.clone(),
+        Some(m) => packages_todo(&root, &c, m),
         None => vec![],
     };
     let bytes: u64 = todo
@@ -972,7 +1093,7 @@ pub fn h_download(api: &Api, v: &Value) -> Result<Value> {
     if let Some(j) = active_job(api, &root, &id) {
         return Ok(json!({"job": j["job"], "already": true}));
     }
-    if todo.is_empty() && !need_rt {
+    if todo.is_empty() && !need_rt && pkgs.is_empty() {
         return Ok(json!({"installed": true, "bytes": 0}));
     }
     free_space_check(&root, bytes + rt_bytes)?;
@@ -986,10 +1107,12 @@ pub fn h_download(api: &Api, v: &Value) -> Result<Value> {
         stages.extend(c.runtime.steps.iter().map(|s| s.name.as_str()));
         stages.push("Checking the voice engine");
     }
+    stages.extend(pkgs.iter().map(|s| s.name.as_str()));
     if model.is_some() {
         stages.push("Downloading model files");
     }
     let (c2, root2, kind2) = (c.clone(), root.clone(), kind.clone());
+    let pkgs = pkgs.clone();
     let job = api
         .jobs
         .spawn("model-download", &title, &stages, move |ctx| {
@@ -1013,6 +1136,10 @@ pub fn h_download(api: &Api, v: &Value) -> Result<Value> {
                 };
                 out["runtime"] = install_runtime(&root2, &c2, &kind2, ctx, &mut m, rt_share)?;
                 ctx.progress(rt_share);
+            }
+            for s in &pkgs {
+                pip_step(&root2, &c2, &kind2, ctx, s)?;
+                mark_package(&root2, &c2, s)?;
             }
             if !todo.is_empty() {
                 ctx.stage("Downloading model files", "active");
@@ -1379,7 +1506,14 @@ pub fn run_model(r: &Ready, req: Value, ctx: &JobCtx) -> Result<Value> {
     std::fs::write(&rq, serde_json::to_vec(&req)?)?;
     let mut cmd = python_cmd(&r.root, &r.catalog)?;
     cmd.arg(&runner).arg("run").arg(&rq);
-    let res = run_logged(cmd, ctx, "Speaking");
+    // Named after the job's own stage, so a failure says what was being done.
+    let stage = match req["op"].as_str() {
+        Some("stems") => "Separating",
+        Some("transcribe") => "Listening",
+        Some("tts") => "Synthesizing",
+        _ => "Speaking",
+    };
+    let res = run_logged(cmd, ctx, stage);
     std::fs::remove_file(&rq).ok();
     let out = res?;
     out.lines()

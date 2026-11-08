@@ -88,6 +88,26 @@ clone_model_delete {model: "chatterbox"}                            # keeps file
 
 `consent_required` means the voice doesn't exist or the consent recording is missing.
 
+## Smart tool models
+
+Stems, transcripts and text to speech each have engines: built-in ones that need no download and models Flux can
+download. `ai_engines` lists them per job with size, licence, tier, whether they are downloaded, which one is
+chosen and which one suits this computer (and why). Downloads need the person's yes, like voice models.
+
+```text
+ai_engines {}
+ai_model_download {model: "demucs"}                       # confirm_required: ask the person first
+ai_model_download {model: "demucs", confirm: true}        # job; installs only the packages it needs
+ai_engine_set {role: "stems", engine: "demucs"}
+tool_stems {mode: "4", wait: true}                        # or engine: "spectral" for the instant built-in split
+ai_engine_set {role: "transcript", engine: "whisper-small", language: "auto"}
+transcript_make {wait: true}
+transcript_get {}                                         # words with sample positions; stale after edits
+transcript_fillers {}                                     # um, uh, repeats, with sample positions
+ai_engine_set {role: "tts", engine: "kokoro", voice: "bf_emma"}
+tts_speak {text: "Welcome back.", wait: true}             # labelled synthetic
+```
+
 ## Privacy
 
 Flux never uploads audio. Diagnostics (`system_diagnostics`) contain no audio, transcripts or file names.

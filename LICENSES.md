@@ -90,6 +90,9 @@ Model code and trained weights have distinct licenses and must be audited separa
 | Chatterbox (Resemble AI), `ResembleAI/chatterbox` | English speech with an emotion control | MIT | Downloadable (3.19 GB), pinned |
 | Chatterbox Multilingual (Resemble AI), same repository | Speech in 23 languages | MIT | Downloadable (3.21 GB), pinned; shares files with the converter |
 | Chatterbox voice converter (Resemble AI), same repository | Turns the user's own recording into the voice | MIT | Downloadable (1.06 GB), pinned |
+| Demucs v4 `htdemucs`, `htdemucs_ft`, `htdemucs_6s` (Meta Research) | Stems (balanced, best, 6 stems) | MIT (code and weights) | Downloadable (84 MB, 336 MB, 55 MB), pinned to the release files with SHA-256 |
+| Whisper Base, Small, Large v3 Turbo (OpenAI); CTranslate2 conversions by Systran (Base, Small) and Mobius Labs (Turbo) | Transcripts | MIT | Downloadable (148 MB, 486 MB, 1.62 GB), pinned to a commit with SHA-256 per file |
+| Kokoro 82M v1.0 (hexgrad) | Light text to speech, 6 voices | Apache-2.0 | Downloadable (about 330 MB), pinned |
 | OpenVoice V2 (MyShell) | Was the light fallback | MIT | Dropped: its MeloTTS front end needs a second runtime; Chatterbox runs on a processor instead (ADR 0003) |
 | Dia (Nari Labs) | Not used | Its README limits use to research and education | Rejected |
 | Coqui XTTS | Not used | Coqui Public Model Licence (non-commercial) | Rejected |
@@ -103,9 +106,14 @@ Model code and trained weights have distinct licenses and must be audited separa
 | `chatterbox-tts` 0.1.7 | Model code | MIT | Allowed; pinned |
 | `resemble-perth` 1.0.1 | Chatterbox's inaudible watermark | MIT | Allowed (pulled in by chatterbox-tts) |
 | `setuptools` 80.9.0 | Pinned so `pkg_resources` exists for the watermarker (removed in setuptools 81+) | MIT | Allowed; pinned |
+| `faster-whisper` 1.2.1, `ctranslate2` 4.8.5, `onnxruntime` 1.31.1 | Runs Whisper | MIT / MIT / MIT | Allowed; faster-whisper installed with `--no-deps` so PyAV (FFmpeg, LGPL/GPL) is not installed |
+| `demucs` 4.0.1, `dora-search` 0.1.13, `einops` 0.8.2, `julius` 0.2.8, `openunmix` 1.3.0 | Runs Demucs | MIT | Allowed; demucs installed with `--no-deps` so lameenc (LGPL) is not installed |
+| `kokoro` 0.9.4, `misaki` 0.9.4, `loguru` 0.7.3, `addict` 2.4.0, `spacy` 3.8.18, `en_core_web_sm` 3.8.0 | Runs Kokoro and reads English text | Apache-2.0 / Apache-2.0 / MIT / MIT / MIT / MIT | Allowed; kokoro and misaki installed with `--no-deps` so num2words (LGPL), phonemizer and espeak-ng (GPL) are not installed |
+| Flux stand-ins in `crates/flux-core/src/py_shims` (`av`, `num2words`, `espeakng_loader`, `phonemizer`) | Replace the copyleft modules above; written by Flux | MIT (Flux) | Allowed (ADR 0005) |
 | Their pip dependencies (transformers, diffusers, librosa, numpy, safetensors, the Perth watermarker and others) | Installed by pip at their versions | Mostly Apache-2.0 / BSD / MIT / ISC | **Review queued**: a full audit of the resolved set is in the human queue |
 
-Stems, clean-up and text to speech use Flux's own DSP and the system speech engine; no model weights ship with Flux.
+Clean-up and mastering use Flux's own DSP. Stems, transcripts and text to speech can also use the downloadable
+models above, chosen by the user; no model weights ship with Flux.
 Weights are never committed to git. Check each model card again before downloading.
 
 ---

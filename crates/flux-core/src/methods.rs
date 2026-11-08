@@ -628,45 +628,88 @@ fn h_methods(_: &Api, _: &Value) -> Result<Value> {
 }
 
 fn h_app_info(api: &Api, _: &Value) -> Result<Value> {
-    let s = api.lock();
+    // Before taking the lock: the engine list reads the models folder through the API, which locks it too.
+    let ai = ai_status(api);
     let tts = !tools::voices().is_empty();
+    let s = api.lock();
     Ok(json!({
         "name": "Flux", "version": env!("CARGO_PKG_VERSION"), "platform": std::env::consts::OS, "arch": std::env::consts::ARCH,
         "data_dir": s.store.root.display().to_string(), "headless": s.headless,
         "project": s.project.as_ref().map(|p| json!({"id": p.id, "name": p.name})),
         "formats": export::formats(), "tts": tts, "ffmpeg": export::find_tool("ffmpeg").is_some(),
         "methods": METHODS.len(), "uptime_s": s.started.elapsed().as_secs(),
-        "ai": ai_status(),
+        "ai": ai,
     }))
 }
 
-fn ai_status() -> Value {
+/// What each smart tool runs on now: its chosen engine, and whether that engine is ready.
+fn ai_status(api: &Api) -> Value {
+    let eng = crate::smart::h_engines(api, &json!({})).unwrap_or_else(|_| json!({"roles": []}));
+    let pick = |role: &str| -> (bool, String, String, String) {
+        let r = eng["roles"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|r| r["role"] == role);
+        let e = r.and_then(|r| {
+            r["engines"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|e| e["chosen"] == true)
+        });
+        match e {
+            Some(e) => {
+                let kind = e["kind"].as_str().unwrap_or("").to_string();
+                let how = match (kind.as_str(), e["id"].as_str().unwrap_or("")) {
+                    ("builtin", "system") => "system",
+                    ("builtin", _) => "dsp",
+                    _ => "model",
+                };
+                let ready = e["installed"] == true;
+                let name = e["name"].as_str().unwrap_or("").to_string();
+                let note = if ready {
+                    format!("{name}. {}", e["note"].as_str().unwrap_or(""))
+                } else {
+                    format!("{name} isn't downloaded yet ({}). Download it in Settings, Smart tools, or choose another engine.", e["size_text"].as_str().unwrap_or(""))
+                };
+                (ready, how.into(), name, note)
+            }
+            None => (
+                false,
+                "model".into(),
+                String::new(),
+                "No engine for this yet.".into(),
+            ),
+        }
+    };
+    let (st, st_how, st_name, st_note) = pick("stems");
+    let (tr, tr_how, tr_name, tr_note) = pick("transcript");
+    let (ts, ts_how, ts_name, ts_note) = pick("tts");
+    let clone = crate::voicemodels::ready_for(api, "speech", None).is_ok();
     json!([
-        {"id": "stems", "available": true, "how": "dsp", "note": "Spectral split (mid/side + harmonic/percussive). Not a neural model."},
+        {"id": "stems", "available": st, "how": st_how, "engine": st_name, "note": st_note},
         {"id": "cleanup", "available": true, "how": "dsp", "note": "Learned noise profile, de-ess, compression and leveling."},
         {"id": "master", "available": true, "how": "dsp", "note": "Measured EQ tilt, compression and true-peak limiting."},
         {"id": "magic", "available": true, "how": "dsp", "note": "Problem detection with measured thresholds."},
         {"id": "tempo_key", "available": true, "how": "dsp", "note": "Onset autocorrelation and chroma key profiles."},
-        {"id": "tts", "available": !tools::voices().is_empty(), "how": "system", "note": "This computer's own speech voices. Output is labelled synthetic."},
-        {"id": "transcript", "available": false, "how": "model", "note": "Needs a speech recognition model, which this build does not include."},
-        {"id": "fillers", "available": false, "how": "model", "note": "Needs a transcript."},
-        {"id": "dub", "available": false, "how": "model", "note": "Needs speech recognition, translation and a voice model; none are in this build."},
-        {"id": "clone", "available": false, "how": "model", "note": "Needs a local model chosen for this computer. Consent-gated voice profiles work now; speaking in a cloned voice waits for the model (see clone.status)."}
+        {"id": "tts", "available": ts, "how": ts_how, "engine": ts_name, "note": ts_note},
+        {"id": "transcript", "available": tr, "how": tr_how, "engine": tr_name, "note": tr_note},
+        {"id": "fillers", "available": tr, "how": tr_how, "engine": tr_name, "note": if tr { format!("Finds um, uh and repeated words in the transcript, made with {tr_name}.") } else { "Needs a transcript: download a transcript model first.".to_string() }},
+        {"id": "dub", "available": false, "how": "model", "note": "Needs speech recognition, translation and a voice model; translation isn't in this build."},
+        {"id": "clone", "available": clone, "how": "model", "note": if clone { "Your voices speak scripts with the chosen cloning model, on this computer." } else { "Download a cloning model on the Voice cloning page. Consent-gated voice profiles work now." }}
     ])
 }
 
 fn unavailable(what: &str) -> anyhow::Error {
     err("unavailable", format!("{what} needs a speech model, and this build of Flux doesn't include one. Nothing was sent anywhere."))
 }
-fn h_unavailable_transcript(_: &Api, _: &Value) -> Result<Value> {
-    Err(unavailable("Transcription"))
-}
 fn h_unavailable_dub(_: &Api, _: &Value) -> Result<Value> {
     Err(unavailable("Translate and dub"))
 }
 
-fn h_ai_status(_: &Api, _: &Value) -> Result<Value> {
-    Ok(ai_status())
+fn h_ai_status(api: &Api, _: &Value) -> Result<Value> {
+    Ok(ai_status(api))
 }
 
 fn h_capabilities(api: &Api, _: &Value) -> Result<Value> {
@@ -2518,6 +2561,45 @@ fn source_of(api: &Api, v: &Value) -> Result<(crate::api::Stereo, Option<u32>)> 
     Ok(((m.0.clone(), m.1.clone()), None))
 }
 
+/// Stems from a downloaded model: vocals first; in 2-stem mode everything else is summed into the instrumental.
+fn neural_stems(
+    a: &Api,
+    engine: &str,
+    l: &[f32],
+    r: &[f32],
+    sr: u32,
+    mode: &str,
+    ctx: &crate::jobs::JobCtx,
+) -> Result<Vec<(String, crate::api::Stereo)>> {
+    let raw = crate::smart::stems(a, engine, l, r, sr, ctx)?;
+    let cap = |s: &str| {
+        let mut c = s.chars();
+        c.next()
+            .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+            .unwrap_or_default()
+    };
+    let (voc, rest): (Vec<_>, Vec<_>) = raw.into_iter().partition(|(n, _)| n == "vocals");
+    if mode == "2" {
+        let n = l.len();
+        let (mut il, mut ir) = (vec![0f32; n], vec![0f32; n]);
+        for (_, (sl, sr_)) in &rest {
+            for i in 0..n {
+                il[i] += sl[i];
+                ir[i] += sr_[i];
+            }
+        }
+        let mut out: Vec<(String, crate::api::Stereo)> =
+            voc.into_iter().map(|(n, x)| (cap(&n), x)).collect();
+        out.push(("Instrumental".into(), (il, ir)));
+        return Ok(out);
+    }
+    Ok(voc
+        .into_iter()
+        .chain(rest)
+        .map(|(n, x)| (cap(&n), x))
+        .collect())
+}
+
 fn h_stems(api: &Api, v: &Value) -> Result<Value> {
     let mode = os(v, "mode").unwrap_or_else(|| "4".into());
     if mode != "4" && mode != "2" {
@@ -2528,6 +2610,13 @@ fn h_stems(api: &Api, v: &Value) -> Result<Value> {
     }
     if api.lock().project()?.length() == 0 {
         bail!(err("empty", "Add audio before splitting into stems"));
+    }
+    let engine = match os(v, "engine") {
+        Some(e) => e,
+        None => crate::smart::chosen(api, "stems")?,
+    };
+    if engine != "spectral" {
+        crate::smart::ready(api, "stems", &engine)?;
     }
     let a = api.clone();
     let vv = v.clone();
@@ -2541,8 +2630,12 @@ fn h_stems(api: &Api, v: &Value) -> Result<Value> {
             ctx.stage("Preparing", "done");
             ctx.stage("Separating", "active");
             let sr = sr(&a) as f32;
-            let res = tools::stems(&l, &r, sr, &mode, &mut |p| ctx.progress(0.05 + p * 0.8))
-                .ok_or_else(|| anyhow::anyhow!("cancelled"))?;
+            let res = if engine == "spectral" {
+                tools::stems(&l, &r, sr, &mode, &mut |p| ctx.progress(0.05 + p * 0.8))
+                    .ok_or_else(|| anyhow::anyhow!("cancelled"))?
+            } else {
+                neural_stems(&a, &engine, &l, &r, sr as u32, &mode, ctx)?
+            };
             ctx.stage("Separating", "done");
             ctx.stage("Saving stems", "active");
             let mut ids = vec![];
@@ -2570,7 +2663,7 @@ fn h_stems(api: &Api, v: &Value) -> Result<Value> {
                         json!({"name": name, "track": t, "clip": c, "media": mid, "lufs": level}),
                     );
                 }
-                Ok(json!({"stems": tracks, "method": "dsp-spectral-split"}))
+                Ok(json!({"stems": tracks, "method": if engine == "spectral" { "dsp-spectral-split".to_string() } else { format!("model:{engine}") }}))
             })?;
             Ok(out)
         },
@@ -2966,6 +3059,13 @@ fn h_tts_voices(_: &Api, _: &Value) -> Result<Value> {
 fn h_tts_speak(api: &Api, v: &Value) -> Result<Value> {
     let text = s_(v, "text")?;
     let voice = os(v, "voice").unwrap_or_default();
+    let engine = match os(v, "engine") {
+        Some(e) => e,
+        None => crate::smart::chosen(api, "tts")?,
+    };
+    if engine != "system" {
+        return tts_model(api, v, &engine, text, voice);
+    }
     let rate = v.get("rate").and_then(|x| x.as_i64()).unwrap_or(0) as i32;
     let sr = sr(api);
     let at = opos(v, "at", sr);
@@ -3002,6 +3102,126 @@ fn h_tts_speak(api: &Api, v: &Value) -> Result<Value> {
         },
     );
     Ok(json!({"job": job}))
+}
+
+fn tts_model(api: &Api, v: &Value, engine: &str, text: String, voice: String) -> Result<Value> {
+    let r = crate::smart::ready(api, "tts", engine)?;
+    let sr = sr(api);
+    let at = opos(v, "at", sr);
+    let (pid, dir) = {
+        let s = api.lock();
+        let p = s.project()?;
+        (p.id.clone(), s.store.media_dir(&p.id))
+    };
+    let a = api.clone();
+    let engine = engine.to_string();
+    let name = r.model.name.clone();
+    let job = api.jobs.spawn(
+        "tts",
+        "Generating speech",
+        &["Synthesizing", "Adding to project"],
+        move |ctx| {
+            ctx.stage("Synthesizing", "active");
+            std::fs::create_dir_all(&dir)?;
+            let id = format!("m{}", new_id());
+            let path = dir.join(format!("{id}.wav"));
+            let voice = (!voice.is_empty()).then_some(voice.as_str());
+            let res = crate::smart::speak(&a, &engine, &text, voice, &path, ctx)?;
+            crate::voicemodels::label_wav(
+                &path,
+                &format!("Synthetic speech made by Flux with {name}. Not a real person."),
+            )?;
+            ctx.stage("Synthesizing", "done");
+            ctx.stage("Adding to project", "active");
+            let short: String = text.chars().take(40).collect();
+            let mut out = add_generated(
+                &a,
+                Place {
+                    project: &pid,
+                    sr,
+                    at,
+                },
+                &id,
+                &path,
+                &short,
+                &name,
+            )?;
+            out["engine"] = json!(engine);
+            out["seconds"] = res["seconds"].clone();
+            Ok(out)
+        },
+    );
+    Ok(json!({"job": job}))
+}
+
+// ---------------------------------------------------------------- transcripts
+
+fn h_transcript_make(api: &Api, v: &Value) -> Result<Value> {
+    if api.lock().project()?.length() == 0 {
+        bail!(err("empty", "Add audio before making a transcript"));
+    }
+    let engine = match os(v, "engine") {
+        Some(e) => e,
+        None => crate::smart::chosen(api, "transcript")?,
+    };
+    crate::smart::ready(api, "transcript", &engine)?;
+    let language =
+        os(v, "language").or_else(|| crate::smart::option(api, "transcript", "language"));
+    let (pid, hash) = {
+        let s = api.lock();
+        let p = s.project()?;
+        (p.id.clone(), p.hash())
+    };
+    let a = api.clone();
+    let vv = v.clone();
+    let job = api.jobs.spawn(
+        "transcript",
+        "Making a transcript",
+        &["Preparing", "Listening", "Saving"],
+        move |ctx| {
+            ctx.stage("Preparing", "active");
+            let ((l, r), _) = source_of(&a, &vv)?;
+            let sr = sr(&a);
+            ctx.stage("Preparing", "done");
+            ctx.stage("Listening", "active");
+            let raw = crate::smart::transcribe(&a, &engine, &l, &r, sr, language.as_deref(), ctx)?;
+            ctx.stage("Listening", "done");
+            ctx.stage("Saving", "active");
+            let t = crate::smart::shape_transcript(&raw, sr, &engine, 0, hash);
+            crate::smart::save_transcript(&a, &pid, &t)?;
+            ctx.stage("Saving", "done");
+            Ok(json!({"words": t["words"].as_array().map(|w| w.len()).unwrap_or(0), "language": t["language"], "engine": engine}))
+        },
+    );
+    Ok(json!({"job": job}))
+}
+
+fn transcript_of(api: &Api) -> Result<(Value, bool)> {
+    let (pid, hash) = {
+        let s = api.lock();
+        let p = s.project()?;
+        (p.id.clone(), p.hash())
+    };
+    let t = crate::smart::load_transcript(api, &pid).ok_or_else(|| {
+        err(
+            "not_found",
+            "This project has no transcript yet. Make one with transcript.make (it runs on this computer).",
+        )
+    })?;
+    let stale = t["project_hash"].as_str() != Some(hash.to_string().as_str());
+    Ok((t, stale))
+}
+
+fn h_transcript_get(api: &Api, _: &Value) -> Result<Value> {
+    let (mut t, stale) = transcript_of(api)?;
+    t["stale"] = json!(stale);
+    Ok(t)
+}
+
+fn h_transcript_fillers(api: &Api, _: &Value) -> Result<Value> {
+    let (t, stale) = transcript_of(api)?;
+    let f = crate::smart::fillers(&t);
+    Ok(json!({"fillers": f, "count": f.len(), "stale": stale, "sample_rate": t["sample_rate"]}))
 }
 
 /// Which project generated speech goes into, at what sample rate, and where on the timeline (default: the playhead).
@@ -3669,6 +3889,10 @@ pub static METHODS: &[MethodSpec] = &[
     m!("methods", "List every Flux method with its parameters.", "", false, h_methods),
     m!("app.info", "Version, platform, data folder, export formats and what processing is available.", "", false, h_app_info),
     m!("app.capabilities", "What this computer supports: audio engine, buffers, folders, AAC, offline.", "", false, h_capabilities),
+    m!("ai.engines", "For stems, transcripts and text to speech: the built-in engine, every model Flux can download (tier, size, licence, how it fits this computer), the suggestion for this computer and why, and the current choice.", "role:string:stems, transcript or tts", false, crate::smart::h_engines),
+    m!("ai.engine.set", "Choose the engine for stems, transcripts or text to speech, and its voice or language.", "!role:string:stems, transcript or tts|engine:string:Engine id from ai.engines|voice:string:Text to speech voice|language:string:Transcript language code, or auto", false, crate::smart::h_engine_set),
+    m!("ai.model.download", "Download a smart tool model (and the engine it runs on, the first time). Needs confirm: true after the size, licence and folder are shown to the person. Job.", "!model:string:Model id from ai.engines|confirm:boolean:The person agreed|device_kind:string:Engine build: cuda, cpu or mps (default: what this computer has)|wait:boolean:Wait for the download to finish", false, crate::voicemodels::h_download),
+    m!("ai.model.delete", "Delete a downloaded smart tool model's files (files another model uses stay).", "!model:string:Model id from ai.engines", false, crate::voicemodels::h_delete),
     m!("ai.status", "Which smart features are available and how each works (DSP, system, or needs a model).", "", false, h_ai_status),
     m!("mcp.info", "How to connect an agent to Flux over MCP.", "", false, h_mcp_info),
     m!("live.status", "Live routes: what is running, levels, buffer, dropouts, and how this computer captures its own sound.", "", false, crate::live_presets::h_status),
@@ -3788,7 +4012,7 @@ pub static METHODS: &[MethodSpec] = &[
     m!("analysis.problems", "Noise floor, hum, clipping, clicks, DC, stereo, sibilance, rumble, reverberance.", "range:string:all, selection or loop|start:pos:Range start|end:pos:Range end", false, h_analysis_problems),
     m!("analysis.spectrum", "Average spectrum of the mix.", "range:string:all, selection or loop|start:pos:Range start|end:pos:Range end|bins:integer:Bands", false, h_analysis_spectrum),
     m!("analysis.spectrogram", "Spectrogram image data (base64 bytes, rows x cols, log frequency).", "media:string:Only this media|start:pos:Start|end:pos:End|cols:integer:Columns|rows:integer:Rows|window:integer:FFT size|range:string:all, selection or loop", false, h_analysis_spectrogram),
-    m!("tool.stems", "Split into stems (vocals, drums, bass, other). DSP spectral split, not a neural model. Job.", "mode:string:4 or 2 (vocals + instrumental)|track:integer:Only this track", true, h_stems),
+    m!("tool.stems", "Split into stems (vocals, drums, bass, other) with the chosen stems engine (ai.engines): the built-in split, which needs no download, or a downloaded model such as Demucs. Job.", "mode:string:4 or 2 (vocals + instrumental)|track:integer:Only this track|engine:string:Engine id from ai.engines (default: the chosen one)", true, h_stems),
     m!("tool.master.analyze", "Measure the mix and propose a mastering chain, without changing anything.", "style:string:balanced, warm, bright, loud or gentle|target:number:LUFS target|amount:number:0..1", false, h_master_analyze),
     m!("tool.master.apply", "Auto-master: add a measured EQ, compressor and limiter to the master.", "style:string:balanced, warm, bright, loud or gentle|target:number:LUFS target|amount:number:0..1", true, h_master_apply),
     m!("tool.magic.scan", "Find problems in the mix and propose fixes.", "", false, h_magic_scan),
@@ -3800,9 +4024,10 @@ pub static METHODS: &[MethodSpec] = &[
     m!("tool.match_eq", "Copy the tone of a reference recording with a graphic EQ.", "!path:string:Reference file|track:integer:Apply to this track (default master)", true, h_match_eq),
     m!("tool.reverse_swell", "Add a reverse reverb swell that rises into a clip.", "!clip:integer:Clip id|beats:number:Swell length in beats", true, h_reverse_swell),
     m!("tts.voices", "Speech voices installed on this computer.", "", false, h_tts_voices),
-    m!("tts.speak", "Generate speech with a system voice onto a new track, labelled synthetic. Job.", "!text:string:What to say|voice:string:Voice id from tts.voices|rate:integer:-10 slow to 10 fast|at:pos:Timeline position", true, h_tts_speak),
-    m!("transcript.get", "Transcript of the project (needs a speech model; not in this build).", "", false, h_unavailable_transcript),
-    m!("transcript.fillers", "Find filler words (needs a transcript; not in this build).", "", false, h_unavailable_transcript),
+    m!("tts.speak", "Generate speech onto a new track, labelled synthetic, with the chosen text to speech engine (ai.engines): a system voice or a downloaded model. Job.", "!text:string:What to say|voice:string:A system voice id from tts.voices, or a model voice from ai.engines|rate:integer:-10 slow to 10 fast (system voices)|engine:string:Engine id from ai.engines (default: the chosen one)|at:pos:Timeline position", true, h_tts_speak),
+    m!("transcript.make", "Transcribe the project (or one track) on this computer with the chosen transcript model: words with exact sample positions, saved with the project. Job.", "track:integer:Only this track|engine:string:Model id from ai.engines|language:string:Language code, or auto", true, h_transcript_make),
+    m!("transcript.get", "The project's transcript: text, segments and every word with its sample position, the model that made it, and whether the project changed since (stale).", "", false, h_transcript_get),
+    m!("transcript.fillers", "Filler words (um, uh, ...) and repeated words in the transcript, with sample positions.", "", false, h_transcript_fillers),
     m!("dub.start", "Translate and dub (needs speech and translation models; not in this build).", "language:string:Target language", false, h_unavailable_dub),
     m!("clone.status", "Voice cloning on this computer: its hardware, the local model Flux picks for it and why, whether it is ready, and the consent statement.", "", false, crate::voiceclone::h_status),
     m!("clone.models", "Every voice cloning model Flux can download or use (permissive licences only): role (speech or convert), exact size, licence, source, languages, whether it performs [laugh] and other sounds, how it fits this computer, its generation settings, and whether it is downloaded or downloading. Also the voice engine, the hardware, the pick for this computer, the current settings and the models folder.", "", false, crate::voiceclone::h_models),

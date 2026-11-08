@@ -15,6 +15,7 @@ pub mod methods;
 pub mod project;
 pub mod render;
 pub mod server;
+pub mod smart;
 pub mod store;
 pub mod tools;
 pub mod voiceclone;

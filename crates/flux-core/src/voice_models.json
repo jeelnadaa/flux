@@ -8,6 +8,26 @@
   "base": {
    "repo": "ResembleAI/chatterbox",
    "rev": "5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18"
+  },
+  "whisper-base": {
+   "repo": "Systran/faster-whisper-base",
+   "rev": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+  },
+  "whisper-small": {
+   "repo": "Systran/faster-whisper-small",
+   "rev": "536b0662742c02347bc0e980a01041f333bce120"
+  },
+  "whisper-turbo": {
+   "repo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+   "rev": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+  },
+  "kokoro": {
+   "repo": "hexgrad/Kokoro-82M",
+   "rev": "f3ff3571791e39611d31c381e3a41a3af07b4987"
+  },
+  "demucs": {
+   "repo": "facebookresearch/demucs",
+   "rev": "ef66d254cd6d558e207eeff2c4b8d053db2e77dd"
   }
  },
  "models": [
@@ -364,6 +384,448 @@
     }
    ],
    "params": []
+  },
+  {
+   "id": "whisper-base",
+   "name": "Whisper Base",
+   "role": "transcript",
+   "loader": "whisper",
+   "repo": "whisper-base",
+   "licence": "MIT",
+   "tier": "light",
+   "languages": [],
+   "sounds": false,
+   "min_vram_gb": 1.0,
+   "min_ram_gb": 2.0,
+   "note": "The lightest transcriber: quick on any computer, rougher on names and noisy audio. Writes what was said, with a time for every word, in 99 languages (or finds the language itself). Runs offline.",
+   "files": [
+    {
+     "path": "config.json",
+     "size": 2309,
+     "sha256": "56a6d8110d311f19c8f0471e562832c7527f146b567275bfca59fcf7c184da9a"
+    },
+    {
+     "path": "model.bin",
+     "size": 145217532,
+     "sha256": "d01c3014881c9c6f3133c182f3d2887eb6ca1c789a7538c5c007196857a0a6a9"
+    },
+    {
+     "path": "tokenizer.json",
+     "size": 2203239,
+     "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+    },
+    {
+     "path": "vocabulary.txt",
+     "size": 459861,
+     "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Whisper",
+     "args": [
+      "--no-deps",
+      "faster-whisper==1.2.1"
+     ]
+    },
+    {
+     "name": "Installing CTranslate2",
+     "args": [
+      "ctranslate2==4.8.5",
+      "onnxruntime==1.31.1"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "whisper-small",
+   "name": "Whisper Small",
+   "role": "transcript",
+   "loader": "whisper",
+   "repo": "whisper-small",
+   "licence": "MIT",
+   "tier": "balanced",
+   "languages": [],
+   "sounds": false,
+   "min_vram_gb": 2.0,
+   "min_ram_gb": 4.0,
+   "note": "A good balance: clearly better than Base, still fine on a processor. Writes what was said, with a time for every word, in 99 languages (or finds the language itself). Runs offline.",
+   "files": [
+    {
+     "path": "config.json",
+     "size": 2370,
+     "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828"
+    },
+    {
+     "path": "model.bin",
+     "size": 483546902,
+     "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671"
+    },
+    {
+     "path": "tokenizer.json",
+     "size": 2203239,
+     "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+    },
+    {
+     "path": "vocabulary.txt",
+     "size": 459861,
+     "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Whisper",
+     "args": [
+      "--no-deps",
+      "faster-whisper==1.2.1"
+     ]
+    },
+    {
+     "name": "Installing CTranslate2",
+     "args": [
+      "ctranslate2==4.8.5",
+      "onnxruntime==1.31.1"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "whisper-large-v3-turbo",
+   "name": "Whisper Large v3 Turbo",
+   "role": "transcript",
+   "loader": "whisper",
+   "repo": "whisper-turbo",
+   "licence": "MIT",
+   "tier": "best",
+   "languages": [],
+   "sounds": false,
+   "min_vram_gb": 3.0,
+   "min_ram_gb": 8.0,
+   "note": "The most accurate: best on names, accents and noise. Fast on an NVIDIA graphics chip, slow on a processor. Writes what was said, with a time for every word, in 99 languages (or finds the language itself). Runs offline.",
+   "files": [
+    {
+     "path": "config.json",
+     "size": 2263,
+     "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e"
+    },
+    {
+     "path": "model.bin",
+     "size": 1617884929,
+     "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da"
+    },
+    {
+     "path": "preprocessor_config.json",
+     "size": 340,
+     "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
+    },
+    {
+     "path": "tokenizer.json",
+     "size": 2710337,
+     "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd"
+    },
+    {
+     "path": "vocabulary.json",
+     "size": 1068114,
+     "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Whisper",
+     "args": [
+      "--no-deps",
+      "faster-whisper==1.2.1"
+     ]
+    },
+    {
+     "name": "Installing CTranslate2",
+     "args": [
+      "ctranslate2==4.8.5",
+      "onnxruntime==1.31.1"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "demucs",
+   "name": "Demucs",
+   "role": "stems",
+   "loader": "demucs",
+   "repo": "demucs",
+   "licence": "MIT",
+   "tier": "balanced",
+   "languages": [],
+   "sounds": false,
+   "min_vram_gb": 2.0,
+   "min_ram_gb": 4.0,
+   "note": "A neural model trained on music: vocals, drums, bass and other, with far less bleed than the built-in split. About real time on a processor, much faster on an NVIDIA chip.",
+   "files": [
+    {
+     "path": "htdemucs.yaml",
+     "size": 21,
+     "sha256": "239c445d0b14454d541ad8bd9bb271c9e536d267e8a4625208744cbb2e7bb66c",
+     "url": "https://raw.githubusercontent.com/facebookresearch/demucs/ef66d254cd6d558e207eeff2c4b8d053db2e77dd/demucs/remote/htdemucs.yaml"
+    },
+    {
+     "path": "955717e8-8726e21a.th",
+     "size": 84141911,
+     "sha256": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4",
+     "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Demucs",
+     "args": [
+      "--no-deps",
+      "demucs==4.0.1"
+     ]
+    },
+    {
+     "name": "Installing Demucs support",
+     "args": [
+      "dora-search==0.1.13",
+      "einops==0.8.2",
+      "julius==0.2.8",
+      "openunmix==1.3.0"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "demucs-ft",
+   "name": "Demucs Fine-tuned",
+   "role": "stems",
+   "loader": "demucs",
+   "repo": "demucs",
+   "licence": "MIT",
+   "tier": "best",
+   "languages": [],
+   "sounds": false,
+   "min_vram_gb": 3.0,
+   "min_ram_gb": 8.0,
+   "note": "Four specialised Demucs models, one per stem: the cleanest split Flux offers, and about four times slower than Demucs.",
+   "files": [
+    {
+     "path": "htdemucs_ft.yaml",
+     "size": 149,
+     "sha256": "69470b8c1bbd674437b51bc9fb491327a10ab0396b702c93389b9cf750016346",
+     "url": "https://raw.githubusercontent.com/facebookresearch/demucs/ef66d254cd6d558e207eeff2c4b8d053db2e77dd/demucs/remote/htdemucs_ft.yaml"
+    },
+    {
+     "path": "f7e0c4bc-ba3fe64a.th",
+     "size": 84141271,
+     "sha256": "ba3fe64ae8ef66ac9a4857222ce48efbdc5eb3ad375cb79dd13debee5aaa4066",
+     "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/f7e0c4bc-ba3fe64a.th"
+    },
+    {
+     "path": "d12395a8-e57c48e6.th",
+     "size": 84141271,
+     "sha256": "e57c48e6b0e38af4f7118d7bd08c49f0a0c0edf7d09143bdd902ea0d237303e6",
+     "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/d12395a8-e57c48e6.th"
+    },
+    {
+     "path": "92cfc3b6-ef3bcb9c.th",
+     "size": 84141271,
+     "sha256": "ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b77c0be151ce6d69002e087bf2",
+     "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/92cfc3b6-ef3bcb9c.th"
+    },
+    {
+     "path": "04573f0d-f3cf25b2.th",
+     "size": 84141271,
+     "sha256": "f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49",
+     "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Demucs",
+     "args": [
+      "--no-deps",
+      "demucs==4.0.1"
+     ]
+    },
+    {
+     "name": "Installing Demucs support",
+     "args": [
+      "dora-search==0.1.13",
+      "einops==0.8.2",
+      "julius==0.2.8",
+      "openunmix==1.3.0"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "demucs-6s",
+   "name": "Demucs 6 stems",
+   "role": "stems",
+   "loader": "demucs",
+   "repo": "demucs",
+   "licence": "MIT",
+   "tier": "extra",
+   "languages": [],
+   "sounds": false,
+   "min_vram_gb": 2.0,
+   "min_ram_gb": 4.0,
+   "note": "Adds guitar and piano to vocals, drums, bass and other. Guitar and piano are rougher than the other four.",
+   "files": [
+    {
+     "path": "htdemucs_6s.yaml",
+     "size": 21,
+     "sha256": "207405151270af8fd81c2373c25d27950916682ac91dca7884a11ce13dad6f58",
+     "url": "https://raw.githubusercontent.com/facebookresearch/demucs/ef66d254cd6d558e207eeff2c4b8d053db2e77dd/demucs/remote/htdemucs_6s.yaml"
+    },
+    {
+     "path": "5c90dfd2-34c22ccb.th",
+     "size": 54996327,
+     "sha256": "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd",
+     "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Demucs",
+     "args": [
+      "--no-deps",
+      "demucs==4.0.1"
+     ]
+    },
+    {
+     "name": "Installing Demucs support",
+     "args": [
+      "dora-search==0.1.13",
+      "einops==0.8.2",
+      "julius==0.2.8",
+      "openunmix==1.3.0"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "kokoro",
+   "name": "Kokoro",
+   "role": "tts",
+   "loader": "kokoro",
+   "repo": "kokoro",
+   "licence": "Apache-2.0",
+   "tier": "light",
+   "languages": [
+    "en-us",
+    "en-gb"
+   ],
+   "language_names": {
+    "en-us": "English (American)",
+    "en-gb": "English (British)"
+   },
+   "sounds": false,
+   "min_vram_gb": 0.5,
+   "min_ram_gb": 2.0,
+   "note": "Small and natural-sounding: faster than real time on a processor. 6 synthetic voices, American and British English. Words it has never seen are spelled out.",
+   "voices": [
+    {
+     "id": "af_heart",
+     "name": "Heart",
+     "language": "en-us"
+    },
+    {
+     "id": "af_bella",
+     "name": "Bella",
+     "language": "en-us"
+    },
+    {
+     "id": "am_michael",
+     "name": "Michael",
+     "language": "en-us"
+    },
+    {
+     "id": "am_fenrir",
+     "name": "Fenrir",
+     "language": "en-us"
+    },
+    {
+     "id": "bf_emma",
+     "name": "Emma",
+     "language": "en-gb"
+    },
+    {
+     "id": "bm_george",
+     "name": "George",
+     "language": "en-gb"
+    }
+   ],
+   "params": [
+    {
+     "key": "speed",
+     "label": "Speed",
+     "min": 0.5,
+     "max": 2.0,
+     "step": 0.05,
+     "default": 1.0,
+     "tip": "How fast the voice speaks. 1 is normal."
+    }
+   ],
+   "files": [
+    {
+     "path": "config.json",
+     "size": 2351,
+     "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f"
+    },
+    {
+     "path": "kokoro-v1_0.pth",
+     "size": 327212226,
+     "sha256": "496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4"
+    },
+    {
+     "path": "voices/af_heart.pt",
+     "size": 523425,
+     "sha256": "0ab5709b8ffab19bfd849cd11d98f75b60af7733253ad0d67b12382a102cb4ff"
+    },
+    {
+     "path": "voices/af_bella.pt",
+     "size": 523425,
+     "sha256": "8cb64e02fcc8de0327a8e13817e49c76c945ecf0052ceac97d3081480e8e48d6"
+    },
+    {
+     "path": "voices/am_michael.pt",
+     "size": 523435,
+     "sha256": "9a443b79a4b22489a5b0ab7c651a0bcd1a30bef675c28333f06971abbd47bd37"
+    },
+    {
+     "path": "voices/am_fenrir.pt",
+     "size": 523430,
+     "sha256": "98e507eca1db08230ae3b6232d59c10aec9630022d19accac4f5d12fcec3c37a"
+    },
+    {
+     "path": "voices/bf_emma.pt",
+     "size": 523420,
+     "sha256": "d0a423deabf4a52b4f49318c51742c54e21bb89bbbe9a12141e7758ddb5da701"
+    },
+    {
+     "path": "voices/bm_george.pt",
+     "size": 523430,
+     "sha256": "f1bc812213dc59774769e5c80004b13eeb79bd78130b11b2d7f934542dab811b"
+    }
+   ],
+   "install": [
+    {
+     "name": "Installing Kokoro",
+     "args": [
+      "--no-deps",
+      "kokoro==0.9.4",
+      "misaki==0.9.4"
+     ]
+    },
+    {
+     "name": "Installing the text reader",
+     "args": [
+      "loguru==0.7.3",
+      "addict==2.4.0",
+      "spacy==3.8.18",
+      "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"
+     ]
+    }
+   ]
   }
  ],
  "runtime": {
