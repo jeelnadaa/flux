@@ -36,7 +36,7 @@ AI agents can drive every feature.
   asks, then puts the preset back. Built-ins play 3 LU below their input by default. Every control has a tooltip.
 - **Tooltips.** Every control in the app explains itself on hover or keyboard focus (2784 controls on 92 screens,
   checked by the end-to-end test).
-- **Command API.** 173 methods in one registry, shared by the UI, the MCP server and the tests.
+- **Command API.** 176 methods in one registry, shared by the UI, the MCP server and the tests.
 - **MCP server (`crates/flux-mcp`).** Every method is an MCP tool over stdio. It drives the running app through a
   token-protected localhost port, or runs headless when the app is closed. See [docs/MCP.md](docs/MCP.md).
 
@@ -71,8 +71,14 @@ AI agents can drive every feature.
   synthetic in the WAV. All MIT or Apache-2.0; each model installs only the packages it needs, once, and runs on
   this computer. Choose with `ai.engine.set`; see ADR 0005.
 
-Not available yet: dubbing (`dub.start` returns `unavailable`). Cloud engines and the Smart tools picker in
-Settings are next.
+- **Online engines, only when you choose them.** Free ones with no key: Whisper Large v3 (text only), Kokoro (6
+  voices) and a vocal/instrumental split, all public Hugging Face Spaces that can be slow or busy. With your key:
+  Whisper on Groq or OpenAI and Deepgram Nova-3 (with word timing), OpenAI speech and ElevenLabs, and Demucs on
+  Replicate. Flux never suggests them; choosing one asks first and says what is sent where. Keys come from an
+  environment variable (`OPENAI_API_KEY` and the like) or the system keychain, and are never shown, logged or saved
+  in Flux's files. The OpenAI engines also work with any OpenAI-compatible server. See ADR 0006.
+
+Not available yet: dubbing (`dub.start` returns `unavailable`). The Smart tools picker in Settings is next.
 
 ## Build and test
 
@@ -94,7 +100,9 @@ npm run test:site
 
 ## Privacy
 
-Everything runs on your computer. Flux never uploads audio, transcripts or file names. Diagnostics never include them.
+Everything runs on your computer unless you turn on an online engine for a job; then only that job's audio or
+text goes to the service you chose. Flux never logs audio, transcripts, keys or file names, and diagnostics never
+include them.
 
 ## Licence
 

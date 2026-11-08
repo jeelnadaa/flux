@@ -26,7 +26,9 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 cpal = { version = "0.18", optional = true }
 # Model downloads (voice cloning): HTTPS with the same TLS stack the app's updater uses, checksums, free space,
 # and unpacking the portable Python archive.
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider", "system-proxy"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider", "system-proxy", "json", "multipart"] }
+# Cloud engine keys live in the system keychain (Credential Manager, Keychain, Secret Service).
+keyring = "4.2"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 sha2 = "0.10"
 fs4 = "0.13"

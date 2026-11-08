@@ -139,6 +139,7 @@ fn engine_ids(c: &Catalog, role: &str) -> Vec<String> {
         .map(|b| b["id"].as_str().unwrap_or("").to_string())
         .into_iter()
         .chain(models_for(c, role).into_iter().map(|m| m.id))
+        .chain(crate::cloud::for_role(role).map(|e| e.id.to_string()))
         .collect()
 }
 
@@ -207,6 +208,7 @@ pub fn h_engines(api: &Api, v: &Value) -> Result<Value> {
                 .iter()
                 .map(|m| engine_json(api, &c, &root, m, h)),
         );
+        engines.extend(crate::cloud::for_role(role).map(|e| crate::cloud::engine_json(api, e)));
         for e in &mut engines {
             e["suggested"] = json!(e["id"] == sug.as_str());
             e["chosen"] = json!(e["id"] == choice.as_str());
@@ -219,8 +221,13 @@ pub fn h_engines(api: &Api, v: &Value) -> Result<Value> {
     let rt = vm::runtime_ready(&root, &c);
     let kind = vm::torch_kind(h);
     let approx = c.runtime.approx_mb.get(kind).copied().unwrap_or(1000) * 1_000_000;
+    let providers: Vec<Value> = crate::cloud::PROVIDERS
+        .iter()
+        .map(|p| json!({"id": p.id, "name": p.name, "key_needed": p.key_needed, "key": crate::cloud::key_source(api, p),
+            "key_env": p.env, "keys_at": p.keys_at, "base_url": s.cloud_base.get(p.id), "default_url": p.base}))
+        .collect();
     Ok(json!({
-        "roles": roles, "hardware": h, "folder": root.display().to_string(),
+        "roles": roles, "hardware": h, "folder": root.display().to_string(), "providers": providers,
         "runtime": {"name": c.runtime.name, "installed": rt.is_some(), "approx_text": format!("about {}", vm::gb(approx))},
     }))
 }
@@ -232,6 +239,12 @@ pub fn h_engine_set(api: &Api, v: &Value) -> Result<Value> {
         bail!(err("bad_params", "`role` is stems, transcript or tts."));
     }
     let c = vm::catalog(api)?;
+    if let Some(e) = v["engine"].as_str().filter(|e| crate::cloud::is_cloud(e)) {
+        if crate::cloud::engine(e).map(|x| x.role) == Some(role) {
+            // Online engines only with the person's yes to what is sent and where.
+            crate::cloud::check_allowed(api, e, v["allow_cloud"].as_bool() == Some(true))?;
+        }
+    }
     let mut s = vm::settings(api);
     if let Some(e) = v["engine"].as_str() {
         let ids = engine_ids(&c, role);
@@ -477,7 +490,7 @@ pub fn speak(
 }
 
 /// Text in pieces of at most about `max` characters, split at sentence ends.
-fn sentences(text: &str, max: usize) -> Vec<String> {
+pub(crate) fn sentences(text: &str, max: usize) -> Vec<String> {
     let mut out: Vec<String> = vec![];
     let mut cur = String::new();
     for word in text.split_whitespace() {

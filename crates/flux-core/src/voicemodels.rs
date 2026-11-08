@@ -334,6 +334,15 @@ pub fn torch_kind(h: &crate::voiceclone::Hardware) -> &'static str {
 // ---------------------------------------------------------------- downloading
 
 fn client() -> Result<reqwest::blocking::Client> {
+    build_client(None)
+}
+
+/// An HTTPS client for cloud engines, with an overall time limit per request.
+pub(crate) fn http_client(timeout: std::time::Duration) -> Result<reqwest::blocking::Client> {
+    build_client(Some(timeout))
+}
+
+fn build_client(timeout: Option<std::time::Duration>) -> Result<reqwest::blocking::Client> {
     static INIT: OnceLock<()> = OnceLock::new();
     INIT.get_or_init(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
@@ -341,7 +350,7 @@ fn client() -> Result<reqwest::blocking::Client> {
     Ok(reqwest::blocking::Client::builder()
         .user_agent(concat!("Flux/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(std::time::Duration::from_secs(20))
-        .timeout(None)
+        .timeout(timeout)
         .build()?)
 }
 
@@ -834,6 +843,15 @@ pub struct Settings {
     /// Per job: the chosen voice (text to speech) or language (transcripts).
     #[serde(default)]
     pub options: BTreeMap<String, BTreeMap<String, String>>,
+    /// Cloud engines the person said yes to (what is sent, and where, was shown first).
+    #[serde(default)]
+    pub cloud_ok: std::collections::BTreeSet<String>,
+    /// Services whose key Flux keeps in the system keychain. The key itself is never in this file.
+    #[serde(default)]
+    pub cloud_keys: std::collections::BTreeSet<String>,
+    /// A service's address when it isn't the default (an OpenAI-compatible server, a mirror).
+    #[serde(default)]
+    pub cloud_base: BTreeMap<String, String>,
 }
 
 impl Default for Settings {
@@ -848,6 +866,9 @@ impl Default for Settings {
             local: vec![],
             engines: BTreeMap::new(),
             options: BTreeMap::new(),
+            cloud_ok: Default::default(),
+            cloud_keys: Default::default(),
+            cloud_base: BTreeMap::new(),
         }
     }
 }

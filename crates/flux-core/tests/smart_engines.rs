@@ -330,11 +330,21 @@ fn engines_are_listed_suggested_and_chosen() {
         engine(&e, "tts", "t-kokoro")["voices"][1]["id"],
         "bm_george"
     );
-    // Only the transcript model is offered for transcripts; voice cloning's list keeps to its own models.
-    assert_eq!(
-        role(&e, "transcript")["engines"].as_array().unwrap().len(),
-        1
-    );
+    // Only the transcript model is offered on this computer for transcripts (online ones are listed too, apart);
+    // voice cloning's list keeps to its own models.
+    let local: Vec<&Value> = role(&e, "transcript")["engines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["kind"] != "cloud")
+        .collect();
+    assert_eq!(local.len(), 1);
+    assert!(role(&e, "transcript")["engines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["kind"] == "cloud")
+        .all(|x| x["suggested"] == false && x["chosen"] == false));
     let clone = call(a, "clone.models", json!({}));
     assert!(clone["models"].as_array().unwrap().iter().all(|m| ![
         "t-whisper",

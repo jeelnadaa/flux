@@ -108,6 +108,20 @@ ai_engine_set {role: "tts", engine: "kokoro", voice: "bf_emma"}
 tts_speak {text: "Welcome back.", wait: true}             # labelled synthetic
 ```
 
+Online engines are listed in `ai_engines` too (`kind: "cloud"`), with `sends` (what would leave the computer),
+`free`, and the key's state (`env:NAME`, `keychain` or `missing`). They are never chosen for the person: say what
+`sends` says, ask, and only then pass `allow_cloud: true`. Keys are the person's to give; Flux never shows them back.
+
+```text
+ai_engine_set {role: "transcript", engine: "cloud-free-whisper", allow_cloud: true}   # free, text only
+ai_cloud_key_set {provider: "deepgram", key: "..."}                                    # kept in the keychain
+ai_engine_set {role: "transcript", engine: "cloud-deepgram", allow_cloud: true}
+ai_cloud_set {provider: "openai", base_url: "http://127.0.0.1:8080/v1"}                # an OpenAI-compatible server
+```
+
+`consent_required`: not turned on yet. `needs_key`: no key, or the service refused it. `busy`: rate limit or a busy
+free demo. `offline`: no connection.
+
 ## Privacy
 
 Flux never uploads audio. Diagnostics (`system_diagnostics`) contain no audio, transcripts or file names.

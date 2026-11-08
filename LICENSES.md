@@ -57,6 +57,7 @@ scanner covers the full tree.
 | `tauri` 2, `tauri-build` 2 | Desktop shell: native window and webview | MIT OR Apache-2.0 | Allowed |
 | `tauri-plugin-dialog`, `-opener`, `-updater`, `-process` 2 | File dialogs, reveal and links, signed auto-update, restart | MIT OR Apache-2.0 | Allowed |
 | `reqwest` 0.13 (rustls, no default features) | Voice model downloads over HTTPS, with resume | MIT OR Apache-2.0 | Allowed |
+| `keyring` 4.2 (with its Windows, Apple and zbus Secret Service stores) | Keeps online-service keys in the system keychain | MIT OR Apache-2.0 | Allowed |
 | `rustls` 0.23 (`ring` provider) | TLS for model downloads | Apache-2.0 OR ISC OR MIT (`ring`: Apache-2.0 AND ISC) | Allowed |
 | `sha2` 0.10 | Checking every downloaded file's SHA-256 | MIT OR Apache-2.0 | Allowed |
 | `fs4` 0.13 | Free disk space before a download | MIT OR Apache-2.0 | Allowed |
@@ -96,6 +97,11 @@ Model code and trained weights have distinct licenses and must be audited separa
 | OpenVoice V2 (MyShell) | Was the light fallback | MIT | Dropped: its MeloTTS front end needs a second runtime; Chatterbox runs on a processor instead (ADR 0003) |
 | Dia (Nari Labs) | Not used | Its README limits use to research and education | Rejected |
 | Coqui XTTS | Not used | Coqui Public Model Licence (non-commercial) | Rejected |
+
+**Online engines (ADR 0006):** off unless the person turns one on. They are services, not code or weights Flux
+ships: OpenAI, Groq, Deepgram, ElevenLabs and Replicate under the person's own account and terms, and three public
+Hugging Face Spaces (Whisper Large v3, MIT weights; Kokoro, Apache-2.0 weights; a vocal split) under each Space's
+terms.
 
 **Voice engine (downloaded on the user's computer when they first download a model; not shipped in the installer):**
 

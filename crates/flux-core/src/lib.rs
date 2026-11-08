@@ -3,6 +3,7 @@
 
 pub mod analysis;
 pub mod api;
+pub mod cloud;
 pub mod device;
 pub mod dsp;
 pub mod export;
