@@ -104,6 +104,8 @@ def main():
             assert foot, "Check again stays on screen in a tall guide"
             here = api(s.port, "live.virtual")["platform"]
             assert "Not installed." in dlg or here == "linux", dlg
+            assert "signed" not in dlg.lower() and "another company" not in dlg, "the guide only says how to use a cable"
+            assert "own_driver" not in api(s.port, "live.virtual")
             page.screenshot(path=str(OUT / "virtual-cable-guide-1440.png"))
             for os_key, want in [("windows", "Run as administrator"), ("macos", "brew install blackhole-2ch"), ("linux", "sudo apt install pulseaudio-utils")]:
                 page.click(f'[data-lact="vos"][data-os="{os_key}"]')

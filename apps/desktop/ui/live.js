@@ -170,9 +170,7 @@
       ${st}${u.vmsg ? cal('info', esc(u.vmsg)) : ''}
       <p class="dim" style="margin:0">${g.what}</p>
       <div class="lst box" data-lv="guide-steps">${g.steps.map((s, i) => `<div style="align-items:flex-start"><span class="act mono">${i + 1}</span><div class="ti" style="flex:1;min-width:0"><b>${s[0]}</b><span class="col" style="white-space:normal;gap:8px">${s[1]}</span></div></div>`).join('')}</div>
-      <span class="dim" style="font-size:12.5px">${g.extra}</span>
-      ${os === 'linux' ? '' : cal('lock', '<b>Made by another company.</b> Flux doesn\'t install it for you. Installing adds a sound driver and asks for your administrator password.')}
-      ${sec('Why Flux doesn\'t include its own', '<span class="dim">Windows and macOS only accept new sound devices from a driver that the maker has signed with a paid, verified developer identity. Flux doesn\'t have one yet, so it uses a cable you install. Linux doesn\'t need this.</span>')}`,
+      <span class="dim" style="font-size:12.5px">${g.extra}</span>`,
       `${btn('Done', { k: 'g', x: `data-lact="vdone"${tip('Back to Live.')}` })}${btn('Check again', { k: 'p', i: 'check', x: `data-lact="vcheck"${tip('Looks for a virtual cable on this computer again.')}` })}`, { wide: true, cls: 'stickfoot' });
   });
   function fluxDevices() {

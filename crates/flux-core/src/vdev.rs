@@ -7,7 +7,7 @@
 //! - Linux: Flux makes both itself with PipeWire or PulseAudio (`pactl`, no root): a null sink "Flux speaker",
 //!   and a null sink "Flux microphone feed" whose monitor is remapped as the source "Flux microphone". While the
 //!   computer-sound route runs, Flux makes the Flux speaker the system output and puts the old one back after.
-//! - Windows and macOS: a device of Flux's own needs a signed audio driver (see ADR 0007), so Flux uses a virtual
+//! - Windows and macOS: Flux uses an existing virtual
 //!   audio cable the person installed: apps play into one side, and the other side records it.
 //!
 //! Detection works on device names only, so it is tested with plain lists on every OS.
@@ -108,7 +108,7 @@ pub fn detect(outputs: &[Dev], inputs: &[Dev]) -> Found {
             label: label.into(),
         })
     };
-    // Linux: "Flux speaker" and "Monitor of Flux speaker"; a driver of Flux's own: the same name on both sides.
+    // Linux: "Flux speaker" and its monitor, "Monitor of Flux speaker".
     let speaker = own("flux speaker", &|n| n.contains("flux speaker"), SPEAKER);
     // Linux: "Flux microphone feed" plays into the source "Flux microphone".
     let mic = own(
@@ -407,7 +407,6 @@ pub fn summary(f: &Found) -> Value {
         "mic": pair_json(&f.mic),
         "shared": f.shared,
         "can_create": create,
-        "own_driver": false,
         "status": state(f, create),
         "install": install(platform()),
         "note": note(f, create, platform()),
@@ -424,7 +423,7 @@ pub fn h_setup(api: &Api, v: &Value) -> Result<Value> {
     if !can_create() {
         bail!(err(
             "unavailable",
-            "Flux can't add audio devices on this computer by itself: that needs a signed audio driver. Install a virtual audio cable and Flux uses it as the Flux speaker and microphone.",
+            "On this computer the Flux speaker and microphone use a virtual audio cable. Install one and Flux finds it (live.virtual says where to get one).",
         ));
     }
     let made = create()?;

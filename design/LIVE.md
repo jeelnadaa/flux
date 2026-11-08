@@ -107,7 +107,6 @@ screenshots `target/e2e/flux-devices-*.png`).
 **Virtual cable guide** (`live-cable`) is a kit `dlg wide` over Live, with the editor's sticky foot (`stickfoot`). A row
 of `chip`s picks the OS (this computer first selected), then a `callout warn` "Not installed" or a `callout check` with
 what was found, a dim line on what it is, a `lst box` of numbered steps (`act mono` number, `ti` with the title in bold,
-links as `btn` with `globe`, commands in mono with a ghost Copy), a dim line on one cable and removal, a `callout lock`
-that it's made by another company, and a `sec` on why Flux has no driver of its own. Foot: ghost Done, primary Check
+links as `btn` with `globe`, commands in mono with a ghost Copy), and a dim line on one cable and removal. Foot: ghost Done, primary Check
 again. When nothing is installed, the panel shows `pill warn` "Not installed" and each route card a dim line with a
 ghost How to install. **Checked:** 1440, 820 and 390 px for each OS (`virtual-cable-guide-*.png`).
