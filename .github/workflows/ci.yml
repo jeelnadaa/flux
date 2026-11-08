@@ -87,9 +87,11 @@ jobs:
           python -m pip install playwright==1.64.0
           python -m playwright install --with-deps chromium
       - name: UI end-to-end (real engine, null audio device)
+        # The key tests use the real system keychain. A build machine has none running, so start one for this step.
         run: |
+          sudo apt-get install -y gnome-keyring dbus
           cargo build -p flux-mcp --release
-          npm run -s test:ui
+          dbus-run-session -- bash -c 'echo -n ci-only | gnome-keyring-daemon --unlock > /dev/null; npm run -s test:ui'
       - name: Screenshots
         if: always()
         uses: actions/upload-artifact@v4

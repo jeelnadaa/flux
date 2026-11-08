@@ -205,7 +205,11 @@ def main():
             page.fill('[role="dialog"] [data-sin="key"]', "e2e-not-a-real-key")
             page.screenshot(path=str(OUT / "smart-key-dialog-1440.png"))
             page.press('[role="dialog"] [data-sin="key"]', "Enter")
-            page.wait_for_selector('[data-sact="use"][data-id="cloud-groq-whisper"][aria-pressed="true"]')
+            try:
+                page.wait_for_selector('[data-sact="use"][data-id="cloud-groq-whisper"][aria-pressed="true"]')
+            except Exception:
+                print(page.inner_text("body")[:1500])
+                raise
             assert "Key in the system keychain" in page.inner_text("#stage")
             assert "e2e-not-a-real-key" not in (tmp / "data" / "settings.json").read_text() if (tmp / "data" / "settings.json").exists() else True
             for p in (tmp / "data").rglob("*.json"):
