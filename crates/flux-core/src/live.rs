@@ -1951,8 +1951,9 @@ pub fn start(o: StartOpts, p: &LivePreset) -> Result<Runner> {
                 if null_out {
                     let sr = out_sr_pref;
                     let mut cb = mk(sr, ring_rx, rx, gtx);
-                    let _ = ready_tx.send(Ok(("none".into(), "Nowhere (silent)".into(), sr)));
+                    // Alive before ready: `live.start` reports the route's state the moment it's told.
                     m2.alive.store(true, Relaxed);
+                    let _ = ready_tx.send(Ok(("none".into(), "Nowhere (silent)".into(), sr)));
                     let n = (sr / 100) as usize;
                     let mut buf = vec![0f32; n * 2];
                     let mut next = Instant::now();
