@@ -341,6 +341,36 @@ def main():
             page.wait_for_selector('[data-act-change="tts-engine"]')
             ok("with no speech voices, the picker names the engine and the page says what's missing")
 
+            # A model with no list of voices reads in its own, and isn't reported as a computer with no voices.
+            def as_model(installed):
+                def handler(route):
+                    if json.loads(route.request.post_data or "{}").get("method") != "ai.engines":
+                        route.continue_()
+                        return
+                    r = route.fetch()
+                    d = r.json()
+                    tts = next(x for x in d["result"]["roles"] if x["role"] == "tts")
+                    tts["engines"] = [dict(e, chosen=e["id"] == "t-kokoro", **({"installed": installed, "voices": []} if e["id"] == "t-kokoro" else {})) for e in tts["engines"]]
+                    route.fulfill(response=r, json=d)
+                return handler
+
+            for installed, want in ((True, "reads in its own built-in voice"), (False, "isn't downloaded yet")):
+                handler = as_model(installed)
+                page.route("**/api/call", handler)
+                page.goto("about:blank")
+                page.goto(f"http://127.0.0.1:{port}/#tts")
+                page.wait_for_selector(f'text={want}')
+                assert "No speech voices were found" not in page.inner_text("#stage")
+                page.fill('[data-ui="ttsText"]', "Read this.")
+                page.evaluate("Flux.rr()")
+                page.wait_for_timeout(300)
+                assert page.is_disabled('[data-act="tts-speak"]') == (not installed), installed
+                page.unroute("**/api/call", handler)
+            page.goto("about:blank")
+            page.goto(f"http://127.0.0.1:{port}/#tts")
+            page.wait_for_selector('[data-act-change="tts-engine"]')
+            ok("a model with no voice list says it reads in its own voice; one not downloaded says so and can't speak")
+
             # 8. Every width: no sideways scroll; every control has a name and a tooltip.
             for w, h in [(1440, 900), (820, 1100), (390, 844)]:
                 page.set_viewport_size({"width": w, "height": h})

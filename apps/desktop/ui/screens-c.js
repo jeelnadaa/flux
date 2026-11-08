@@ -118,7 +118,10 @@
     const installed = ttsRole().engines.filter(e => e.kind === 'cloud' ? e.allowed && e.installed : e.installed);
     // The picker always names the engine in use, even on a computer with no voices and nothing else to choose.
     const usable = installed.some(e => e.id === en.id) ? installed : [en, ...installed];
-    const ready = sys ? vs.length : true;
+    const missing = en.kind === 'local' && !en.installed;
+    const ready = sys ? vs.length : !missing;
+    // A model with no list of voices reads in its own; only the system engine can really have none.
+    const noList = sys ? cal('warn', 'No speech voices were found on this computer. Install one in your system settings, or choose another engine.', 'warn') : cal('info', `${esc(en.name)} reads in its own built-in voice. To have it speak in a voice you recorded, choose Use your own voice below.`);
     const where = en.kind === 'cloud' ? cal('globe', `<b>Runs online with ${esc(en.provider_name || en.name)}.</b> ${esc(en.sends || '')}`, 'warn') : '';
     return pr('aitools', `<div class="split"><div class="a"><div class="pg in" style="max-width:none"><h1 class="h1">Write it. Hear it.</h1>
     <textarea class="inp" rows="9" aria-label="Script" placeholder="Type what you want said." data-ui="ttsText" style="font-size:18px;font-weight:500">${esc(text)}</textarea>
@@ -126,7 +129,7 @@
     <div class="row">${btn('Add to timeline', { k: 'p', lg: 1, i: 'plus', x: 'data-act="tts-speak"' + (ready && text.trim() ? '' : ' disabled') })}</div>
     ${where}${cal('tag', 'Generated speech is labeled as synthetic in the track name and in exported file tags.')}</div></div>
     <aside class="b in">${sec('Engine', `${fld('Speaks with', sel(usable.map(e => [e.id, esc(e.name)]), en.id, 'data-act-change="tts-engine" aria-label="Speaks with" data-tip="Which engine reads the text. Download models or turn on online ones in Settings, Smart tools."'))}<a class="dim" href="#prefs-models" data-go="prefs-models">More engines</a>`)}
-    ${sec('Voice', vs.length ? `<div class="lst">${vs.map(r => `<div><div class="ti"><b>${esc(r.name.replace(/^Microsoft /, '').replace(/ Desktop$/, ''))}</b><span>${esc(r.language || '')}${r.language ? ' · ' : ''}${esc(r.engine || 'System')}</span></div>${r.id === cur ? pill('Selected', 'ai') : btn('Use', { k: 'g', x: sys ? `data-act="ui-set" data-k="ttsVoice" data-v="${esc(r.id)}"` : `data-act="tts-mvoice" data-v="${esc(r.id)}"` })}</div>`).join('')}</div>` : cal('warn', 'No speech voices were found on this computer. Install one in your system settings, or choose another engine.', 'warn'))}${sys ? sl('Rate', (rate + 10) / 20 * 100, (rate >= 0 ? '+' : '') + F.minus(String(rate)), { bind: 'ui:ttsRate:-10:10:int' }) : ''}${sec('Run on', pill(en.kind === 'cloud' ? esc(en.provider_name || 'Online') : 'This computer', en.kind === 'cloud' ? 'warn' : 'ok'))}<a class="dim" href="#clone" data-go="clone">Use your own voice</a></aside></div>`);
+    ${sec('Voice', missing ? cal('warn', `${esc(en.name)} isn't downloaded yet. Get it under More engines.`, 'warn') : vs.length ? `<div class="lst">${vs.map(r => `<div><div class="ti"><b>${esc(r.name.replace(/^Microsoft /, '').replace(/ Desktop$/, ''))}</b><span>${esc(r.language || '')}${r.language ? ' · ' : ''}${esc(r.engine || 'System')}</span></div>${r.id === cur ? pill('Selected', 'ai') : btn('Use', { k: 'g', x: sys ? `data-act="ui-set" data-k="ttsVoice" data-v="${esc(r.id)}"` : `data-act="tts-mvoice" data-v="${esc(r.id)}"` })}</div>`).join('')}</div>` : noList)}${sys ? sl('Rate', (rate + 10) / 20 * 100, (rate >= 0 ? '+' : '') + F.minus(String(rate)), { bind: 'ui:ttsRate:-10:10:int' }) : ''}${sec('Run on', pill(en.kind === 'cloud' ? esc(en.provider_name || 'Online') : 'This computer', en.kind === 'cloud' ? 'warn' : 'ok'))}<a class="dim" href="#clone" data-go="clone">Use your own voice</a></aside></div>`);
   });;
 
   /* ---------- Output ---------- */
