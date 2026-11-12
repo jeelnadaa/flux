@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Flux records and processes sound from the microphone you choose.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Flux captures your computer's sound when you use Live on it.</string>
+</dict>
+</plist>

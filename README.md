@@ -66,6 +66,11 @@ AI agents can drive every feature.
   GitHub release in the visitor's browser and offers the right installer for their computer. `npm run build:static`
   writes `dist-static/` for Cloudflare Pages, with a content security policy.
 
+- **Installing on a Mac.** The app is signed (ad hoc, not yet notarized), so macOS no longer calls it damaged. The
+  first time, it says it can't check Flux: open System Settings, Privacy & Security and click Open Anyway. Flux asks
+  before using the microphone or the computer's sound. On Linux, the AppImage needs FUSE (libfuse2); the .deb and .rpm
+  don't.
+
 - **Listen first, then keep it.** Generate speech with or without a project open. The result waits for you with a player: add it to the assets of the open project, another project (which stays closed) or a new one, or throw it away. Nothing lands on a timeline until you put it there.
 - **Assets.** Every project keeps its audio, on the timeline or not. Add files, listen, put them on the timeline at the playhead or remove them, from the Assets page or the Edit panel. All of it can be undone.
 - **Tags in any script.** [laugh], [hmm] and [pause 2s] work in Text to speech as well as voice cloning. An engine that can't perform a sound leaves it out and says so; it's never read aloud.

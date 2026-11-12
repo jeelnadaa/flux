@@ -171,6 +171,32 @@ jobs:
           # A download that fails the first time usually works a moment later; compiled code is reused.
           retryAttempts: 3
 
+      # macOS says an app is "damaged" when its bundle isn't signed as a whole. The config signs it ad hoc ("-");
+      # this fails the build, and so removes the draft, if the seal is missing or broken.
+      - name: Check the Mac app is signed
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          app="target/${{ matrix.target }}/release/bundle/macos/Flux.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E 'Signature=adhoc|Authority='
+          codesign -d --entitlements - "$app" 2>&1 | grep -q 'com.apple.security.device.audio-input'
+          for bin in "$app"/Contents/MacOS/*; do codesign --verify --strict "$bin"; done
+          dmg=$(ls target/${{ matrix.target }}/release/bundle/dmg/*.dmg)
+          hdiutil verify "$dmg"
+
+      - name: Check the Linux packages open
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          b="target/${{ matrix.target }}/release/bundle"
+          img=$(ls "$b"/appimage/*.AppImage)
+          test -x "$img"
+          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/$img" --appimage-extract > /dev/null)
+          test -x "$RUNNER_TEMP/squashfs-root/AppRun"
+          dpkg-deb --info "$b"/deb/*.deb | grep -E 'Package|Depends'
+          if command -v rpm > /dev/null; then rpm -qip "$b"/rpm/*.rpm | grep -E '^Name'; else test -s "$(ls "$b"/rpm/*.rpm)"; fi
+
       - name: Upload the MCP server on its own
         shell: bash
         env:

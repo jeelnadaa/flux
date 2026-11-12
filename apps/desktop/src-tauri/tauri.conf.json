@@ -45,7 +45,10 @@
       "nsis": { "installMode": "currentUser" }
     },
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "Entitlements.plist"
     },
     "linux": {
       "deb": { "depends": [] }
